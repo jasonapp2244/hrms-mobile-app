@@ -35,6 +35,7 @@
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Department</span><span>{{ $employee->department->name ?? '—' }}</span></li>
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Designation</span><span>{{ $employee->designation->name ?? '—' }}</span></li>
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Office</span><span>{{ $employee->office->name ?? '—' }}</span></li>
+        <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Shift</span><span>{{ $employee->shift ? $employee->shift->name . ' (' . $employee->shift->timing . ')' : '—' }}</span></li>
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Hire Date</span><span>{{ $employee->hire_date?->format('m/d/Y') ?? '—' }}</span></li>
       </ul>
     </div>

@@ -95,7 +95,12 @@
 							<a href="{{ route('designations.index') }}"><i class="ti ti-badge"></i><span>Designations</span></a>
 						</li>
 						@endcan
-						@canany(['manage-company', 'manage-offices'])
+						@can('manage-shifts')
+							<li class="{{ request()->routeIs('shifts.*') ? 'active' : '' }}">
+								<a href="{{ route('shifts.index') }}"><i class="ti ti-clock-hour-4"></i><span>Shifts &amp; Schedule</span></a>
+							</li>
+							@endcan
+							@canany(['manage-company', 'manage-offices'])
 						<li class="submenu {{ request()->routeIs('company.*') || request()->routeIs('offices.*') ? 'active' : '' }}">
 							<a href="javascript:void(0);" class="{{ request()->routeIs('company.*') || request()->routeIs('offices.*') ? 'subdrop' : '' }}">
 								<i class="ti ti-building-community"></i><span>Company</span><span class="menu-arrow"></span>
@@ -136,8 +141,7 @@
 				<li>
 					<ul>
 						<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-calendar-off"></i><span>Leave Management</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
-						<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-clock-hour-4"></i><span>Shift &amp; Schedule</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
-						<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-robot"></i><span>AI Assistant</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
+												<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-robot"></i><span>AI Assistant</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
 					</ul>
 				</li>
 			</ul>

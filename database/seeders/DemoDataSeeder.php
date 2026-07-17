@@ -83,6 +83,20 @@ class DemoDataSeeder extends Seeder
             );
         }
 
+        // Shifts
+        $shiftData = [
+            ['name' => 'Morning Shift', 'code' => 'MOR', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'color' => '#e8622e'],
+            ['name' => 'Evening Shift', 'code' => 'EVE', 'start_time' => '13:00:00', 'end_time' => '21:00:00', 'color' => '#2b8fbe'],
+            ['name' => 'Night Shift',   'code' => 'NGT', 'start_time' => '22:00:00', 'end_time' => '06:00:00', 'color' => '#7b4bd8'],
+        ];
+        $shifts = [];
+        foreach ($shiftData as $sd) {
+            $shifts[] = \App\Models\Shift::firstOrCreate(
+                ['company_id' => $company->id, 'name' => $sd['name']],
+                $sd + ['break_minutes' => 60, 'late_grace_minutes' => 15, 'is_active' => true]
+            );
+        }
+
         // Sample employees
         $sampleEmployees = [
             ['James', 'Smith', 'james.smith@acme.test', 'male'],
@@ -110,6 +124,7 @@ class DemoDataSeeder extends Seeder
                     'company_id' => $company->id,
                     'user_id' => $empUser->id,
                     'office_id' => $i % 2 === 0 ? $head->id : $branch->id,
+                    'shift_id' => $shifts[$i % count($shifts)]->id,
                     'department_id' => $departments[$i % count($departments)]->id,
                     'designation_id' => $designations[$i % count($designations)]->id,
                     'first_name' => $first,

@@ -13,6 +13,7 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\ShiftController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Guest / Auth ----
@@ -85,6 +86,9 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     // Departments / Designations
     Route::resource('departments', DepartmentController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-departments');
     Route::resource('designations', DesignationController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-designations');
+
+    // Shifts & Schedule
+    Route::resource('shifts', ShiftController::class)->only(['index', 'store', 'update', 'destroy'])->middleware('permission:manage-shifts');
 
     // Company / Offices (admin only — HR lacks these permissions)
     Route::middleware('permission:manage-company')->group(function () {
