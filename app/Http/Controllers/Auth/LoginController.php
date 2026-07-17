@@ -12,7 +12,7 @@ class LoginController extends Controller
     public function show()
     {
         if (Auth::check()) {
-            return redirect()->route('dashboard');
+            return redirect()->route(Auth::user()->homeRoute());
         }
         return view('auth.login');
     }
@@ -32,13 +32,12 @@ class LoginController extends Controller
 
         $user = Auth::user();
 
-        // Web dashboard login is for staff roles (admin + HR).
-        // Employee access is delivered through the mobile app phase, so employee-only
-        // accounts cannot sign in to the dashboard.
-        if (! $user->hasAnyRole(['admin', 'hr'])) {
+        // Only known roles may sign in: admin/HR reach the dashboard, employees
+        // reach the self-service portal. Any other account is rejected.
+        if (! $user->hasAnyRole(['admin', 'hr', 'employee'])) {
             Auth::logout();
             throw ValidationException::withMessages([
-                'email' => 'This account is not permitted to access the dashboard.',
+                'email' => 'This account is not permitted to sign in.',
             ]);
         }
 
@@ -51,7 +50,11 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        // Employees always land on their own portal; staff use intended() so deep
+        // links still work after a session timeout.
+        return $user->homeRoute() === 'employee.dashboard'
+            ? redirect()->route('employee.dashboard')
+            : redirect()->intended(route('dashboard'));
     }
 
     public function logout(Request $request)

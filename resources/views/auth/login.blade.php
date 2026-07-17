@@ -103,6 +103,7 @@
 												<div class="fw-semibold text-dark mb-1"><i class="ti ti-info-circle me-1"></i>Demo credentials</div>
 												<div class="text-muted"><b>Admin:</b> admin@hrms.test / password</div>
 												<div class="text-muted"><b>HR:</b> hr@hrms.test / password</div>
+												<div class="text-muted"><b>Employee:</b> james.smith@acme.test / password</div>
 											</div>
 										</div>
 

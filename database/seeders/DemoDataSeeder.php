@@ -92,10 +92,23 @@ class DemoDataSeeder extends Seeder
             ['David', 'Wilson', 'david.wilson@acme.test', 'male'],
         ];
         foreach ($sampleEmployees as $i => [$first, $last, $email, $gender]) {
+            // Employee self-service login account (employee role).
+            $empUser = User::firstOrCreate(
+                ['email' => $email],
+                [
+                    'name' => trim("$first $last"),
+                    'password' => Hash::make('password'),
+                    'company_id' => $company->id,
+                    'is_active' => true,
+                ]
+            );
+            $empUser->assignRole('employee');
+
             Employee::firstOrCreate(
                 ['employee_code' => 'EMP-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT)],
                 [
                     'company_id' => $company->id,
+                    'user_id' => $empUser->id,
                     'office_id' => $i % 2 === 0 ? $head->id : $branch->id,
                     'department_id' => $departments[$i % count($departments)]->id,
                     'designation_id' => $designations[$i % count($designations)]->id,

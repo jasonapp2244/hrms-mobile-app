@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeePortalController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
@@ -21,7 +22,20 @@ Route::middleware('guest')->group(function () {
 });
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
-Route::get('/', fn () => redirect()->route('dashboard'));
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route(auth()->user()->homeRoute());
+    }
+    return redirect()->route('login');
+});
+
+// ---- Employee self-service portal (employee role only) ----
+// A locked-down area: employees can check in/out and view their own attendance,
+// and nothing else in the application.
+Route::middleware(['auth', 'role:employee'])->prefix('employee')->name('employee.')->group(function () {
+    Route::get('dashboard', [EmployeePortalController::class, 'dashboard'])->name('dashboard');
+    Route::post('scan', [EmployeePortalController::class, 'scan'])->name('scan');
+});
 
 // ---- Full-screen kiosk display (unattended tablet) ----
 // Permanent signed URLs — no login required, cannot be enumerated/forged.
@@ -32,8 +46,10 @@ Route::middleware('signed')->group(function () {
         ->name('attendance.kiosk.display.qr');
 });
 
-// ---- Authenticated (admin-only in Phase 1) ----
-Route::middleware('auth')->group(function () {
+// ---- Staff dashboard (admin + HR only) ----
+// Locked to staff roles so an employee-role account can never reach the admin
+// app or any company-wide data, even where it shares a permission.
+Route::middleware(['auth', 'role:admin|hr'])->group(function () {
 
     Route::get('dashboard', [DashboardController::class, 'index'])
         ->middleware('permission:view-dashboard')->name('dashboard');

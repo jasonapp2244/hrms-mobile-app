@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
@@ -33,6 +34,20 @@ class User extends Authenticatable
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /** The employee record this user account belongs to (for employee-role logins). */
+    public function employee(): HasOne
+    {
+        return $this->hasOne(Employee::class);
+    }
+
+    /** Route name of the home page this user should land on, based on role. */
+    public function homeRoute(): string
+    {
+        return $this->hasRole('employee') && ! $this->hasAnyRole(['admin', 'hr'])
+            ? 'employee.dashboard'
+            : 'dashboard';
     }
 
     /**
