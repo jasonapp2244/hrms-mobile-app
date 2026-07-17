@@ -20,10 +20,10 @@ class DemoDataSeeder extends Seeder
             ['name' => 'Acme Corporation'],
             [
                 'email' => 'info@acme.test',
-                'phone' => '+92 300 1234567',
-                'city' => 'Karachi',
-                'country' => 'Pakistan',
-                'timezone' => 'Asia/Karachi',
+                'phone' => '+1 (212) 555-0100',
+                'city' => 'New York',
+                'country' => 'United States',
+                'timezone' => 'America/New_York',
                 'is_active' => true,
             ]
         );
@@ -55,11 +55,11 @@ class DemoDataSeeder extends Seeder
         // Offices (each gets an auto-generated rotating-QR secret)
         $head = Office::firstOrCreate(
             ['company_id' => $company->id, 'name' => 'Head Office'],
-            ['code' => 'HO', 'city' => 'Karachi', 'work_start_time' => '09:00:00', 'work_end_time' => '17:00:00', 'late_grace_minutes' => 15]
+            ['code' => 'HO', 'city' => 'New York', 'work_start_time' => '09:00:00', 'work_end_time' => '17:00:00', 'late_grace_minutes' => 15]
         );
         $branch = Office::firstOrCreate(
-            ['company_id' => $company->id, 'name' => 'Lahore Branch'],
-            ['code' => 'LHR', 'city' => 'Lahore', 'work_start_time' => '09:30:00', 'work_end_time' => '17:30:00', 'late_grace_minutes' => 10]
+            ['company_id' => $company->id, 'name' => 'Los Angeles Branch'],
+            ['code' => 'LA', 'city' => 'Los Angeles', 'work_start_time' => '09:30:00', 'work_end_time' => '17:30:00', 'late_grace_minutes' => 10]
         );
 
         // Departments
@@ -84,11 +84,11 @@ class DemoDataSeeder extends Seeder
 
         // Sample employees
         $sampleEmployees = [
-            ['Ali', 'Khan', 'ali.khan@acme.test', 'male'],
-            ['Sara', 'Ahmed', 'sara.ahmed@acme.test', 'female'],
-            ['Bilal', 'Hussain', 'bilal.hussain@acme.test', 'male'],
-            ['Ayesha', 'Malik', 'ayesha.malik@acme.test', 'female'],
-            ['Usman', 'Raza', 'usman.raza@acme.test', 'male'],
+            ['James', 'Smith', 'james.smith@acme.test', 'male'],
+            ['Emily', 'Johnson', 'emily.johnson@acme.test', 'female'],
+            ['Michael', 'Brown', 'michael.brown@acme.test', 'male'],
+            ['Jessica', 'Davis', 'jessica.davis@acme.test', 'female'],
+            ['David', 'Wilson', 'david.wilson@acme.test', 'male'],
         ];
         foreach ($sampleEmployees as $i => [$first, $last, $email, $gender]) {
             Employee::firstOrCreate(

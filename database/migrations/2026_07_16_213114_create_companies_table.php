@@ -21,7 +21,7 @@ return new class extends Migration
             $table->text('address')->nullable();
             $table->string('city')->nullable();
             $table->string('country')->nullable();
-            $table->string('timezone')->default('Asia/Karachi');
+            $table->string('timezone')->default('America/New_York');
             $table->json('settings')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
