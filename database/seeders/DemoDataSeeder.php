@@ -24,6 +24,7 @@ class DemoDataSeeder extends Seeder
                 'city' => 'New York',
                 'country' => 'United States',
                 'timezone' => 'America/New_York',
+                'currency' => 'USD',
                 'is_active' => true,
             ]
         );

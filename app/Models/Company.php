@@ -9,7 +9,7 @@ class Company extends Model
 {
     protected $fillable = [
         'name', 'email', 'phone', 'website', 'logo', 'address',
-        'city', 'country', 'timezone', 'settings', 'is_active',
+        'city', 'country', 'timezone', 'currency', 'settings', 'is_active',
     ];
 
     protected $casts = [

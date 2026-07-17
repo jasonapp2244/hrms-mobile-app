@@ -22,6 +22,7 @@ return new class extends Migration
             $table->string('city')->nullable();
             $table->string('country')->nullable();
             $table->string('timezone')->default('America/New_York');
+            $table->string('currency', 8)->default('USD');
             $table->json('settings')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();

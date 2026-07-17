@@ -55,6 +55,15 @@
           <label class="form-label">Timezone <span class="text-danger">*</span></label>
           <input type="text" name="timezone" class="form-control" value="{{ old('timezone', $company->timezone) }}" required>
         </div>
+        <div class="col-md-6">
+          <label class="form-label">Currency <span class="text-danger">*</span></label>
+          @php $selectedCurrency = old('currency', $company->currency ?? 'USD'); @endphp
+          <select name="currency" class="form-select" required>
+            @foreach(['USD' => 'US Dollar ($)', 'EUR' => 'Euro (€)', 'GBP' => 'British Pound (£)', 'CAD' => 'Canadian Dollar (C$)', 'AUD' => 'Australian Dollar (A$)'] as $code => $label)
+              <option value="{{ $code }}" @selected($selectedCurrency === $code)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
       </div>
       <div class="mt-4">
         <button type="submit" class="btn btn-primary">Save Company</button>
