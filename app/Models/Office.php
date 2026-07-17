@@ -11,8 +11,7 @@ class Office extends Model
 {
     protected $fillable = [
         'company_id', 'name', 'code', 'address', 'city',
-        'latitude', 'longitude', 'geofence_radius', 'qr_secret',
-        'work_start_time', 'work_end_time', 'late_grace_minutes', 'is_active',
+        'latitude', 'longitude', 'geofence_radius', 'qr_secret', 'is_active',
     ];
 
     protected $casts = [

@@ -148,7 +148,6 @@ class EmployeeController extends Controller
             'offices'      => Office::where('company_id', $companyId)->get(),
             'departments'  => Department::where('company_id', $companyId)->get(),
             'designations' => Designation::where('company_id', $companyId)->get(),
-            'shifts'       => \App\Models\Shift::where('company_id', $companyId)->where('is_active', true)->get(),
         ];
     }
 
@@ -163,7 +162,6 @@ class EmployeeController extends Controller
             'office_id'      => 'nullable|exists:offices,id',
             'department_id'  => 'nullable|exists:departments,id',
             'designation_id' => 'nullable|exists:designations,id',
-            'shift_id'       => 'nullable|exists:shifts,id',
             'gender'         => 'nullable|in:male,female,other',
             'date_of_birth'  => 'nullable|date',
             'hire_date'      => 'nullable|date',

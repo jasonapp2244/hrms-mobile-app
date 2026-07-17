@@ -15,7 +15,7 @@ class ShiftController extends Controller
 
     public function index()
     {
-        $shifts = Shift::withCount('employees')
+        $shifts = Shift::withCount(['departments', 'employees'])
             ->where('company_id', $this->companyId())
             ->orderBy('start_time')
             ->paginate(15);

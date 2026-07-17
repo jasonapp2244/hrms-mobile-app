@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Shift extends Model
 {
@@ -22,9 +23,16 @@ class Shift extends Model
         return $this->belongsTo(Company::class);
     }
 
-    public function employees(): HasMany
+    /** Departments assigned to this shift. */
+    public function departments(): HasMany
     {
-        return $this->hasMany(Employee::class);
+        return $this->hasMany(Department::class);
+    }
+
+    /** Employees on this shift — reached through their department. */
+    public function employees(): HasManyThrough
+    {
+        return $this->hasManyThrough(Employee::class, Department::class);
     }
 
     /** "09:00 - 17:00" for display. */

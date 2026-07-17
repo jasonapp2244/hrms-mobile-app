@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\Office;
+use App\Models\Shift;
 use Illuminate\Http\Request;
 
 class DepartmentController extends Controller
@@ -15,11 +16,13 @@ class DepartmentController extends Controller
 
     public function index()
     {
-        $departments = Department::withCount('employees')
+        $departments = Department::withCount('employees')->with('shift')
             ->where('company_id', $this->companyId())
             ->latest()->paginate(15);
 
-        return view('departments.index', compact('departments'));
+        $shifts = Shift::where('company_id', $this->companyId())->where('is_active', true)->get();
+
+        return view('departments.index', compact('departments', 'shifts'));
     }
 
     public function store(Request $request)
@@ -27,6 +30,7 @@ class DepartmentController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:150',
             'code' => 'nullable|string|max:50',
+            'shift_id' => 'nullable|exists:shifts,id',
             'description' => 'nullable|string',
         ]);
         $data['company_id'] = $this->companyId();
@@ -41,6 +45,7 @@ class DepartmentController extends Controller
         $data = $request->validate([
             'name' => 'required|string|max:150',
             'code' => 'nullable|string|max:50',
+            'shift_id' => 'nullable|exists:shifts,id',
             'description' => 'nullable|string',
             'is_active' => 'nullable|boolean',
         ]);

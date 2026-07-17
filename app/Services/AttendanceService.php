@@ -31,7 +31,7 @@ class AttendanceService
 
         $type = ($lastToday && $lastToday->type === 'in') ? 'out' : 'in';
 
-        $status = $this->determineStatus($type, $now, $office);
+        $status = $this->determineStatus($type, $now, $employee);
 
         $log = AttendanceLog::create([
             'employee_id' => $employee->id,
@@ -62,19 +62,27 @@ class AttendanceService
     }
 
     /**
-     * On a clock-in, compare to the office work-start (+ grace) to flag lateness.
-     * On a clock-out, compare to work-end to flag early leave.
+     * Status is measured against the employee's shift (inherited from their
+     * department). On a clock-in, compare to shift start (+ grace) for lateness;
+     * on a clock-out, compare to shift end for early leave. Falls back to a
+     * sensible 09:00–17:00 / 15-min default when no shift is assigned.
      */
-    protected function determineStatus(string $type, Carbon $now, Office $office): string
+    protected function determineStatus(string $type, Carbon $now, Employee $employee): string
     {
+        $shift = $employee->shift; // inherited from department
+
+        $startTime = $shift->start_time ?? '09:00:00';
+        $endTime   = $shift->end_time ?? '17:00:00';
+        $grace     = (int) ($shift->late_grace_minutes ?? 15);
+
         if ($type === 'in') {
-            $start = Carbon::parse($now->toDateString() . ' ' . $office->work_start_time, $now->timezone)
-                ->addMinutes((int) $office->late_grace_minutes);
+            $start = Carbon::parse($now->toDateString() . ' ' . $startTime, $now->timezone)
+                ->addMinutes($grace);
             return $now->greaterThan($start) ? 'late' : 'ontime';
         }
 
         // type === 'out'
-        $end = Carbon::parse($now->toDateString() . ' ' . $office->work_end_time, $now->timezone);
+        $end = Carbon::parse($now->toDateString() . ' ' . $endTime, $now->timezone);
         return $now->lessThan($end) ? 'early_leave' : 'ontime';
     }
 

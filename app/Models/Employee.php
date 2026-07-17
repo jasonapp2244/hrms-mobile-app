@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Employee extends Model
 {
     protected $fillable = [
-        'company_id', 'office_id', 'department_id', 'designation_id', 'shift_id', 'user_id',
+        'company_id', 'office_id', 'department_id', 'designation_id', 'user_id',
         'employee_code', 'first_name', 'last_name', 'email', 'phone', 'avatar',
         'date_of_birth', 'gender', 'hire_date', 'status',
     ];
@@ -44,9 +44,10 @@ class Employee extends Model
         return $this->belongsTo(Designation::class);
     }
 
-    public function shift(): BelongsTo
+    /** An employee's working shift is inherited from their department. */
+    public function getShiftAttribute(): ?Shift
     {
-        return $this->belongsTo(Shift::class);
+        return $this->department?->shift;
     }
 
     public function user(): BelongsTo

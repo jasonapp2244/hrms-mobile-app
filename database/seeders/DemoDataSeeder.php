@@ -53,37 +53,17 @@ class DemoDataSeeder extends Seeder
         );
         $hr->assignRole('hr');
 
-        // Offices (each gets an auto-generated rotating-QR secret)
+        // Offices (location only; each gets an auto-generated rotating-QR secret)
         $head = Office::firstOrCreate(
             ['company_id' => $company->id, 'name' => 'Head Office'],
-            ['code' => 'HO', 'city' => 'New York', 'work_start_time' => '09:00:00', 'work_end_time' => '17:00:00', 'late_grace_minutes' => 15]
+            ['code' => 'HO', 'city' => 'New York']
         );
         $branch = Office::firstOrCreate(
             ['company_id' => $company->id, 'name' => 'Los Angeles Branch'],
-            ['code' => 'LA', 'city' => 'Los Angeles', 'work_start_time' => '09:30:00', 'work_end_time' => '17:30:00', 'late_grace_minutes' => 10]
+            ['code' => 'LA', 'city' => 'Los Angeles']
         );
 
-        // Departments
-        $deptData = ['Engineering', 'Human Resources', 'Sales', 'Finance'];
-        $departments = [];
-        foreach ($deptData as $i => $name) {
-            $departments[] = Department::firstOrCreate(
-                ['company_id' => $company->id, 'name' => $name],
-                ['code' => strtoupper(substr($name, 0, 3)), 'is_active' => true]
-            );
-        }
-
-        // Designations
-        $desigData = ['Software Engineer', 'HR Executive', 'Sales Manager', 'Accountant'];
-        $designations = [];
-        foreach ($desigData as $i => $name) {
-            $designations[] = Designation::firstOrCreate(
-                ['company_id' => $company->id, 'name' => $name],
-                ['department_id' => $departments[$i]->id, 'is_active' => true]
-            );
-        }
-
-        // Shifts
+        // Shifts (working time lives here; assigned to departments below)
         $shiftData = [
             ['name' => 'Morning Shift', 'code' => 'MOR', 'start_time' => '09:00:00', 'end_time' => '17:00:00', 'color' => '#e8622e'],
             ['name' => 'Evening Shift', 'code' => 'EVE', 'start_time' => '13:00:00', 'end_time' => '21:00:00', 'color' => '#2b8fbe'],
@@ -94,6 +74,31 @@ class DemoDataSeeder extends Seeder
             $shifts[] = \App\Models\Shift::firstOrCreate(
                 ['company_id' => $company->id, 'name' => $sd['name']],
                 $sd + ['break_minutes' => 60, 'late_grace_minutes' => 15, 'is_active' => true]
+            );
+        }
+
+        // Departments (each assigned a shift that sets its working hours)
+        $deptData = [
+            ['Engineering', 0],      // Morning
+            ['Human Resources', 0],  // Morning
+            ['Sales', 1],            // Evening
+            ['Finance', 0],          // Morning
+        ];
+        $departments = [];
+        foreach ($deptData as $i => [$name, $shiftIdx]) {
+            $departments[] = Department::firstOrCreate(
+                ['company_id' => $company->id, 'name' => $name],
+                ['code' => strtoupper(substr($name, 0, 3)), 'shift_id' => $shifts[$shiftIdx]->id, 'is_active' => true]
+            );
+        }
+
+        // Designations
+        $desigData = ['Software Engineer', 'HR Executive', 'Sales Manager', 'Accountant'];
+        $designations = [];
+        foreach ($desigData as $i => $name) {
+            $designations[] = Designation::firstOrCreate(
+                ['company_id' => $company->id, 'name' => $name],
+                ['department_id' => $departments[$i]->id, 'is_active' => true]
             );
         }
 
@@ -124,7 +129,6 @@ class DemoDataSeeder extends Seeder
                     'company_id' => $company->id,
                     'user_id' => $empUser->id,
                     'office_id' => $i % 2 === 0 ? $head->id : $branch->id,
-                    'shift_id' => $shifts[$i % count($shifts)]->id,
                     'department_id' => $departments[$i % count($departments)]->id,
                     'designation_id' => $designations[$i % count($designations)]->id,
                     'first_name' => $first,

@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Department extends Model
 {
     protected $fillable = [
-        'company_id', 'name', 'code', 'description', 'is_active',
+        'company_id', 'name', 'code', 'shift_id', 'description', 'is_active',
     ];
 
     protected $casts = [
@@ -19,6 +19,11 @@ class Department extends Model
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
     }
 
     public function designations(): HasMany

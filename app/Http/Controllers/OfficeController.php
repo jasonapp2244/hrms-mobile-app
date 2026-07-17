@@ -62,9 +62,6 @@ class OfficeController extends Controller
             'code' => 'nullable|string|max:50',
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
-            'work_start_time' => 'required|date_format:H:i',
-            'work_end_time' => 'required|date_format:H:i',
-            'late_grace_minutes' => 'required|integer|min:0|max:120',
             'is_active' => 'nullable|boolean',
         ]);
     }

@@ -32,6 +32,7 @@
             <th>Timing</th>
             <th>Break</th>
             <th>Grace</th>
+            <th>Departments</th>
             <th>Employees</th>
             <th>Status</th>
             <th class="text-end">Actions</th>
@@ -48,6 +49,7 @@
             <td>{{ $s->timing }}</td>
             <td>{{ $s->break_minutes }} min</td>
             <td>{{ $s->late_grace_minutes }} min</td>
+            <td><span class="badge bg-light text-dark">{{ $s->departments_count }}</span></td>
             <td><span class="badge bg-light text-dark">{{ $s->employees_count }}</span></td>
             <td>
               @if($s->is_active)
@@ -58,7 +60,7 @@
             </td>
             <td class="text-end">
               <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ $s->id }}"><i class="ti ti-edit"></i></button>
-              <form action="{{ route('shifts.destroy', $s) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this shift? Employees on it will be unassigned.');">
+              <form action="{{ route('shifts.destroy', $s) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this shift? Departments on it will be unassigned.');">
                 @csrf
                 @method('DELETE')
                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="ti ti-trash"></i></button>
@@ -129,7 +131,7 @@
             </div>
           </div>
           @empty
-          <tr><td colspan="8" class="text-center">No shifts yet. Add your first shift to get started.</td></tr>
+          <tr><td colspan="9" class="text-center">No shifts yet. Add your first shift to get started.</td></tr>
           @endforelse
         </tbody>
       </table>

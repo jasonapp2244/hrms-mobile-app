@@ -27,7 +27,7 @@
           <tr>
             <th>Name</th>
             <th>Code</th>
-            <th>Description</th>
+            <th>Shift</th>
             <th>Employees</th>
             <th>Status</th>
             <th class="text-end">Actions</th>
@@ -38,7 +38,14 @@
           <tr>
             <td>{{ $d->name }}</td>
             <td>{{ $d->code ?? '—' }}</td>
-            <td>{{ $d->description ?? '—' }}</td>
+            <td>
+              @if($d->shift)
+                <span class="d-inline-block me-1" style="width:9px;height:9px;border-radius:50%;background:{{ $d->shift->color }}"></span>
+                {{ $d->shift->name }} <small class="text-muted">({{ $d->shift->timing }})</small>
+              @else
+                <span class="text-muted">—</span>
+              @endif
+            </td>
             <td><span class="badge bg-light text-dark">{{ $d->employees_count }}</span></td>
             <td>
               @if($d->is_active)
@@ -76,6 +83,15 @@
                     <div class="mb-3">
                       <label class="form-label">Code</label>
                       <input type="text" name="code" class="form-control" value="{{ old('code', $d->code) }}">
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Shift <span class="text-muted small">(sets working hours)</span></label>
+                      <select name="shift_id" class="form-select">
+                        <option value="">No shift</option>
+                        @foreach($shifts as $shift)
+                          <option value="{{ $shift->id }}" @selected(old('shift_id', $d->shift_id) == $shift->id)>{{ $shift->name }} ({{ $shift->timing }})</option>
+                        @endforeach
+                      </select>
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Description</label>
@@ -127,6 +143,15 @@
           <div class="mb-3">
             <label class="form-label">Code</label>
             <input type="text" name="code" class="form-control" value="{{ old('code') }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Shift <span class="text-muted small">(sets working hours)</span></label>
+            <select name="shift_id" class="form-select">
+              <option value="">No shift</option>
+              @foreach($shifts as $shift)
+                <option value="{{ $shift->id }}" @selected(old('shift_id') == $shift->id)>{{ $shift->name }} ({{ $shift->timing }})</option>
+              @endforeach
+            </select>
           </div>
           <div class="mb-3">
             <label class="form-label">Description</label>

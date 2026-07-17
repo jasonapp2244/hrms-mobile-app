@@ -32,8 +32,6 @@
             <th>Name</th>
             <th>Code</th>
             <th>City</th>
-            <th>Work Hours</th>
-            <th>Grace</th>
             <th>Employees</th>
             <th>Status</th>
             <th class="text-end">Actions</th>
@@ -45,8 +43,6 @@
             <td>{{ $o->name }}</td>
             <td>{{ $o->code ?? '—' }}</td>
             <td>{{ $o->city ?? '—' }}</td>
-            <td>{{ \Illuminate\Support\Str::of($o->work_start_time)->substr(0,5) }} - {{ \Illuminate\Support\Str::of($o->work_end_time)->substr(0,5) }}</td>
-            <td>{{ $o->late_grace_minutes }} min</td>
             <td><span class="badge bg-light text-dark">{{ $o->employees_count }}</span></td>
             <td>
               @if($o->is_active)
@@ -97,20 +93,7 @@
                       <label class="form-label">Address</label>
                       <textarea name="address" class="form-control" rows="2">{{ old('address', $o->address) }}</textarea>
                     </div>
-                    <div class="row g-3">
-                      <div class="col-md-6">
-                        <label class="form-label">Work Start Time <span class="text-danger">*</span></label>
-                        <input type="time" name="work_start_time" class="form-control" value="{{ old('work_start_time', \Illuminate\Support\Str::of($o->work_start_time)->substr(0,5)) }}" required>
-                      </div>
-                      <div class="col-md-6">
-                        <label class="form-label">Work End Time <span class="text-danger">*</span></label>
-                        <input type="time" name="work_end_time" class="form-control" value="{{ old('work_end_time', \Illuminate\Support\Str::of($o->work_end_time)->substr(0,5)) }}" required>
-                      </div>
-                    </div>
-                    <div class="mb-3 mt-3">
-                      <label class="form-label">Late Grace (minutes) <span class="text-danger">*</span></label>
-                      <input type="number" name="late_grace_minutes" class="form-control" value="{{ old('late_grace_minutes', $o->late_grace_minutes) }}" required>
-                    </div>
+                    <div class="alert alert-light border small mb-3"><i class="ti ti-clock me-1"></i>Working hours come from the <b>Shift</b> assigned to each department, not the office.</div>
                     <div class="mb-3">
                       <label class="form-label">Status</label>
                       <select name="is_active" class="form-select">
@@ -129,7 +112,7 @@
           </div>
           @empty
           <tr>
-            <td colspan="8" class="text-center">No offices found.</td>
+            <td colspan="6" class="text-center">No offices found.</td>
           </tr>
           @endforelse
         </tbody>
@@ -166,20 +149,7 @@
             <label class="form-label">Address</label>
             <textarea name="address" class="form-control" rows="2">{{ old('address') }}</textarea>
           </div>
-          <div class="row g-3">
-            <div class="col-md-6">
-              <label class="form-label">Work Start Time <span class="text-danger">*</span></label>
-              <input type="time" name="work_start_time" class="form-control" value="{{ old('work_start_time', '09:00') }}" required>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Work End Time <span class="text-danger">*</span></label>
-              <input type="time" name="work_end_time" class="form-control" value="{{ old('work_end_time', '17:00') }}" required>
-            </div>
-          </div>
-          <div class="mb-3 mt-3">
-            <label class="form-label">Late Grace (minutes) <span class="text-danger">*</span></label>
-            <input type="number" name="late_grace_minutes" class="form-control" value="{{ old('late_grace_minutes', 15) }}" required>
-          </div>
+          <div class="alert alert-light border small mb-0"><i class="ti ti-clock me-1"></i>Working hours come from the <b>Shift</b> assigned to each department, not the office.</div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>

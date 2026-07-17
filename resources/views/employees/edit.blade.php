@@ -90,15 +90,6 @@
           </select>
         </div>
         <div class="col-md-4">
-          <label class="form-label">Shift</label>
-          <select name="shift_id" class="form-select">
-            <option value="">Select Shift</option>
-            @foreach($shifts as $shift)
-              <option value="{{ $shift->id }}" @selected(old('shift_id', $employee->shift_id) == $shift->id)>{{ $shift->name }} ({{ $shift->timing }})</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="col-md-4">
           <label class="form-label">Status</label>
           <select name="status" class="form-select">
             <option value="active" @selected(old('status', $employee->status) === 'active')>Active</option>
