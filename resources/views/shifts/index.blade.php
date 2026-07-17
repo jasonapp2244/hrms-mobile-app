@@ -7,7 +7,8 @@
       <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="ti ti-smart-home"></i></a></li>
       <li class="breadcrumb-item active">Shifts &amp; Schedule</li>
     </ol></nav></div>
-  <div class="d-flex align-items-center flex-wrap">
+  <div class="d-flex align-items-center flex-wrap gap-2">
+    <a href="{{ route('shifts.roster') }}" class="btn btn-outline-primary"><i class="ti ti-calendar-week me-1"></i>Weekly Roster</a>
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal"><i class="ti ti-plus me-1"></i>Add Shift</button>
   </div>
 </div>

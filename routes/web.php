@@ -88,6 +88,7 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::resource('designations', DesignationController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-designations');
 
     // Shifts & Schedule
+    Route::get('shifts/roster', [ShiftController::class, 'roster'])->middleware('permission:manage-shifts')->name('shifts.roster');
     Route::resource('shifts', ShiftController::class)->only(['index', 'store', 'update', 'destroy'])->middleware('permission:manage-shifts');
 
     // Company / Offices (admin only — HR lacks these permissions)
