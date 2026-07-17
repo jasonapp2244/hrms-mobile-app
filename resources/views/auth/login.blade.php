@@ -33,12 +33,12 @@
 							</div>
 							<div class="authentication-card w-100">
 								<div class="authen-overlay-item border w-100">
-									<h1 class="text-white fs-40 fw-bold">Empowering people <br> through seamless HR <br> management.</h1>
+									<h1 class="text-white fs-40 fw-bold">Attendance &amp; workforce <br> management, unified in <br> one secure platform.</h1>
 									<div class="my-4 mx-auto authen-overlay-img">
 										<img src="{{ asset('assets/img/bg/authentication-bg-01.png') }}" alt="">
 									</div>
 									<div>
-										<p class="text-white fs-20 fw-semibold text-center">Track attendance, manage your workforce, <br> and streamline operations effortlessly.</p>
+										<p class="text-white fs-20 fw-semibold text-center">Secure QR check-ins, real-time dashboards, and <br> instant reports &mdash; for smarter people decisions.</p>
 									</div>
 								</div>
 							</div>
