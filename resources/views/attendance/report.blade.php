@@ -97,7 +97,7 @@
 						<td>{{ $log->office->name ?? '' }}</td>
 						<td><span class="badge bg-{{ $log->type=='in'?'success':'secondary' }}">{{ strtoupper($log->type) }}</span></td>
 						<td><span class="badge bg-{{ $log->status=='late'?'warning':($log->status=='ontime'?'success':'secondary') }}">{{ $log->status }}</span></td>
-						<td>{{ $log->work_date->format('d M Y') }}</td>
+						<td>{{ $log->work_date->format('m/d/Y') }}</td>
 						<td>{{ $log->scanned_at->format('h:i A') }}</td>
 					</tr>
 					@empty

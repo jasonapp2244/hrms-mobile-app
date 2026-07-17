@@ -33,7 +33,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
             strtoupper($log->type),
             ucfirst(str_replace('_', ' ', $log->status)),
             $log->scanned_at->format('h:i A'),
-            $log->work_date->format('d M Y'),
+            $log->work_date->format('m/d/Y'),
             $log->source,
         ];
     }
