@@ -35,7 +35,27 @@
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Department</span><span>{{ $employee->department->name ?? '—' }}</span></li>
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Designation</span><span>{{ $employee->designation->name ?? '—' }}</span></li>
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Office</span><span>{{ $employee->office->name ?? '—' }}</span></li>
-        <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Shift</span><span>{{ $employee->shift ? $employee->shift->name . ' (' . $employee->shift->timing . ')' : '—' }}</span></li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          <span class="text-muted">Shift</span>
+          <span>
+            @if($employee->shift)
+              <span class="d-inline-block me-1" style="width:9px;height:9px;border-radius:50%;background:{{ $employee->shift->color }}"></span>{{ $employee->shift->name }}
+            @else
+              —
+            @endif
+          </span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Working Hours</span>
+          <span>
+            @if($employee->shift)
+              {{ $employee->shift->timing }}
+              <span class="text-muted small">· {{ $employee->shift->late_grace_minutes }} min grace</span>
+            @else
+              <span class="text-muted">Not set</span>
+            @endif
+          </span>
+        </li>
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Hire Date</span><span>{{ $employee->hire_date?->format('m/d/Y') ?? '—' }}</span></li>
       </ul>
     </div>
