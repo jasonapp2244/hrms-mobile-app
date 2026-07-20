@@ -35,6 +35,9 @@ Route::get('/', function () {
 // and nothing else in the application.
 Route::middleware(['auth', 'role:employee'])->prefix('employee')->name('employee.')->group(function () {
     Route::get('dashboard', [EmployeePortalController::class, 'dashboard'])->name('dashboard');
+    // One-tap button check in/out (works on mobile or PC, any location).
+    Route::post('check', [EmployeePortalController::class, 'check'])->name('check');
+    // Optional QR-scan path (kept for offices that use a kiosk display).
     Route::post('scan', [EmployeePortalController::class, 'scan'])->name('scan');
 });
 

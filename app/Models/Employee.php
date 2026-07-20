@@ -11,7 +11,14 @@ class Employee extends Model
     protected $fillable = [
         'company_id', 'office_id', 'department_id', 'designation_id', 'user_id',
         'employee_code', 'first_name', 'last_name', 'email', 'phone', 'avatar',
-        'date_of_birth', 'gender', 'hire_date', 'status',
+        'date_of_birth', 'gender', 'hire_date', 'status', 'work_mode',
+    ];
+
+    /** Human labels for the work_mode enum. */
+    public const WORK_MODES = [
+        'office' => 'Office (on-site)',
+        'wfh'    => 'Work From Home',
+        'hybrid' => 'Hybrid',
     ];
 
     protected $casts = [

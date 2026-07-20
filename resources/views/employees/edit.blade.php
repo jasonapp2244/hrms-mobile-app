@@ -97,6 +97,14 @@
             <option value="terminated" @selected(old('status', $employee->status) === 'terminated')>Terminated</option>
           </select>
         </div>
+        <div class="col-md-4">
+          <label class="form-label">Work Mode</label>
+          <select name="work_mode" class="form-select">
+            @foreach(\App\Models\Employee::WORK_MODES as $val => $label)
+              <option value="{{ $val }}" @selected(old('work_mode', $employee->work_mode) === $val)>{{ $label }}</option>
+            @endforeach
+          </select>
+        </div>
       </div>
     </div>
     <div class="card-footer text-end">

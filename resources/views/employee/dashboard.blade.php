@@ -49,20 +49,28 @@
 			<span class="badge bg-primary-transparent text-primary">Next: {{ strtoupper($nextAction) }}</span>
 		</div>
 		<div class="card-body text-center">
-			<p class="text-muted">Point your camera at the office QR code to record your {{ $nextAction === 'in' ? 'check-in' : 'check-out' }}.</p>
+			<p class="text-muted mb-4">
+				Tap the button below to record your {{ $nextAction === 'in' ? 'check-in' : 'check-out' }}.
+				Works on your phone or computer.
+			</p>
 
-			<div id="reader" style="width:100%;max-width:340px;margin:0 auto;border-radius:12px;overflow:hidden"></div>
-
-			<div class="d-flex gap-2 mt-3 justify-content-center">
-				<button id="start-btn" class="btn btn-primary"><i class="ti ti-camera me-1"></i>Start Camera</button>
-				<button id="stop-btn" class="btn btn-outline-secondary" style="display:none"><i class="ti ti-camera-off me-1"></i>Stop</button>
-			</div>
+			<button id="check-btn"
+				class="btn btn-lg {{ $nextAction === 'in' ? 'btn-success' : 'btn-primary' }} px-5 py-3"
+				data-action="{{ $nextAction }}"
+				style="min-width:220px;font-size:1.15rem;border-radius:14px">
+				@if($nextAction === 'in')
+					<i class="ti ti-login me-1"></i>Check In
+				@else
+					<i class="ti ti-logout me-1"></i>Check Out
+				@endif
+			</button>
 
 			<div id="result" class="mt-3"></div>
 
-			<div class="alert alert-info mt-3 mb-0 text-start" style="font-size:12.5px">
-				<i class="ti ti-shield-lock me-1"></i>
-				The office QR rotates every few seconds and your location is checked, so attendance can only be recorded on-site.
+			<div class="alert alert-info mt-4 mb-0 text-start" style="font-size:12.5px">
+				<i class="ti ti-map-pin me-1"></i>
+				Your time is recorded on our server. If your browser allows it, your location is
+				also saved for HR — you are never blocked, so WFH and remote staff can check in from anywhere.
 			</div>
 		</div>
 	</div>
@@ -120,67 +128,62 @@
 @endsection
 
 @push('scripts')
-<script src="{{ asset('assets/js/html5-qrcode.min.js') }}"></script>
 <script>
 (function () {
-	const scanUrl = "{{ route('employee.scan') }}";
+	const checkUrl = "{{ route('employee.check') }}";
 	const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 	const resultEl = document.getElementById('result');
-	const startBtn = document.getElementById('start-btn');
-	const stopBtn = document.getElementById('stop-btn');
-	let html5Qr = null, busy = false, lastPayload = null, lastTime = 0;
+	const btn = document.getElementById('check-btn');
+	let busy = false;
 
 	function show(type, msg) {
 		resultEl.innerHTML = '<div class="alert alert-' + type + ' mb-0">' + msg + '</div>';
 	}
 
+	// Optional, free browser GPS. Resolves quickly with {} if unavailable or denied
+	// — we never block the punch on location.
 	function getGeo() {
 		return new Promise((resolve) => {
 			if (!navigator.geolocation) return resolve({});
 			navigator.geolocation.getCurrentPosition(
 				p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
-				() => resolve({}), { timeout: 3000 }
+				() => resolve({}),
+				{ timeout: 4000, maximumAge: 60000 }
 			);
 		});
 	}
 
-	async function onScan(payload) {
-		const now = Date.now();
-		if (busy || (payload === lastPayload && now - lastTime < 4000)) return;
-		lastPayload = payload; lastTime = now;
+	btn.addEventListener('click', async function () {
+		if (busy) return;
 		busy = true;
+		const original = btn.innerHTML;
+		btn.disabled = true;
+		btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Recording…';
+
 		const geo = await getGeo();
 		try {
-			const res = await fetch(scanUrl, {
+			const res = await fetch(checkUrl, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
-				body: JSON.stringify({ payload: payload, latitude: geo.latitude, longitude: geo.longitude })
+				body: JSON.stringify({ latitude: geo.latitude, longitude: geo.longitude })
 			});
 			const data = await res.json();
 			if (data.ok) {
 				const icon = data.type === 'in' ? '✅' : '👋';
 				show('success', icon + ' ' + data.message + ' <span class="badge bg-' + (data.status === 'late' ? 'warning' : 'success') + '">' + data.status + '</span>');
-				setTimeout(() => window.location.reload(), 1800);
+				setTimeout(() => window.location.reload(), 1500);
 			} else {
-				show('danger', data.message || 'Scan rejected.');
+				show('danger', data.message || 'Could not record. Please try again.');
+				btn.disabled = false;
+				btn.innerHTML = original;
+				busy = false;
 			}
 		} catch (e) {
 			show('danger', 'Network error, please try again.');
+			btn.disabled = false;
+			btn.innerHTML = original;
+			busy = false;
 		}
-		setTimeout(() => { busy = false; }, 1500);
-	}
-
-	startBtn.addEventListener('click', function () {
-		html5Qr = new Html5Qrcode('reader');
-		html5Qr.start({ facingMode: 'environment' }, { fps: 10, qrbox: 240 }, onScan)
-			.then(() => { startBtn.style.display = 'none'; stopBtn.style.display = 'inline-block'; })
-			.catch(err => show('danger', 'Cannot access camera: ' + err));
-	});
-
-	stopBtn.addEventListener('click', function () {
-		if (html5Qr) html5Qr.stop().then(() => {
-			startBtn.style.display = 'inline-block'; stopBtn.style.display = 'none';
-		});
 	});
 })();
 </script>

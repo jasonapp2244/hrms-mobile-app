@@ -61,6 +61,7 @@
             <th>Department</th>
             <th>Designation</th>
             <th>Office</th>
+            <th>Work Mode</th>
             <th>Status</th>
             <th class="text-end">Actions</th>
           </tr>
@@ -81,6 +82,18 @@
               <td>{{ $e->office->name ?? '—' }}</td>
               <td>
                 @php
+                  $modeMeta = [
+                    'office' => ['ti-building', 'info', 'Office'],
+                    'wfh'    => ['ti-home', 'success', 'WFH'],
+                    'hybrid' => ['ti-arrows-shuffle', 'warning', 'Hybrid'],
+                  ][$e->work_mode] ?? ['ti-building', 'info', 'Office'];
+                @endphp
+                <span class="badge bg-{{ $modeMeta[1] }}-transparent text-{{ $modeMeta[1] }}">
+                  <i class="ti {{ $modeMeta[0] }} me-1"></i>{{ $modeMeta[2] }}
+                </span>
+              </td>
+              <td>
+                @php
                   $statusBadge = ['active' => 'success', 'inactive' => 'secondary', 'terminated' => 'danger'][$e->status] ?? 'secondary';
                 @endphp
                 <span class="badge bg-{{ $statusBadge }}">{{ ucfirst($e->status) }}</span>
@@ -97,7 +110,7 @@
             </tr>
           @empty
             <tr>
-              <td colspan="8" class="text-center text-muted py-4">No employees found.</td>
+              <td colspan="9" class="text-center text-muted py-4">No employees found.</td>
             </tr>
           @endforelse
         </tbody>

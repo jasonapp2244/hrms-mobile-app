@@ -166,6 +166,7 @@ class EmployeeController extends Controller
             'date_of_birth'  => 'nullable|date',
             'hire_date'      => 'nullable|date',
             'status'         => 'required|in:active,inactive,terminated',
+            'work_mode'      => 'required|in:office,wfh,hybrid',
         ]);
     }
 
