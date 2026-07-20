@@ -51,14 +51,18 @@ class AttendanceService
 
     /**
      * Prevent accidental duplicate scans within a short cooldown.
+     *
+     * Compares against created_at (always stored/read in UTC) rather than
+     * scanned_at — scanned_at is written in the company timezone, so comparing
+     * it to now() would mismatch by the tz offset and skip the guard entirely.
      */
     public function recentlyScanned(Employee $employee, int $cooldownSeconds = 60): bool
     {
         $last = AttendanceLog::where('employee_id', $employee->id)
-            ->orderByDesc('scanned_at')
+            ->orderByDesc('created_at')
             ->first();
 
-        return $last && $last->scanned_at->diffInSeconds(now()) < $cooldownSeconds;
+        return $last && $last->created_at->diffInSeconds(now()) < $cooldownSeconds;
     }
 
     /**
