@@ -78,6 +78,8 @@
 						<th>Time</th>
 						<th>Date</th>
 						<th>Source</th>
+						<th>Location</th>
+						<th>IP Address</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -91,10 +93,22 @@
 						<td>{{ $log->scanned_at->format('h:i A') }}</td>
 						<td>{{ $log->work_date->format('m/d/Y') }}</td>
 						<td>{{ $log->source }}</td>
+						<td>
+							@if($log->latitude && $log->longitude)
+								<a href="https://www.google.com/maps?q={{ $log->latitude }},{{ $log->longitude }}" target="_blank" rel="noopener"
+									class="badge bg-info-transparent text-info text-decoration-none"
+									title="{{ $log->latitude }}, {{ $log->longitude }}">
+									<i class="ti ti-map-pin me-1"></i>View map
+								</a>
+							@else
+								<span class="badge bg-light text-muted" title="Location not shared by the employee's device">—</span>
+							@endif
+						</td>
+						<td><small class="text-muted">{{ $log->ip_address ?? '—' }}</small></td>
 					</tr>
 					@empty
 					<tr>
-						<td colspan="8" class="text-center text-muted py-4">No attendance logs found.</td>
+						<td colspan="10" class="text-center text-muted py-4">No attendance logs found.</td>
 					</tr>
 					@endforelse
 				</tbody>
