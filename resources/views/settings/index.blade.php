@@ -17,22 +17,26 @@
   <div class="col-lg-6">
     <div class="card">
       <div class="card-header">
-        <h5 class="mb-0"><i class="ti ti-qrcode me-1"></i>Attendance QR</h5>
+        <h5 class="mb-0"><i class="ti ti-clock-check me-1"></i>Attendance</h5>
       </div>
       <div class="card-body">
         <table class="table mb-2">
           <tbody>
             <tr>
-              <th style="width:50%">Rotation Window</th>
-              <td>{{ $qrWindow }} seconds</td>
+              <th style="width:50%">Check-in Method</th>
+              <td>Button (Check In / Check Out)</td>
             </tr>
             <tr>
-              <th>Grace Windows</th>
-              <td>{{ $qrGrace }}</td>
+              <th>Works On</th>
+              <td>Employee's own mobile or PC</td>
+            </tr>
+            <tr>
+              <th>Location (GPS)</th>
+              <td>Captured for record, does not block</td>
             </tr>
           </tbody>
         </table>
-        <p class="text-muted mb-0"><small>These values are configured in <code>App\Services\QrTokenService</code>.</small></p>
+        <p class="text-muted mb-0"><small>Employees clock in/out from their self-service portal. Work mode (Office / WFH / Hybrid) is set per employee.</small></p>
       </div>
     </div>
   </div>

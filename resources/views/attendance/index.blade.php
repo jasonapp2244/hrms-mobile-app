@@ -14,8 +14,7 @@
 		</nav>
 	</div>
 	<div class="d-flex align-items-center flex-wrap">
-		<a href="{{ route('attendance.kiosk') }}" class="btn btn-primary me-2 mb-2"><i class="ti ti-qrcode me-1"></i>QR Kiosk</a>
-		<a href="{{ route('attendance.logs') }}" class="btn btn-outline-secondary mb-2"><i class="ti ti-list me-1"></i>All Logs</a>
+		<a href="{{ route('attendance.logs') }}" class="btn btn-primary mb-2"><i class="ti ti-list me-1"></i>All Logs</a>
 	</div>
 </div>
 

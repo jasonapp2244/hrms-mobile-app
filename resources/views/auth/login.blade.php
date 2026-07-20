@@ -38,7 +38,7 @@
 										<img src="{{ asset('assets/img/bg/authentication-bg-01.png') }}" alt="">
 									</div>
 									<div>
-										<p class="text-white fs-20 fw-semibold text-center">Secure QR check-ins, real-time dashboards, and <br> instant reports &mdash; for smarter people decisions.</p>
+										<p class="text-white fs-20 fw-semibold text-center">One-tap check-ins, real-time dashboards, and <br> instant reports &mdash; for smarter people decisions.</p>
 									</div>
 								</div>
 							</div>

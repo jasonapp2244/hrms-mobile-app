@@ -37,17 +37,6 @@ Route::middleware(['auth', 'role:employee'])->prefix('employee')->name('employee
     Route::get('dashboard', [EmployeePortalController::class, 'dashboard'])->name('dashboard');
     // One-tap button check in/out (works on mobile or PC, any location).
     Route::post('check', [EmployeePortalController::class, 'check'])->name('check');
-    // Optional QR-scan path (kept for offices that use a kiosk display).
-    Route::post('scan', [EmployeePortalController::class, 'scan'])->name('scan');
-});
-
-// ---- Full-screen kiosk display (unattended tablet) ----
-// Permanent signed URLs — no login required, cannot be enumerated/forged.
-Route::middleware('signed')->group(function () {
-    Route::get('kiosk/{office}/display', [AttendanceController::class, 'kioskDisplay'])
-        ->name('attendance.kiosk.display');
-    Route::get('kiosk/{office}/display/qr', [AttendanceController::class, 'kioskDisplayQr'])
-        ->name('attendance.kiosk.display.qr');
 });
 
 // ---- Staff dashboard (admin + HR only) ----
@@ -65,13 +54,6 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::get('report', [AttendanceController::class, 'report'])->middleware('permission:view-reports')->name('report');
         Route::get('report/pdf', [AttendanceController::class, 'exportPdf'])->middleware('permission:export-reports')->name('report.pdf');
         Route::get('report/excel', [AttendanceController::class, 'exportExcel'])->middleware('permission:export-reports')->name('report.excel');
-        // Kiosk + scanner operations
-        Route::middleware('permission:manage-attendance')->group(function () {
-            Route::get('kiosk', [AttendanceController::class, 'kiosk'])->name('kiosk');
-            Route::get('kiosk/{office}/qr', [AttendanceController::class, 'qrToken'])->name('qr');
-            Route::get('scanner', [AttendanceController::class, 'scanner'])->name('scanner');
-            Route::post('scan', [AttendanceController::class, 'scan'])->name('scan');
-        });
     });
 
     // HR Reporting — analytics variants (late / outliers / department)
@@ -100,7 +82,6 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::put('company', [CompanyController::class, 'update'])->name('company.update');
     });
     Route::middleware('permission:manage-offices')->group(function () {
-        Route::post('offices/{office}/rotate-secret', [OfficeController::class, 'rotateSecret'])->name('offices.rotate');
         Route::resource('offices', OfficeController::class)->except(['create', 'show', 'edit']);
     });
 

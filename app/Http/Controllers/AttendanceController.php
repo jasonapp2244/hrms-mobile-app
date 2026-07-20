@@ -3,18 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\AttendanceLog;
-use App\Models\Employee;
 use App\Models\Office;
 use App\Services\AttendanceService;
-use App\Services\QrTokenService;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
     public function __construct(
-        protected QrTokenService $qr,
         protected AttendanceService $attendance,
     ) {}
 
@@ -56,121 +51,6 @@ class AttendanceController extends Controller
         $offices = Office::where('company_id', $companyId)->get();
 
         return view('attendance.logs', compact('logs', 'offices'));
-    }
-
-    /** Kiosk screen — picks an office and shows the rotating QR. */
-    public function kiosk(Request $request)
-    {
-        $companyId = $this->companyId();
-        $offices = Office::where('company_id', $companyId)->where('is_active', true)->get();
-        $office = $request->filled('office')
-            ? $offices->firstWhere('id', (int) $request->office)
-            : $offices->first();
-
-        return view('attendance.kiosk', compact('offices', 'office'));
-    }
-
-    /** Build the current-QR JSON payload for an office (shared by authed + signed kiosk). */
-    protected function qrJson(Office $office)
-    {
-        $payload = $this->qr->payload($office);
-        $svg = (new SvgWriter())->write(new QrCode($payload))->getString();
-
-        return response()->json([
-            'office'      => $office->name,
-            'svg'         => $svg,
-            'expires_in'  => $this->qr->secondsUntilRotate(),
-            'window'      => QrTokenService::WINDOW_SECONDS,
-        ]);
-    }
-
-    /** AJAX: current QR for the in-dashboard kiosk (admin session). */
-    public function qrToken(Office $office)
-    {
-        abort_unless($office->company_id === $this->companyId(), 403);
-        return $this->qrJson($office);
-    }
-
-    /**
-     * Full-screen, unattended kiosk display for a tablet/monitor at the entrance.
-     * Reached via a permanent SIGNED URL — no admin login needed, cannot be
-     * enumerated, and exposes nothing but this office's rotating QR.
-     */
-    public function kioskDisplay(Office $office)
-    {
-        abort_unless($office->is_active, 404);
-        $qrUrl = \Illuminate\Support\Facades\URL::signedRoute(
-            'attendance.kiosk.display.qr', ['office' => $office->id]
-        );
-        return view('attendance.kiosk-fullscreen', compact('office', 'qrUrl'));
-    }
-
-    /** AJAX: current QR for the signed full-screen kiosk display. */
-    public function kioskDisplayQr(Office $office)
-    {
-        return $this->qrJson($office);
-    }
-
-    /** PWA scanner page (browser camera, no app install). */
-    public function scanner()
-    {
-        $companyId = $this->companyId();
-        $employees = Employee::where('company_id', $companyId)->active()
-            ->orderBy('first_name')->get(['id', 'employee_code', 'first_name', 'last_name']);
-
-        return view('attendance.scanner', compact('employees'));
-    }
-
-    /** AJAX: validate scanned QR + record clock in/out. Called by the PWA scanner. */
-    public function scan(Request $request)
-    {
-        $data = $request->validate([
-            'employee_id' => 'required|exists:employees,id',
-            'payload'     => 'required|string',
-            'latitude'    => 'nullable|numeric',
-            'longitude'   => 'nullable|numeric',
-        ]);
-
-        $parsed = $this->qr->parsePayload($data['payload']);
-        if (!$parsed) {
-            return response()->json(['ok' => false, 'message' => 'Invalid QR code.'], 422);
-        }
-
-        $office = Office::find($parsed['office_id']);
-        if (!$office) {
-            return response()->json(['ok' => false, 'message' => 'Unknown office.'], 404);
-        }
-
-        if (!$this->qr->validate($office, $parsed['token'])) {
-            return response()->json(['ok' => false, 'message' => 'QR code expired. Please scan the live code again.'], 422);
-        }
-
-        $employee = Employee::where('company_id', $office->company_id)->find($data['employee_id']);
-        if (!$employee) {
-            return response()->json(['ok' => false, 'message' => 'Employee not found for this office\'s company.'], 404);
-        }
-
-        if ($this->attendance->recentlyScanned($employee)) {
-            return response()->json(['ok' => false, 'message' => 'Already scanned moments ago. Please wait a minute.'], 429);
-        }
-
-        $result = $this->attendance->record($employee, $office, [
-            'source'     => 'pwa',
-            'latitude'   => $data['latitude'] ?? null,
-            'longitude'  => $data['longitude'] ?? null,
-            'ip_address' => $request->ip(),
-        ]);
-
-        return response()->json([
-            'ok'       => true,
-            'type'     => $result['type'],
-            'status'   => $result['status'],
-            'employee' => $employee->full_name,
-            'office'   => $office->name,
-            'time'     => $result['log']->scanned_at->format('h:i:s A'),
-            'message'  => sprintf('%s clocked %s (%s) at %s',
-                $employee->full_name, strtoupper($result['type']), $result['status'], $result['log']->scanned_at->format('h:i A')),
-        ]);
     }
 
     /** Build the filtered report dataset shared by the view + exports. */

@@ -16,10 +16,6 @@
 @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
 @if($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
-<div class="alert alert-info">
-  <i class="ti ti-info-circle me-1"></i>Each office generates its own dynamic rotating QR code for attendance. Rotating the secret immediately invalidates previously displayed codes.
-</div>
-
 <div class="card">
   <div class="card-header">
     <h5 class="mb-0">Offices & Branches</h5>
@@ -53,10 +49,6 @@
             </td>
             <td class="text-end">
               <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal{{ $o->id }}"><i class="ti ti-edit"></i></button>
-              <form action="{{ route('offices.rotate', $o) }}" method="POST" class="d-inline" onsubmit="return confirm('Rotate secret? Existing QR codes will stop working.');">
-                @csrf
-                <button type="submit" class="btn btn-sm btn-outline-warning" title="Rotate QR secret"><i class="ti ti-refresh"></i></button>
-              </form>
               <form action="{{ route('offices.destroy', $o) }}" method="POST" class="d-inline" onsubmit="return confirm('Delete this office?');">
                 @csrf
                 @method('DELETE')

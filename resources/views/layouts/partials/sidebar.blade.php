@@ -38,10 +38,6 @@
 								<li><a class="{{ request()->routeIs('attendance.index') ? 'active' : '' }}" href="{{ route('attendance.index') }}">Overview</a></li>
 								<li><a class="{{ request()->routeIs('attendance.logs') ? 'active' : '' }}" href="{{ route('attendance.logs') }}">Attendance Logs</a></li>
 								@endcan
-								@can('manage-attendance')
-								<li><a class="{{ request()->routeIs('attendance.kiosk') ? 'active' : '' }}" href="{{ route('attendance.kiosk') }}">QR Kiosk</a></li>
-								<li><a class="{{ request()->routeIs('attendance.scanner') ? 'active' : '' }}" href="{{ route('attendance.scanner') }}">QR Scanner</a></li>
-								@endcan
 							</ul>
 						</li>
 						@endcanany

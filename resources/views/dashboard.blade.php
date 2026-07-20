@@ -13,7 +13,7 @@
 		</nav>
 	</div>
 	<div class="d-flex my-xl-auto right-content align-items-center flex-wrap">
-		<a href="{{ route('attendance.kiosk') }}" class="btn btn-primary me-2 mb-2"><i class="ti ti-qrcode me-1"></i>Open QR Kiosk</a>
+		<a href="{{ route('attendance.logs') }}" class="btn btn-primary me-2 mb-2"><i class="ti ti-list-check me-1"></i>Attendance Logs</a>
 		<a href="{{ route('attendance.report') }}" class="btn btn-outline-secondary mb-2"><i class="ti ti-file-report me-1"></i>Reports</a>
 	</div>
 </div>
@@ -86,7 +86,7 @@
 						</div>
 					</li>
 					@empty
-					<li class="list-group-item text-center text-muted py-4">No attendance recorded yet. Open the <a href="{{ route('attendance.kiosk') }}">QR Kiosk</a> to start.</li>
+					<li class="list-group-item text-center text-muted py-4">No attendance recorded yet. Employees check in from their portal to start.</li>
 					@endforelse
 				</ul>
 			</div>

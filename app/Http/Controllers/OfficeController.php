@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\Office;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 
 class OfficeController extends Controller
 {
@@ -44,15 +43,6 @@ class OfficeController extends Controller
         $office->delete();
 
         return back()->with('success', 'Office deleted.');
-    }
-
-    /** Rotate (reset) the office QR secret — invalidates all previously shown codes. */
-    public function rotateSecret(Office $office)
-    {
-        abort_unless($office->company_id === $this->companyId(), 403);
-        $office->update(['qr_secret' => Str::random(64)]);
-
-        return back()->with('success', 'QR secret rotated — old codes are now invalid.');
     }
 
     protected function validateOffice(Request $request): array
