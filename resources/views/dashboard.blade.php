@@ -78,6 +78,16 @@
 							<div>
 								<h6 class="mb-0 fs-14">{{ $log->employee->full_name ?? 'Unknown' }}</h6>
 								<small class="text-muted">{{ strtoupper($log->type) }} · {{ $log->office->name ?? '' }}</small>
+								<div class="mt-1" style="font-size:11.5px;line-height:1.4">
+									@if($log->latitude && $log->longitude)
+										<a href="https://www.google.com/maps?q={{ $log->latitude }},{{ $log->longitude }}" target="_blank" rel="noopener" class="text-info text-decoration-none me-2" title="{{ $log->latitude }}, {{ $log->longitude }}"><i class="ti ti-map-pin"></i> map</a>
+									@else
+										<span class="text-muted me-2"><i class="ti ti-map-pin-off"></i> no location</span>
+									@endif
+									@if($log->ip_address)
+										<span class="text-muted"><i class="ti ti-world"></i> {{ $log->ip_address }}</span>
+									@endif
+								</div>
 							</div>
 						</div>
 						<div class="text-end">
