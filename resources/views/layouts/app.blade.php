@@ -7,7 +7,7 @@
 	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<title>@yield('title', 'Dashboard') | {{ config('app.name') }}</title>
 
-	<link rel="shortcut icon" type="image/x-icon" href="{{ asset('assets/img/favicon.png') }}">
+	<link rel="icon" type="image/svg+xml" href="{{ asset('assets/img/favicon.svg') }}">
 	<script src="{{ asset('assets/js/theme-script.js') }}"></script>
 
 	<link rel="stylesheet" href="{{ asset('assets/css/bootstrap.min.css') }}">

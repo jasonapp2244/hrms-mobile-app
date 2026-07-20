@@ -6,7 +6,7 @@
 	<meta name="robots" content="noindex, nofollow">
 	<title>Login | {{ config('app.name') }}</title>
 
-	<link rel="shortcut icon" type="image/x-icon" href="{{ asset('assets/img/favicon.png') }}">
+	<link rel="icon" type="image/svg+xml" href="{{ asset('assets/img/favicon.svg') }}">
 	<link rel="stylesheet" href="{{ asset('assets/css/bootstrap.min.css') }}">
 	<link rel="stylesheet" href="{{ asset('assets/plugins/icons/feather/feather.css') }}">
 	<link rel="stylesheet" href="{{ asset('assets/plugins/tabler-icons/tabler-icons.min.css') }}">
