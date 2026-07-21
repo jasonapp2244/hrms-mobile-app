@@ -19,7 +19,7 @@ class AttendanceService
     public function record(Employee $employee, Office $office, array $meta = []): array
     {
         // Server-authoritative time — never trust the device clock
-        $now = Carbon::now($office->company->timezone ?? config('app.timezone'));
+        $now = Carbon::now($office->company?->tz() ?? config('app.timezone'));
         $workDate = $now->toDateString();
 
         // Determine whether this scan is a clock-in or clock-out:

@@ -17,6 +17,18 @@ class Company extends Model
         'is_active' => 'boolean',
     ];
 
+    /**
+     * A guaranteed-valid timezone identifier for date math. Falls back to the
+     * app default if the stored value is empty or not a real timezone, so bad
+     * data can never crash now()/Carbon::now() with an "Unknown timezone" error.
+     */
+    public function tz(): string
+    {
+        return ($this->timezone && in_array($this->timezone, timezone_identifiers_list(), true))
+            ? $this->timezone
+            : config('app.timezone');
+    }
+
     public function offices(): HasMany
     {
         return $this->hasMany(Office::class);

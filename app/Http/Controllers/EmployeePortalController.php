@@ -26,7 +26,7 @@ class EmployeePortalController extends Controller
     {
         $employee = $this->currentEmployee()->load('office', 'department', 'designation');
 
-        $today = now($employee->company->timezone ?? config('app.timezone'))->toDateString();
+        $today = now($employee->company?->tz() ?? config('app.timezone'))->toDateString();
 
         $todayLogs = AttendanceLog::where('employee_id', $employee->id)
             ->where('work_date', $today)

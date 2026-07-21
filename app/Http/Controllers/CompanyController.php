@@ -31,7 +31,7 @@ class CompanyController extends Controller
             'address' => 'nullable|string',
             'city' => 'nullable|string|max:100',
             'country' => 'nullable|string|max:100',
-            'timezone' => 'required|string|max:64',
+            'timezone' => 'required|timezone',
             'currency' => 'required|string|max:8',
         ]);
         $company->update($data);
