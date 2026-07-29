@@ -42,12 +42,19 @@ class User extends Authenticatable
         return $this->hasOne(Employee::class);
     }
 
-    /** Route name of the home page this user should land on, based on role. */
+    /**
+     * Route name of the home page this user should land on, based on role.
+     *
+     * Only admin and HR reach the staff dashboard. Everyone else — employees and
+     * managers alike — lands on the self-service portal. Managers are staff who
+     * approve for their own team, not dashboard users, and sending them to
+     * 'dashboard' would bounce them straight off its role:admin|hr gate.
+     */
     public function homeRoute(): string
     {
-        return $this->hasRole('employee') && ! $this->hasAnyRole(['admin', 'hr'])
-            ? 'employee.dashboard'
-            : 'dashboard';
+        return $this->hasAnyRole(['admin', 'hr'])
+            ? 'dashboard'
+            : 'employee.dashboard';
     }
 
     /**

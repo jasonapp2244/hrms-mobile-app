@@ -33,8 +33,8 @@ class LoginController extends Controller
         $user = Auth::user();
 
         // Only known roles may sign in: admin/HR reach the dashboard, employees
-        // reach the self-service portal. Any other account is rejected.
-        if (! $user->hasAnyRole(['admin', 'hr', 'employee'])) {
+        // and managers reach the self-service portal. Any other account is rejected.
+        if (! $user->hasAnyRole(['admin', 'hr', 'employee', 'manager'])) {
             Auth::logout();
             throw ValidationException::withMessages([
                 'email' => 'This account is not permitted to sign in.',

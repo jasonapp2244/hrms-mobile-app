@@ -30,10 +30,12 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// ---- Employee self-service portal (employee role only) ----
+// ---- Employee self-service portal (employee + manager roles) ----
 // A locked-down area: employees can check in/out and view their own attendance,
-// and nothing else in the application.
-Route::middleware(['auth', 'role:employee'])->prefix('employee')->name('employee.')->group(function () {
+// and nothing else in the application. Managers hold this role too — their
+// approval screens live here rather than in the admin app, and each one is
+// additionally gated on approve-leave / view-team and scoped to their own team.
+Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('employee.')->group(function () {
     Route::get('dashboard', [EmployeePortalController::class, 'dashboard'])->name('dashboard');
     // One-tap button check in/out (works on mobile or PC, any location).
     Route::post('check', [EmployeePortalController::class, 'check'])->name('check');

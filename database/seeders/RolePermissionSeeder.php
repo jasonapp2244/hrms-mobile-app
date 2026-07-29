@@ -26,6 +26,8 @@ class RolePermissionSeeder extends Seeder
             'view-reports',
             'export-reports',
             'manage-leave',
+            'approve-leave',
+            'view-team',
             'manage-shifts',
             'manage-roles',
             'manage-settings',
@@ -39,6 +41,7 @@ class RolePermissionSeeder extends Seeder
         $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
         $hr = Role::firstOrCreate(['name' => 'hr', 'guard_name' => 'web']);
         $employee = Role::firstOrCreate(['name' => 'employee', 'guard_name' => 'web']);
+        $manager = Role::firstOrCreate(['name' => 'manager', 'guard_name' => 'web']);
 
         // Admin gets everything
         $admin->syncPermissions(Permission::all());
@@ -50,12 +53,22 @@ class RolePermissionSeeder extends Seeder
             'view-dashboard', 'manage-departments', 'manage-designations',
             'manage-employees', 'import-employees', 'view-attendance',
             'manage-attendance', 'view-reports', 'export-reports', 'manage-leave',
-            'manage-shifts',
+            'approve-leave', 'view-team', 'manage-shifts',
         ]);
 
         // Employee — self-service portal only (check in/out + own attendance)
         $employee->syncPermissions([
             'view-attendance',
+        ]);
+
+        // Manager — a team lead. This role is always held *in addition to*
+        // `employee`, never on its own: a manager is a member of staff who also
+        // approves for their own reports. It grants no company-wide visibility;
+        // every query it powers is scoped to the manager's direct reports.
+        $manager->syncPermissions([
+            'view-attendance',
+            'approve-leave',
+            'view-team',
         ]);
     }
 }
