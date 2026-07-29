@@ -2,18 +2,17 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * The root path has no public page — it hands guests to the login screen and
+     * signed-in users to whichever home their role resolves to. The stub this
+     * replaces asserted a 200 and had been failing since the routes were written.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_root_path_sends_guests_to_login(): void
     {
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
+        $this->get('/')->assertRedirect('/login');
     }
 }

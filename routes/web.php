@@ -8,6 +8,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeePortalController;
+use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
@@ -73,6 +74,12 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     // Departments / Designations
     Route::resource('departments', DepartmentController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-departments');
     Route::resource('designations', DesignationController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-designations');
+
+    // Leave — configuration (types). Requests and approvals follow.
+    Route::resource('leave-types', LeaveTypeController::class)
+        ->parameters(['leave-types' => 'leaveType'])
+        ->except(['create', 'show', 'edit'])
+        ->middleware('permission:manage-leave');
 
     // Shifts & Schedule
     Route::get('shifts/roster', [ShiftController::class, 'roster'])->middleware('permission:manage-shifts')->name('shifts.roster');

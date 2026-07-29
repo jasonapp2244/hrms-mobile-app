@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Office;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class EmployeeController extends Controller
 {
@@ -67,13 +68,13 @@ class EmployeeController extends Controller
     public function edit(Employee $employee)
     {
         $this->authorizeCompany($employee);
-        return view('employees.edit', array_merge($this->formData(), compact('employee')));
+        return view('employees.edit', array_merge($this->formData($employee), compact('employee')));
     }
 
     public function update(Request $request, Employee $employee)
     {
         $this->authorizeCompany($employee);
-        $data = $this->validateEmployee($request, $employee->id);
+        $data = $this->validateEmployee($request, $employee);
         $employee->update($data);
 
         return redirect()->route('employees.index')->with('success', 'Employee updated successfully.');
@@ -141,33 +142,55 @@ class EmployeeController extends Controller
 
     // ---- helpers ----
 
-    protected function formData(): array
+    protected function formData(?Employee $employee = null): array
     {
         $companyId = $this->companyId();
+
+        // Candidate managers: anyone active in the company except the employee
+        // being edited. Assignments that would close a loop in the reporting
+        // chain are still rejected in validation — this only trims the obvious.
+        $managers = Employee::where('company_id', $companyId)->active()
+            ->when($employee, fn ($q) => $q->whereKeyNot($employee->id))
+            ->orderBy('first_name')->get();
+
         return [
             'offices'      => Office::where('company_id', $companyId)->get(),
             'departments'  => Department::where('company_id', $companyId)->get(),
             'designations' => Designation::where('company_id', $companyId)->get(),
+            'managers'     => $managers,
         ];
     }
 
-    protected function validateEmployee(Request $request, ?int $ignoreId = null): array
+    protected function validateEmployee(Request $request, ?Employee $employee = null): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'employee_code'  => 'nullable|string|max:50',
             'first_name'     => 'required|string|max:100',
             'last_name'      => 'nullable|string|max:100',
-            'email'          => 'nullable|email|max:150|unique:employees,email' . ($ignoreId ? ",{$ignoreId}" : ''),
+            'email'          => 'nullable|email|max:150|unique:employees,email' . ($employee ? ",{$employee->id}" : ''),
             'phone'          => 'nullable|string|max:30',
             'office_id'      => 'nullable|exists:offices,id',
             'department_id'  => 'nullable|exists:departments,id',
             'designation_id' => 'nullable|exists:designations,id',
+            'manager_id'     => 'nullable|exists:employees,id',
             'gender'         => 'nullable|in:male,female,other',
             'date_of_birth'  => 'nullable|date',
             'hire_date'      => 'nullable|date',
             'status'         => 'required|in:active,inactive,terminated',
             'work_mode'      => 'required|in:office,wfh,hybrid',
         ]);
+
+        // A new employee cannot close a loop, so the guard only has real work to
+        // do on update — but running it either way keeps the rule in one place.
+        $managerId = ($data['manager_id'] ?? null) ? (int) $data['manager_id'] : null;
+
+        if (! ($employee ?? new Employee())->canReportTo($managerId)) {
+            throw ValidationException::withMessages([
+                'manager_id' => 'That manager cannot be assigned — it would create a loop in the reporting line.',
+            ]);
+        }
+
+        return $data;
     }
 
     protected function nextCode(int $companyId): string

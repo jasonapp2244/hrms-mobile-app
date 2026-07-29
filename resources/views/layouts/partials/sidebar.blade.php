@@ -96,6 +96,11 @@
 								<a href="{{ route('shifts.index') }}"><i class="ti ti-clock-hour-4"></i><span>Shifts &amp; Schedule</span></a>
 							</li>
 							@endcan
+							@can('manage-leave')
+							<li class="{{ request()->routeIs('leave-types.*') ? 'active' : '' }}">
+								<a href="{{ route('leave-types.index') }}"><i class="ti ti-calendar-off"></i><span>Leave Types</span></a>
+							</li>
+							@endcan
 							@canany(['manage-company', 'manage-offices'])
 						<li class="submenu {{ request()->routeIs('company.*') || request()->routeIs('offices.*') ? 'active' : '' }}">
 							<a href="javascript:void(0);" class="{{ request()->routeIs('company.*') || request()->routeIs('offices.*') ? 'subdrop' : '' }}">

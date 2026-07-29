@@ -89,6 +89,15 @@
           </select>
         </div>
         <div class="col-md-4">
+          <label class="form-label">Reports To</label>
+          <select name="manager_id" class="form-select">
+            <option value="">No manager</option>
+            @foreach($managers as $manager)
+              <option value="{{ $manager->id }}" @selected(old('manager_id') == $manager->id)>{{ $manager->full_name }}</option>
+            @endforeach
+          </select>
+        </div>
+        <div class="col-md-4">
           <label class="form-label">Status</label>
           <select name="status" class="form-select">
             <option value="active" @selected(old('status', 'active') === 'active')>Active</option>

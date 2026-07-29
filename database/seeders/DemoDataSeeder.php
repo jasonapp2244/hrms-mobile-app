@@ -15,19 +15,22 @@ class DemoDataSeeder extends Seeder
 {
     public function run(): void
     {
-        // Company
-        $company = Company::firstOrCreate(
-            ['name' => 'Acme Corporation'],
-            [
-                'email' => 'info@acme.test',
-                'phone' => '+1 (212) 555-0100',
-                'city' => 'New York',
-                'country' => 'United States',
-                'timezone' => 'America/New_York',
-                'currency' => 'USD',
-                'is_active' => true,
-            ]
-        );
+        // Company — attach to whichever company already exists rather than
+        // matching on name. Matching on 'Acme Corporation' meant that once the
+        // company was renamed through Company Profile, re-running this seeder
+        // found no match and forked a second, parallel company: every later
+        // re-run then seeded departments, offices and shifts into an orphan the
+        // signed-in admin could not see.
+        $company = Company::first() ?? Company::create([
+            'name' => 'Acme Corporation',
+            'email' => 'info@acme.test',
+            'phone' => '+1 (212) 555-0100',
+            'city' => 'New York',
+            'country' => 'United States',
+            'timezone' => 'America/New_York',
+            'currency' => 'USD',
+            'is_active' => true,
+        ]);
 
         // Admin user (Phase 1 = admin-only login)
         $admin = User::firstOrCreate(
@@ -74,6 +77,20 @@ class DemoDataSeeder extends Seeder
             $shifts[] = \App\Models\Shift::firstOrCreate(
                 ['company_id' => $company->id, 'name' => $sd['name']],
                 $sd + ['break_minutes' => 60, 'late_grace_minutes' => 15, 'is_active' => true]
+            );
+        }
+
+        // Leave types. Carry-forward: null = unlimited, 0 = expires at year end.
+        $leaveTypeData = [
+            ['name' => 'Annual Leave', 'code' => 'AL', 'days_per_year' => 20, 'is_paid' => true,  'carry_forward_max' => 5,    'color' => '#F26522'],
+            ['name' => 'Sick Leave',   'code' => 'SL', 'days_per_year' => 10, 'is_paid' => true,  'carry_forward_max' => 0,    'color' => '#dc3545'],
+            ['name' => 'Casual Leave', 'code' => 'CL', 'days_per_year' => 6,  'is_paid' => true,  'carry_forward_max' => 0,    'color' => '#2b8fbe'],
+            ['name' => 'Unpaid Leave', 'code' => 'UL', 'days_per_year' => 0,  'is_paid' => false, 'carry_forward_max' => null, 'color' => '#6c757d'],
+        ];
+        foreach ($leaveTypeData as $ltd) {
+            \App\Models\LeaveType::firstOrCreate(
+                ['company_id' => $company->id, 'name' => $ltd['name']],
+                $ltd + ['requires_approval' => true, 'allow_half_day' => true, 'is_active' => true]
             );
         }
 
