@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 class AttendanceService
 {
     /**
-     * Record a clock in/out event after the QR token has been validated.
+     * Record a clock in/out event from a check-in button press.
      * Determines type (in/out) automatically and computes late/early status.
      *
      * @return array{log: AttendanceLog, type: string, status: string}

@@ -23,7 +23,6 @@ class RolePermissionSeeder extends Seeder
             'import-employees',
             'view-attendance',
             'manage-attendance',
-            'configure-qr',
             'view-reports',
             'export-reports',
             'manage-leave',
@@ -44,14 +43,17 @@ class RolePermissionSeeder extends Seeder
         // Admin gets everything
         $admin->syncPermissions(Permission::all());
 
-        // HR subset (seeded now, login disabled in Phase 1 — enabled later)
+        // HR subset. Covers day-to-day people operations: staff records, attendance,
+        // schedules and reporting. Deliberately excludes company-level configuration
+        // (company profile, offices, roles, settings), which stays with the admin.
         $hr->syncPermissions([
             'view-dashboard', 'manage-departments', 'manage-designations',
             'manage-employees', 'import-employees', 'view-attendance',
             'manage-attendance', 'view-reports', 'export-reports', 'manage-leave',
+            'manage-shifts',
         ]);
 
-        // Employee (reserved for the mobile self-service phase)
+        // Employee — self-service portal only (check in/out + own attendance)
         $employee->syncPermissions([
             'view-attendance',
         ]);

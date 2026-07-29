@@ -53,7 +53,7 @@ class DemoDataSeeder extends Seeder
         );
         $hr->assignRole('hr');
 
-        // Offices (location only; each gets an auto-generated rotating-QR secret)
+        // Offices (location only; working time lives on Shifts)
         $head = Office::firstOrCreate(
             ['company_id' => $company->id, 'name' => 'Head Office'],
             ['code' => 'HO', 'city' => 'New York']
