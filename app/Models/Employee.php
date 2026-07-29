@@ -67,6 +67,26 @@ class Employee extends Model
         return $this->hasMany(AttendanceLog::class);
     }
 
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
+
+    public function leaveBalances(): HasMany
+    {
+        return $this->hasMany(LeaveBalance::class);
+    }
+
+    /** Approved leave covering a given date, if any. */
+    public function leaveOn(string $date): ?LeaveRequest
+    {
+        return $this->leaveRequests()
+            ->approved()
+            ->where('start_date', '<=', $date)
+            ->where('end_date', '>=', $date)
+            ->first();
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
