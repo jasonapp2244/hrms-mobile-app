@@ -8,7 +8,9 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeePortalController;
+use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LeaveApprovalController;
+use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
@@ -102,11 +104,22 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::post('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->name('leave.reject');
     });
 
-    // Leave — configuration (types).
-    Route::resource('leave-types', LeaveTypeController::class)
-        ->parameters(['leave-types' => 'leaveType'])
-        ->except(['create', 'show', 'edit'])
-        ->middleware('permission:manage-leave');
+    // Leave — configuration (types, holidays) and balance administration.
+    Route::middleware('permission:manage-leave')->group(function () {
+        Route::resource('leave-types', LeaveTypeController::class)
+            ->parameters(['leave-types' => 'leaveType'])
+            ->except(['create', 'show', 'edit']);
+
+        // The holiday calendar drives what leave costs and what counts as an
+        // absence, so it sits with leave rather than under general settings.
+        Route::resource('holidays', HolidayController::class)
+            ->except(['create', 'show', 'edit']);
+
+        Route::get('leave-balances', [LeaveBalanceController::class, 'index'])->name('leave-balances.index');
+        Route::post('leave-balances/generate', [LeaveBalanceController::class, 'generate'])->name('leave-balances.generate');
+        Route::put('leave-balances/{leaveBalance}', [LeaveBalanceController::class, 'update'])->name('leave-balances.update');
+        Route::post('leave-balances/{leaveBalance}/recalculate', [LeaveBalanceController::class, 'recalculate'])->name('leave-balances.recalculate');
+    });
 
     // Shifts & Schedule
     Route::get('shifts/roster', [ShiftController::class, 'roster'])->middleware('permission:manage-shifts')->name('shifts.roster');
