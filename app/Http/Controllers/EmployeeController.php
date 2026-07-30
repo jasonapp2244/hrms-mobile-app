@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Designation;
 use App\Models\Employee;
 use App\Models\Office;
+use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -155,9 +156,10 @@ class EmployeeController extends Controller
 
         return [
             'offices'      => Office::where('company_id', $companyId)->get(),
-            'departments'  => Department::where('company_id', $companyId)->get(),
+            'departments'  => Department::with('shift')->where('company_id', $companyId)->get(),
             'designations' => Designation::where('company_id', $companyId)->get(),
             'managers'     => $managers,
+            'shifts'       => Shift::where('company_id', $companyId)->active()->orderBy('start_time')->get(),
         ];
     }
 
@@ -173,6 +175,8 @@ class EmployeeController extends Controller
             'department_id'  => 'nullable|exists:departments,id',
             'designation_id' => 'nullable|exists:designations,id',
             'manager_id'     => 'nullable|exists:employees,id',
+            // Empty means "follow the department", which is the normal case.
+            'shift_id'       => 'nullable|exists:shifts,id',
             'gender'         => 'nullable|in:male,female,other',
             'date_of_birth'  => 'nullable|date',
             'hire_date'      => 'nullable|date',

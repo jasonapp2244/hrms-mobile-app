@@ -47,7 +47,13 @@
               {{ $s->name }}
             </td>
             <td>{{ $s->code ?? '—' }}</td>
-            <td>{{ $s->timing }}</td>
+            <td>
+              {{ $s->timing }}
+              @if($s->crossesMidnight())
+                <span class="badge bg-dark ms-1" title="This shift ends the following morning">Overnight</span>
+              @endif
+              <div class="text-muted small">{{ $s->working_hours }} paid</div>
+            </td>
             <td>{{ $s->break_minutes }} min</td>
             <td>{{ $s->late_grace_minutes }} min</td>
             <td><span class="badge bg-light text-dark">{{ $s->departments_count }}</span></td>

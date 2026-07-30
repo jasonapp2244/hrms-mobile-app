@@ -10,8 +10,8 @@ class Employee extends Model
 {
     protected $fillable = [
         'company_id', 'office_id', 'department_id', 'designation_id', 'manager_id',
-        'user_id', 'employee_code', 'first_name', 'last_name', 'email', 'phone',
-        'avatar', 'date_of_birth', 'gender', 'hire_date', 'status', 'work_mode',
+        'shift_id', 'user_id', 'employee_code', 'first_name', 'last_name', 'email',
+        'phone', 'avatar', 'date_of_birth', 'gender', 'hire_date', 'status', 'work_mode',
     ];
 
     /** Human labels for the work_mode enum. */
@@ -51,10 +51,31 @@ class Employee extends Model
         return $this->belongsTo(Designation::class);
     }
 
-    /** An employee's working shift is inherited from their department. */
+    /**
+     * A shift assigned to this employee specifically, overriding their
+     * department's. Null for almost everyone.
+     */
+    public function shiftOverride(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class, 'shift_id');
+    }
+
+    /**
+     * The shift this employee actually works.
+     *
+     * Their own overrides the department's, and the department's is the default.
+     * Everything that judges a punch reads this, so there is one answer to
+     * "what hours is this person on" rather than one per caller.
+     */
     public function getShiftAttribute(): ?Shift
     {
-        return $this->department?->shift;
+        return $this->shiftOverride ?? $this->department?->shift;
+    }
+
+    /** Whether this employee is on a shift of their own rather than the team's. */
+    public function hasShiftOverride(): bool
+    {
+        return $this->shift_id !== null;
     }
 
     public function user(): BelongsTo

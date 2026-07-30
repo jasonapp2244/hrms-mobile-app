@@ -98,6 +98,18 @@
           </select>
         </div>
         <div class="col-md-4">
+          <label class="form-label">Shift</label>
+          <select name="shift_id" class="form-select">
+            <option value="">Follow department</option>
+            @foreach($shifts as $shift)
+              <option value="{{ $shift->id }}" @selected(old('shift_id') == $shift->id)>
+                {{ $shift->name }} ({{ $shift->timing }}){{ $shift->crossesMidnight() ? ' · overnight' : '' }}
+              </option>
+            @endforeach
+          </select>
+          <div class="form-text">Only set this for someone who works different hours from their team.</div>
+        </div>
+        <div class="col-md-4">
           <label class="form-label">Status</label>
           <select name="status" class="form-select">
             <option value="active" @selected(old('status', 'active') === 'active')>Active</option>

@@ -3,14 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Models\AttendanceLog;
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Office;
 use App\Models\Shift;
+use App\Services\LeaveService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class ShiftController extends Controller
 {
+    public function __construct(
+        protected LeaveService $leave,
+    ) {}
+
     protected function companyId(): int
     {
         return auth()->user()->company_id ?? Office::value('company_id');
@@ -37,7 +43,9 @@ class ShiftController extends Controller
 
         $days = collect(range(0, 6))->map(fn ($i) => (clone $weekStart)->addDays($i));
 
-        $employees = Employee::with('department.shift')
+        // shiftOverride eager loaded alongside the department's: the roster reads
+        // $emp->shift for every cell, and that resolves one or the other.
+        $employees = Employee::with('department.shift', 'shiftOverride')
             ->where('company_id', $companyId)->active()
             ->orderBy('department_id')->orderBy('first_name')->get();
 
@@ -52,12 +60,30 @@ class ShiftController extends Controller
             $attendance[$log->employee_id][Carbon::parse($log->work_date)->toDateString()] = $log->status;
         }
 
+        $company = Company::find($companyId);
+
+        // The roster used to hardcode Saturday and Sunday as off and had no idea
+        // about holidays or leave, so anyone on booked time off showed as absent
+        // — the roster contradicting the leave register it sits next to.
+        $weekend  = $this->leave->weekendDays($company);
+        $holidays = collect(\App\Models\Holiday::datesBetween(
+            $companyId, $weekStart->toDateString(), $weekEnd->toDateString(),
+        ))->flip();
+
+        $leaveDates = $this->leave->leaveDatesByEmployee(
+            $companyId, $weekStart->toDateString(), $weekEnd->toDateString(),
+        );
+        $onLeave = collect($leaveDates)->map(fn (array $dates) => collect($dates)->flip());
+
         return view('shifts.roster', [
             'weekStart'  => $weekStart,
             'weekEnd'    => $weekEnd,
             'days'       => $days,
             'employees'  => $employees,
             'attendance' => $attendance,
+            'weekend'    => $weekend,
+            'holidays'   => $holidays,
+            'onLeave'    => $onLeave,
             'today'      => Carbon::today(),
         ]);
     }

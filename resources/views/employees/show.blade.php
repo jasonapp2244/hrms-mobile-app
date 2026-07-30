@@ -40,6 +40,11 @@
           <span>
             @if($employee->shift)
               <span class="d-inline-block me-1" style="width:9px;height:9px;border-radius:50%;background:{{ $employee->shift->color }}"></span>{{ $employee->shift->name }}
+              @if($employee->hasShiftOverride())
+                <span class="badge bg-info-transparent text-info ms-1" title="Set for this employee, not inherited from their department">Own shift</span>
+              @else
+                <span class="text-muted small ms-1">via department</span>
+              @endif
             @else
               —
             @endif
@@ -50,7 +55,10 @@
           <span>
             @if($employee->shift)
               {{ $employee->shift->timing }}
-              <span class="text-muted small">· {{ $employee->shift->late_grace_minutes }} min grace</span>
+              @if($employee->shift->crossesMidnight())
+                <span class="badge bg-dark" title="Ends the following morning">Overnight</span>
+              @endif
+              <span class="text-muted small">· {{ $employee->shift->working_hours }} paid · {{ $employee->shift->late_grace_minutes }} min grace</span>
             @else
               <span class="text-muted">Not set</span>
             @endif

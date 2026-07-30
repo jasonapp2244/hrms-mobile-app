@@ -31,7 +31,9 @@
   <span><span class="badge bg-warning">&nbsp;</span> Late</span>
   <span><span class="badge bg-danger">&nbsp;</span> Absent</span>
   <span><span class="badge bg-secondary-transparent text-secondary">&nbsp;</span> Scheduled</span>
-  <span><span class="badge bg-light text-dark">Off</span> Weekend</span>
+  <span><span class="badge bg-info">&nbsp;</span> On Leave</span>
+  <span><span class="badge bg-primary-transparent text-primary">&nbsp;</span> Holiday</span>
+  <span><span class="badge bg-light text-dark">Off</span> Non-working day</span>
 </div>
 
 <div class="card">
@@ -54,19 +56,33 @@
           <tr>
             <td class="text-start">
               <div class="fw-semibold">{{ $emp->full_name }}</div>
-              <small class="text-muted">{{ $emp->department->name ?? '—' }}</small>
+              <small class="text-muted">
+                {{ $emp->department->name ?? '—' }}
+                @if($emp->hasShiftOverride())
+                  <span class="badge bg-info-transparent text-info ms-1" style="font-size:9px"
+                        title="On their own shift, not the department's">own shift</span>
+                @endif
+              </small>
             </td>
             @foreach($days as $day)
               @php
                 $dateStr = $day->toDateString();
-                $shift   = $emp->shift;                 // inherited from department
+                $shift   = $emp->shift;                 // own shift, else the department's
                 $status  = $attendance[$emp->id][$dateStr] ?? null;
                 $isPast  = $day->lt($today);
                 $isToday = $day->isSameDay($today);
+                $isWeekend = in_array($day->dayOfWeek, $weekend, true);
+                $isHoliday = $holidays->has($dateStr);
+                $isOnLeave = ($onLeave[$emp->id] ?? collect())->has($dateStr);
               @endphp
               <td class="{{ $isToday ? 'table-active' : '' }}" style="min-width:100px">
-                @if($day->isWeekend())
+                @if($isWeekend)
                   <span class="badge bg-light text-dark">Off</span>
+                @elseif($isHoliday)
+                  <span class="badge bg-primary-transparent text-primary">Holiday</span>
+                @elseif($isOnLeave)
+                  {{-- Booked and approved: not absent, whatever the punches say. --}}
+                  <span class="badge bg-info">On Leave</span>
                 @elseif(! $shift)
                   <span class="text-muted">—</span>
                 @else
@@ -76,7 +92,9 @@
                     <span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:{{ $shift->color }}"></span>
                     <span class="fw-semibold">{{ $shift->code ?? $shift->name }}</span>
                   </div>
-                  <div class="text-muted" style="font-size:10px">{{ $shift->timing }}</div>
+                  <div class="text-muted" style="font-size:10px">
+                    {{ $shift->timing }}@if($shift->crossesMidnight())<span title="Ends the next morning">+1</span>@endif
+                  </div>
                   {{-- Attendance status --}}
                   <div class="mt-1">
                     @if($status === 'ontime')

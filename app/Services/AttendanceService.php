@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
 use App\Models\Office;
+use App\Models\Shift;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -24,7 +25,7 @@ class AttendanceService
     {
         // Server-authoritative time — never trust the device clock
         $now = Carbon::now($office->company?->tz() ?? config('app.timezone'));
-        $workDate = $now->toDateString();
+        $workDate = $this->workDateFor($employee, $now);
 
         // Determine whether this scan is a clock-in or clock-out:
         // if the last event today was an "in", this one is an "out", else "in".
@@ -74,27 +75,64 @@ class AttendanceService
     }
 
     /**
-     * Status is measured against the employee's shift (inherited from their
-     * department). On a clock-in, compare to shift start (+ grace) for lateness;
-     * on a clock-out, compare to shift end for early leave. Falls back to a
-     * sensible 09:00–17:00 / 15-min default when no shift is assigned.
+     * The day a punch is counted against.
+     *
+     * Normally today. On a shift that crosses midnight it is the day the shift
+     * started, so a 22:00 clock-in and the 06:00 clock-out that ends the same
+     * stretch of work share a work_date instead of being split across two — a
+     * split that would break in/out pairing and leave the night worker looking
+     * absent on one day and half-present on the next.
+     */
+    protected function workDateFor(Employee $employee, Carbon $now): string
+    {
+        $shift = $employee->shift;
+
+        if ($shift && $shift->crossesMidnight() && $now->hour < Shift::NIGHT_CUTOFF_HOUR) {
+            return $now->copy()->subDay()->toDateString();
+        }
+
+        return $now->toDateString();
+    }
+
+    /**
+     * Status is measured against the shift the employee actually works — their
+     * own if one is set for them, otherwise their department's. On a clock-in,
+     * compare to shift start (+ grace) for lateness; on a clock-out, compare to
+     * shift end for early leave. Falls back to a sensible 09:00–17:00 / 15-min
+     * default when no shift is assigned at all.
      */
     protected function determineStatus(string $type, Carbon $now, Employee $employee): string
     {
-        $shift = $employee->shift; // inherited from department
+        $shift = $employee->shift;
 
         $startTime = $shift->start_time ?? '09:00:00';
         $endTime   = $shift->end_time ?? '17:00:00';
         $grace     = (int) ($shift->late_grace_minutes ?? 15);
+        $overnight = $shift?->crossesMidnight() ?? false;
+        $small     = $now->hour < Shift::NIGHT_CUTOFF_HOUR;
 
         if ($type === 'in') {
             $start = Carbon::parse($now->toDateString() . ' ' . $startTime, $now->timezone)
                 ->addMinutes($grace);
+
+            // Arriving after midnight for a shift that began last night: the
+            // start to measure against is yesterday's, not tonight's.
+            if ($overnight && $small) {
+                $start->subDay();
+            }
+
             return $now->greaterThan($start) ? 'late' : 'ontime';
         }
 
         // type === 'out'
         $end = Carbon::parse($now->toDateString() . ' ' . $endTime, $now->timezone);
+
+        // Leaving before midnight on a night shift: the end that matters is
+        // tomorrow morning's, so anything now is early.
+        if ($overnight && ! $small) {
+            $end->addDay();
+        }
+
         return $now->lessThan($end) ? 'early_leave' : 'ontime';
     }
 
