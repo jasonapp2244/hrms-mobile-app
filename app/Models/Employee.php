@@ -60,16 +60,53 @@ class Employee extends Model
         return $this->belongsTo(Shift::class, 'shift_id');
     }
 
+    /** Planned days on the roster. */
+    public function shiftAssignments(): HasMany
+    {
+        return $this->hasMany(ShiftAssignment::class);
+    }
+
     /**
-     * The shift this employee actually works.
+     * The employee's standing shift, ignoring the roster.
      *
      * Their own overrides the department's, and the department's is the default.
-     * Everything that judges a punch reads this, so there is one answer to
-     * "what hours is this person on" rather than one per caller.
+     * This is what applies on any day nobody has planned.
      */
     public function getShiftAttribute(): ?Shift
     {
         return $this->shiftOverride ?? $this->department?->shift;
+    }
+
+    /**
+     * The shift this employee works on a given date.
+     *
+     * A planned day wins over the standing shift, which is the whole point of
+     * the roster — otherwise every week would look identical and a rotation
+     * could not be expressed. A rostered day off returns null, exactly like
+     * having no shift at all, because for judging a punch they are the same
+     * thing: no hours to be measured against.
+     *
+     * Everything that judges a punch reads this, so there is one answer to
+     * "what hours is this person on, that day" rather than one per caller.
+     */
+    public function shiftOn(string $date): ?Shift
+    {
+        $assignment = $this->relationLoaded('shiftAssignments')
+            ? $this->shiftAssignments->first(fn (ShiftAssignment $a) => $a->date->toDateString() === $date)
+            : $this->shiftAssignments()->whereDate('date', $date)->first();
+
+        if ($assignment) {
+            return $assignment->is_day_off ? null : $assignment->shift;
+        }
+
+        return $this->shift;
+    }
+
+    /** Whether this employee is rostered off on a date. */
+    public function isRosteredOff(string $date): bool
+    {
+        return (bool) $this->shiftAssignments()
+            ->whereDate('date', $date)->value('is_day_off');
     }
 
     /** Whether this employee is on a shift of their own rather than the team's. */

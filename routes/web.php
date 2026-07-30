@@ -122,7 +122,12 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     });
 
     // Shifts & Schedule
-    Route::get('shifts/roster', [ShiftController::class, 'roster'])->middleware('permission:manage-shifts')->name('shifts.roster');
+    Route::middleware('permission:manage-shifts')->group(function () {
+        Route::get('shifts/roster', [ShiftController::class, 'roster'])->name('shifts.roster');
+        Route::post('shifts/roster', [ShiftController::class, 'saveRoster'])->name('shifts.roster.save');
+        Route::post('shifts/roster/rotation', [ShiftController::class, 'generateRotation'])->name('shifts.roster.rotation');
+        Route::post('shifts/roster/publish', [ShiftController::class, 'publishRoster'])->name('shifts.roster.publish');
+    });
     Route::resource('shifts', ShiftController::class)->only(['index', 'store', 'update', 'destroy'])->middleware('permission:manage-shifts');
 
     // Company / Offices (admin only — HR lacks these permissions)

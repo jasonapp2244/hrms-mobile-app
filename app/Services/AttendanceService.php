@@ -40,7 +40,7 @@ class AttendanceService
 
         $type = ($lastToday && $lastToday->type === 'in') ? 'out' : 'in';
 
-        $status = $this->determineStatus($type, $now, $employee);
+        $status = $this->determineStatus($type, $now, $employee, $workDate);
 
         $log = AttendanceLog::create([
             'employee_id' => $employee->id,
@@ -85,13 +85,17 @@ class AttendanceService
      */
     protected function workDateFor(Employee $employee, Carbon $now): string
     {
-        $shift = $employee->shift;
-
-        if ($shift && $shift->crossesMidnight() && $now->hour < Shift::NIGHT_CUTOFF_HOUR) {
-            return $now->copy()->subDay()->toDateString();
+        if ($now->hour >= Shift::NIGHT_CUTOFF_HOUR) {
+            return $now->toDateString();
         }
 
-        return $now->toDateString();
+        // Before noon, the question is whether *yesterday's* shift was still
+        // running — which is yesterday's roster entry, not today's. On a
+        // rotation the two are routinely different shifts.
+        $yesterday = $now->copy()->subDay()->toDateString();
+        $shift = $employee->shiftOn($yesterday);
+
+        return $shift && $shift->crossesMidnight() ? $yesterday : $now->toDateString();
     }
 
     /**
@@ -101,9 +105,11 @@ class AttendanceService
      * shift end for early leave. Falls back to a sensible 09:00–17:00 / 15-min
      * default when no shift is assigned at all.
      */
-    protected function determineStatus(string $type, Carbon $now, Employee $employee): string
+    protected function determineStatus(string $type, Carbon $now, Employee $employee, ?string $workDate = null): string
     {
-        $shift = $employee->shift;
+        // The shift rostered for the day this punch counts against — not
+        // whatever the employee's standing shift happens to be.
+        $shift = $employee->shiftOn($workDate ?? $now->toDateString());
 
         $startTime = $shift->start_time ?? '09:00:00';
         $endTime   = $shift->end_time ?? '17:00:00';

@@ -50,6 +50,33 @@
 		</div>
 	@endif
 
+	@if($schedule->isNotEmpty())
+		<div class="card mb-3">
+			<div class="card-header"><h5 class="mb-0"><i class="ti ti-calendar-week me-1 text-primary"></i>My Upcoming Schedule</h5></div>
+			<div class="card-body">
+				<div class="d-flex flex-wrap gap-2">
+					@foreach($schedule as $day)
+						<div class="border rounded text-center px-2 py-1" style="min-width:88px">
+							<div class="small text-muted">{{ $day->date->format('D j M') }}</div>
+							@if($day->is_day_off)
+								<span class="badge bg-light text-dark">Day off</span>
+							@elseif($day->shift)
+								<span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:{{ $day->shift->color }}"></span>
+								<span class="fw-semibold" style="font-size:12px">{{ $day->shift->code ?? $day->shift->name }}</span>
+								<div class="text-muted" style="font-size:10px">
+									{{ $day->shift->timing }}@if($day->shift->crossesMidnight())<span title="Ends the next morning">+1</span>@endif
+								</div>
+							@else
+								<span class="text-muted small">—</span>
+							@endif
+						</div>
+					@endforeach
+				</div>
+				<p class="text-muted small mb-0 mt-2">Days not shown follow your usual shift.</p>
+			</div>
+		</div>
+	@endif
+
 	{{-- Check in / out --}}
 	<div class="card mb-3">
 		<div class="card-header d-flex align-items-center justify-content-between">

@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\Office;
 use App\Models\Shift;
 use App\Services\LeaveService;
+use App\Services\RosterService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -15,6 +16,7 @@ class ShiftController extends Controller
 {
     public function __construct(
         protected LeaveService $leave,
+        protected RosterService $roster,
     ) {}
 
     protected function companyId(): int
@@ -75,17 +77,125 @@ class ShiftController extends Controller
         );
         $onLeave = collect($leaveDates)->map(fn (array $dates) => collect($dates)->flip());
 
+        $plan = $this->roster->weekMap(
+            $companyId, $weekStart->toDateString(), $weekEnd->toDateString(),
+        );
+
+        $planned = collect($plan)->flatten(1);
+
         return view('shifts.roster', [
-            'weekStart'  => $weekStart,
-            'weekEnd'    => $weekEnd,
-            'days'       => $days,
-            'employees'  => $employees,
-            'attendance' => $attendance,
-            'weekend'    => $weekend,
-            'holidays'   => $holidays,
-            'onLeave'    => $onLeave,
-            'today'      => Carbon::today(),
+            'weekStart'   => $weekStart,
+            'weekEnd'     => $weekEnd,
+            'days'        => $days,
+            'employees'   => $employees,
+            'attendance'  => $attendance,
+            'weekend'     => $weekend,
+            'holidays'    => $holidays,
+            'onLeave'     => $onLeave,
+            'plan'        => $plan,
+            'shifts'      => Shift::where('company_id', $companyId)->active()->orderBy('start_time')->get(),
+            'planning'    => $request->boolean('plan'),
+            'plannedCount'   => $planned->count(),
+            'unpublishedCount' => $planned->whereNull('published_at')->count(),
+            'today'       => Carbon::today(),
         ]);
+    }
+
+    /** Save a whole week of the planner in one submit. */
+    public function saveRoster(Request $request)
+    {
+        $companyId = $this->companyId();
+
+        $data = $request->validate([
+            'week'        => 'required|date',
+            // roster[employeeId][Y-m-d] = shift id, 'off', or '' to clear.
+            'roster'      => 'array',
+            'roster.*'    => 'array',
+        ]);
+
+        $employees = Employee::where('company_id', $companyId)
+            ->whereIn('id', array_keys($data['roster'] ?? []))
+            ->get()
+            ->keyBy('id');
+
+        $changed = 0;
+
+        foreach ($data['roster'] ?? [] as $employeeId => $days) {
+            $employee = $employees->get((int) $employeeId);
+
+            // Silently skipped rather than 403: a stale form could name someone
+            // who has since been moved out of the company, and the rest of the
+            // week is still worth saving.
+            if (! $employee) {
+                continue;
+            }
+
+            foreach ($days as $date => $value) {
+                $this->roster->setDay($employee, $date, $value, auth()->id());
+                $changed++;
+            }
+        }
+
+        return redirect()
+            ->route('shifts.roster', ['week' => $data['week'], 'plan' => 1])
+            ->with('success', "Roster saved for {$changed} day(s). Publish the week to make it visible to staff.");
+    }
+
+    /** Generate a repeating rotation across several weeks. */
+    public function generateRotation(Request $request)
+    {
+        $companyId = $this->companyId();
+
+        $data = $request->validate([
+            'week'          => 'required|date',
+            'start_date'    => 'required|date',
+            'weeks'         => 'required|integer|min:1|max:' . RosterService::MAX_WEEKS,
+            'employee_ids'  => 'required|array|min:1',
+            'employee_ids.*' => 'integer',
+            'cycle'         => 'required|array|min:1|max:' . RosterService::MAX_CYCLE,
+        ], [
+            'employee_ids.required' => 'Choose at least one employee to put on the rotation.',
+        ]);
+
+        $employees = Employee::where('company_id', $companyId)
+            ->whereIn('id', $data['employee_ids'])->active()->get();
+
+        abort_if($employees->isEmpty(), 403);
+
+        $written = $this->roster->generateRotation(
+            $employees, $data['cycle'], $data['start_date'], (int) $data['weeks'], auth()->id(),
+        );
+
+        return redirect()
+            ->route('shifts.roster', ['week' => $data['week'], 'plan' => 1])
+            ->with('success', sprintf(
+                '%d day(s) planned for %d employee(s). The rotation is a draft until you publish it.',
+                $written, $employees->count(),
+            ));
+    }
+
+    /** Publish or withdraw the displayed week. */
+    public function publishRoster(Request $request)
+    {
+        $companyId = $this->companyId();
+
+        $data = $request->validate([
+            'week'   => 'required|date',
+            'action' => 'required|in:publish,unpublish',
+        ]);
+
+        $from = Carbon::parse($data['week'])->startOfWeek(Carbon::MONDAY);
+        $to   = $from->copy()->endOfWeek(Carbon::SUNDAY);
+
+        $count = $data['action'] === 'publish'
+            ? $this->roster->publish($companyId, $from->toDateString(), $to->toDateString())
+            : $this->roster->unpublish($companyId, $from->toDateString(), $to->toDateString());
+
+        return redirect()
+            ->route('shifts.roster', ['week' => $data['week'], 'plan' => 1])
+            ->with('success', $data['action'] === 'publish'
+                ? "{$count} day(s) published — staff can now see this week."
+                : "{$count} day(s) withdrawn — this week is a draft again.");
     }
 
     public function store(Request $request)

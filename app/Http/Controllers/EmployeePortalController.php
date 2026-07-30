@@ -47,7 +47,19 @@ class EmployeePortalController extends Controller
         // page says why they are not expected rather than prompting them.
         $leaveToday = $employee->leaveOn($today);
 
-        return view('employee.dashboard', compact('employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday'));
+        // Only published days. A roster still being planned is deliberately
+        // invisible here — staff seeing drafts move around is the problem the
+        // publish step exists to prevent.
+        $schedule = \App\Models\ShiftAssignment::with('shift')
+            ->where('employee_id', $employee->id)
+            ->published()
+            ->between($today, now($employee->company?->tz() ?? config('app.timezone'))->addDays(13)->toDateString())
+            ->orderBy('date')
+            ->get();
+
+        return view('employee.dashboard', compact(
+            'employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday', 'schedule',
+        ));
     }
 
     /**
