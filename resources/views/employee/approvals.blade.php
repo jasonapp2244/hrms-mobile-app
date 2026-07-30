@@ -123,6 +123,63 @@
 	</div>
 </div>
 
+@if($swaps->isNotEmpty())
+<div class="card mb-3">
+	<div class="card-header d-flex align-items-center justify-content-between">
+		<h5 class="mb-0"><i class="ti ti-arrows-exchange me-1 text-warning"></i>Shift Swaps to Approve</h5>
+		<span class="badge bg-warning">{{ $swaps->count() }}</span>
+	</div>
+	<div class="card-body">
+		<p class="text-muted small">Both employees have already agreed. Approving updates the roster immediately.</p>
+		@foreach($swaps as $s)
+			<div class="border rounded p-3 mb-2">
+				<div>
+					<strong>{{ $s->requester->full_name }}</strong>
+					<i class="ti ti-arrows-exchange mx-1 text-muted"></i>
+					<strong>{{ $s->target->full_name }}</strong>
+				</div>
+				<div class="small text-muted mt-1">
+					{{ $s->requester->first_name }} gives up {{ $s->requester_date->format('D, M j') }},
+					{{ $s->target->first_name }} gives up {{ $s->target_date->format('D, M j') }}.
+					@if($s->isSameDay())<span class="badge bg-light text-dark ms-1">same day — straight trade</span>@endif
+				</div>
+				@if($s->reason)<div class="small mt-2"><span class="text-muted">Reason:</span> {{ $s->reason }}</div>@endif
+				<div class="mt-2 d-flex gap-2">
+					<form action="{{ route('employee.swaps.approve', $s) }}" method="POST">
+						@csrf
+						<button type="submit" class="btn btn-sm btn-success"><i class="ti ti-check me-1"></i>Approve</button>
+					</form>
+					<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectSwap{{ $s->id }}">Reject</button>
+				</div>
+			</div>
+
+			<div class="modal fade" id="rejectSwap{{ $s->id }}" tabindex="-1" aria-hidden="true">
+				<div class="modal-dialog">
+					<div class="modal-content">
+						<form action="{{ route('employee.swaps.reject', $s) }}" method="POST">
+							@csrf
+							<div class="modal-header">
+								<h5 class="modal-title">Reject swap</h5>
+								<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+							</div>
+							<div class="modal-body">
+								<label class="form-label">Reason <span class="text-danger">*</span></label>
+								<textarea name="decision_note" class="form-control" rows="3" maxlength="1000" required
+									placeholder="Both employees see this."></textarea>
+							</div>
+							<div class="modal-footer">
+								<button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+								<button type="submit" class="btn btn-danger">Reject Swap</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			</div>
+		@endforeach
+	</div>
+</div>
+@endif
+
 <div class="card">
 	<div class="card-header"><h5 class="mb-0">Recently Handled</h5></div>
 	<div class="card-body">

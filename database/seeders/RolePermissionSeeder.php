@@ -27,6 +27,7 @@ class RolePermissionSeeder extends Seeder
             'export-reports',
             'manage-leave',
             'approve-leave',
+            'approve-swaps',
             'view-team',
             'manage-shifts',
             'manage-roles',
@@ -53,7 +54,7 @@ class RolePermissionSeeder extends Seeder
             'view-dashboard', 'manage-departments', 'manage-designations',
             'manage-employees', 'import-employees', 'view-attendance',
             'manage-attendance', 'view-reports', 'export-reports', 'manage-leave',
-            'approve-leave', 'view-team', 'manage-shifts',
+            'approve-leave', 'approve-swaps', 'view-team', 'manage-shifts',
         ]);
 
         // Employee — self-service portal only (check in/out + own attendance)
@@ -68,6 +69,7 @@ class RolePermissionSeeder extends Seeder
         $manager->syncPermissions([
             'view-attendance',
             'approve-leave',
+            'approve-swaps',
             'view-team',
         ]);
     }

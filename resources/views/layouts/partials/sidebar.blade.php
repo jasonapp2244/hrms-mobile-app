@@ -92,8 +92,15 @@
 						</li>
 						@endcan
 						@can('manage-shifts')
-							<li class="{{ request()->routeIs('shifts.*') ? 'active' : '' }}">
-								<a href="{{ route('shifts.index') }}"><i class="ti ti-clock-hour-4"></i><span>Shifts &amp; Schedule</span></a>
+							<li class="submenu {{ request()->routeIs('shifts.*') || request()->routeIs('shift-swaps.*') ? 'active' : '' }}">
+								<a href="javascript:void(0);" class="{{ request()->routeIs('shifts.*') || request()->routeIs('shift-swaps.*') ? 'subdrop' : '' }}">
+									<i class="ti ti-clock-hour-4"></i><span>Shifts &amp; Schedule</span><span class="menu-arrow"></span>
+								</a>
+								<ul style="{{ request()->routeIs('shifts.*') || request()->routeIs('shift-swaps.*') ? 'display:block;' : '' }}">
+									<li><a class="{{ request()->routeIs('shifts.index') ? 'active' : '' }}" href="{{ route('shifts.index') }}">Shifts</a></li>
+									<li><a class="{{ request()->routeIs('shifts.roster') ? 'active' : '' }}" href="{{ route('shifts.roster') }}">Weekly Roster</a></li>
+									<li><a class="{{ request()->routeIs('shift-swaps.*') ? 'active' : '' }}" href="{{ route('shift-swaps.index') }}">Shift Swaps</a></li>
+								</ul>
 							</li>
 							@endcan
 							@can('manage-leave')

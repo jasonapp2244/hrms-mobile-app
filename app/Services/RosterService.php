@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Employee;
 use App\Models\Shift;
 use App\Models\ShiftAssignment;
+use App\Models\ShiftSwapRequest;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -167,6 +168,208 @@ class RosterService
             ->between($from, $to)
             ->whereNotNull('published_at')
             ->update(['published_at' => null]);
+    }
+
+    // ---- shift swaps ----
+
+    /**
+     * Raise a swap: the requester offers their rostered day and asks for the
+     * colleague's.
+     *
+     * Both people must actually be working the days being traded — there is
+     * nothing to swap otherwise — and on a cross-date swap neither may already
+     * be working the day they would be moving onto, or approving it would
+     * double-book them.
+     */
+    public function requestSwap(
+        Employee $requester,
+        string $requesterDate,
+        Employee $target,
+        string $targetDate,
+        ?string $reason = null,
+    ): ShiftSwapRequest {
+        if ($requester->id === $target->id) {
+            throw ValidationException::withMessages([
+                'target_id' => 'Pick a colleague to swap with.',
+            ]);
+        }
+
+        if ($target->company_id !== $requester->company_id) {
+            throw ValidationException::withMessages([
+                'target_id' => 'That employee is not available.',
+            ]);
+        }
+
+        if (! $requester->shiftOn($requesterDate)) {
+            throw ValidationException::withMessages([
+                'requester_date' => 'You are not rostered to work that day, so there is nothing to swap.',
+            ]);
+        }
+
+        if (! $target->shiftOn($targetDate)) {
+            throw ValidationException::withMessages([
+                'target_date' => $target->first_name . ' is not rostered to work that day.',
+            ]);
+        }
+
+        if ($requesterDate !== $targetDate) {
+            if ($requester->shiftOn($targetDate)) {
+                throw ValidationException::withMessages([
+                    'target_date' => 'You are already working that day — swapping onto it would double-book you.',
+                ]);
+            }
+
+            if ($target->shiftOn($requesterDate)) {
+                throw ValidationException::withMessages([
+                    'requester_date' => $target->first_name . ' is already working your day.',
+                ]);
+            }
+        }
+
+        // One open request per pair of days, so two people cannot queue up
+        // conflicting trades on the same shift.
+        $existing = ShiftSwapRequest::open()
+            ->where('requester_id', $requester->id)
+            ->whereDate('requester_date', $requesterDate)
+            ->exists();
+
+        if ($existing) {
+            throw ValidationException::withMessages([
+                'requester_date' => 'You already have a swap open for that day.',
+            ]);
+        }
+
+        return ShiftSwapRequest::create([
+            'company_id'     => $requester->company_id,
+            'requester_id'   => $requester->id,
+            'requester_date' => $requesterDate,
+            'target_id'      => $target->id,
+            'target_date'    => $targetDate,
+            'reason'         => $reason,
+            'status'         => 'pending',
+        ]);
+    }
+
+    /** The colleague agrees. Nothing moves yet — a manager still has to sanction it. */
+    public function acceptSwap(ShiftSwapRequest $swap, ?string $note = null): void
+    {
+        if (! $swap->isAwaitingColleague()) {
+            throw ValidationException::withMessages([
+                'status' => 'This swap is no longer waiting on you.',
+            ]);
+        }
+
+        $swap->update([
+            'status'        => 'accepted',
+            'responded_at'  => now(),
+            'response_note' => $note,
+        ]);
+    }
+
+    public function declineSwap(ShiftSwapRequest $swap, ?string $note = null): void
+    {
+        if (! $swap->isAwaitingColleague()) {
+            throw ValidationException::withMessages([
+                'status' => 'This swap is no longer waiting on you.',
+            ]);
+        }
+
+        $swap->update([
+            'status'        => 'declined',
+            'responded_at'  => now(),
+            'response_note' => $note,
+        ]);
+    }
+
+    public function cancelSwap(ShiftSwapRequest $swap): void
+    {
+        if (! $swap->isOpen()) {
+            throw ValidationException::withMessages([
+                'status' => 'This swap has already been ' . strtolower($swap->status_label) . '.',
+            ]);
+        }
+
+        $swap->update(['status' => 'cancelled']);
+    }
+
+    /**
+     * Sanction an agreed swap and move the roster.
+     *
+     * The shifts are read now rather than at request time, because the plan can
+     * be regenerated underneath a pending swap. If either day has since stopped
+     * being a working day the swap is refused instead of applied to whatever
+     * happens to sit there.
+     *
+     * Both sides are written explicitly, including the days off, so a cross-date
+     * swap leaves neither person silently still rostered on their old day.
+     */
+    public function approveSwap(ShiftSwapRequest $swap, ?int $approverId = null, ?string $note = null): void
+    {
+        if (! $swap->isAwaitingApproval()) {
+            throw ValidationException::withMessages([
+                'status' => $swap->isAwaitingColleague()
+                    ? 'The colleague has not accepted this swap yet.'
+                    : 'This swap has already been ' . strtolower($swap->status_label) . '.',
+            ]);
+        }
+
+        $requester = $swap->requester;
+        $target    = $swap->target;
+        $from      = $swap->requester_date->toDateString();
+        $to        = $swap->target_date->toDateString();
+
+        $requesterShift = $requester->shiftOn($from);
+        $targetShift    = $target->shiftOn($to);
+
+        if (! $requesterShift || ! $targetShift) {
+            throw ValidationException::withMessages([
+                'status' => 'The roster has changed since this swap was agreed — one of the '
+                    . 'days is no longer a working shift. Ask them to raise it again.',
+            ]);
+        }
+
+        DB::transaction(function () use ($swap, $requester, $target, $from, $to, $requesterShift, $targetShift, $approverId, $note) {
+            if ($from === $to) {
+                // Same day: the two simply trade shifts.
+                $this->setDay($requester, $from, $targetShift->id, $approverId);
+                $this->setDay($target, $to, $requesterShift->id, $approverId);
+            } else {
+                // Different days: each takes the other's day and is off their own.
+                $this->setDay($requester, $to, $targetShift->id, $approverId);
+                $this->setDay($requester, $from, 'off', $approverId);
+                $this->setDay($target, $from, $requesterShift->id, $approverId);
+                $this->setDay($target, $to, 'off', $approverId);
+            }
+
+            // Published straight away: the people affected have already agreed
+            // to it, so there is nothing to stage.
+            ShiftAssignment::whereIn('employee_id', [$requester->id, $target->id])
+                ->where(fn ($q) => $q->whereDate('date', $from)->orWhereDate('date', $to))
+                ->update(['published_at' => now()]);
+
+            $swap->update([
+                'status'        => 'approved',
+                'approved_by'   => $approverId,
+                'approved_at'   => now(),
+                'decision_note' => $note,
+            ]);
+        });
+    }
+
+    public function rejectSwap(ShiftSwapRequest $swap, ?int $approverId = null, ?string $note = null): void
+    {
+        if (! $swap->isOpen()) {
+            throw ValidationException::withMessages([
+                'status' => 'This swap has already been ' . strtolower($swap->status_label) . '.',
+            ]);
+        }
+
+        $swap->update([
+            'status'        => 'rejected',
+            'approved_by'   => $approverId,
+            'approved_at'   => now(),
+            'decision_note' => $note,
+        ]);
     }
 
     /**

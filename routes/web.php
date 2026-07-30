@@ -20,6 +20,8 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\ShiftSwapAdminController;
+use App\Http\Controllers\ShiftSwapController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Guest / Auth ----
@@ -52,6 +54,19 @@ Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('
     Route::get('leave', [LeaveRequestController::class, 'index'])->name('leave.index');
     Route::post('leave', [LeaveRequestController::class, 'store'])->name('leave.store');
     Route::post('leave/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])->name('leave.cancel');
+
+    // Shift swaps. Requesting, accepting and withdrawing are open to any
+    // employee — each action is scoped to the record in the controller, since
+    // being named on a swap is what authorises acting on it.
+    Route::prefix('swaps')->name('swaps.')->group(function () {
+        Route::get('/', [ShiftSwapController::class, 'index'])->name('index');
+        Route::post('/', [ShiftSwapController::class, 'store'])->name('store');
+        Route::post('{swap}/accept', [ShiftSwapController::class, 'accept'])->name('accept');
+        Route::post('{swap}/decline', [ShiftSwapController::class, 'decline'])->name('decline');
+        Route::post('{swap}/cancel', [ShiftSwapController::class, 'cancel'])->name('cancel');
+        Route::post('{swap}/approve', [ShiftSwapController::class, 'approve'])->name('approve');
+        Route::post('{swap}/reject', [ShiftSwapController::class, 'reject'])->name('reject');
+    });
 
     // Line-manager approvals. Permission-gated *and* scoped to the manager's own
     // direct reports in the controller — the permission alone grants no access
@@ -127,6 +142,12 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::post('shifts/roster', [ShiftController::class, 'saveRoster'])->name('shifts.roster.save');
         Route::post('shifts/roster/rotation', [ShiftController::class, 'generateRotation'])->name('shifts.roster.rotation');
         Route::post('shifts/roster/publish', [ShiftController::class, 'publishRoster'])->name('shifts.roster.publish');
+
+        // Company-wide swap register. HR can sanction a swap between two people
+        // whose managers differ, which a single manager cannot.
+        Route::get('shift-swaps', [ShiftSwapAdminController::class, 'index'])->name('shift-swaps.index');
+        Route::post('shift-swaps/{swap}/approve', [ShiftSwapAdminController::class, 'approve'])->name('shift-swaps.approve');
+        Route::post('shift-swaps/{swap}/reject', [ShiftSwapAdminController::class, 'reject'])->name('shift-swaps.reject');
     });
     Route::resource('shifts', ShiftController::class)->only(['index', 'store', 'update', 'destroy'])->middleware('permission:manage-shifts');
 

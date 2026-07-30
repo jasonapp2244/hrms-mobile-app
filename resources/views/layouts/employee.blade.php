@@ -44,6 +44,10 @@
 				<a class="nav-link {{ request()->routeIs('employee.leave.*') ? 'active' : 'bg-white' }}"
 					href="{{ route('employee.leave.index') }}"><i class="ti ti-calendar-off me-1"></i>My Leave</a>
 			</li>
+			<li class="nav-item">
+				<a class="nav-link {{ request()->routeIs('employee.swaps.*') ? 'active' : 'bg-white' }}"
+					href="{{ route('employee.swaps.index') }}"><i class="ti ti-arrows-exchange me-1"></i>Shift Swaps</a>
+			</li>
 			@can('approve-leave')
 			<li class="nav-item">
 				<a class="nav-link {{ request()->routeIs('employee.approvals.*') ? 'active' : 'bg-white' }}"

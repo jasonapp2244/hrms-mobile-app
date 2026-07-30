@@ -60,7 +60,22 @@ class LeaveApprovalController extends Controller
             ->limit(15)
             ->get();
 
-        return view('employee.approvals', compact('manager', 'pending', 'clashes', 'decided'));
+        // Swaps agreed between two people and waiting on a manager. Shown here
+        // rather than on a screen of their own — it is the same inbox and the
+        // same decision, and a manager should not have to check two places.
+        $swaps = auth()->user()->can('approve-swaps')
+            ? \App\Models\ShiftSwapRequest::with('requester', 'target')
+                ->awaitingApproval()
+                ->where(fn ($q) => $q->whereIn('requester_id', $teamIds)->orWhereIn('target_id', $teamIds))
+                // Never their own trade: approving one you are standing in is
+                // not an approval, and the controller refuses it anyway.
+                ->where('requester_id', '!=', $manager->id)
+                ->where('target_id', '!=', $manager->id)
+                ->orderBy('requester_date')
+                ->get()
+            : collect();
+
+        return view('employee.approvals', compact('manager', 'pending', 'clashes', 'decided', 'swaps'));
     }
 
     public function approve(Request $request, LeaveRequest $leaveRequest)
