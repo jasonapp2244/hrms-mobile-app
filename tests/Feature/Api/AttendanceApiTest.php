@@ -199,6 +199,29 @@ class AttendanceApiTest extends TestCase
             ->assertJsonPath('error', 'no_office');
     }
 
+    public function test_a_punch_records_the_company_it_belongs_to(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 08:50:00'));
+        $this->postJson('/api/v1/attendance/check')->assertOk();
+
+        // A row with no company is invisible to every company-scoped query —
+        // the dashboard tiles, the reports, the whole staff-facing side.
+        $this->assertSame($this->company->id, AttendanceLog::first()->company_id);
+    }
+
+    public function test_a_punch_created_without_a_company_still_gets_one(): void
+    {
+        // Seeders, imports and the portal button all create logs directly. The
+        // model fills it in so a caller that forgets cannot produce an orphan.
+        $log = AttendanceLog::create([
+            'employee_id' => $this->employee->id, 'office_id' => $this->office->id,
+            'type' => 'in', 'scanned_at' => '2026-08-03 09:00:00',
+            'work_date' => '2026-08-03', 'status' => 'ontime', 'source' => 'button',
+        ]);
+
+        $this->assertSame($this->company->id, $log->company_id);
+    }
+
     public function test_the_punch_is_marked_as_coming_from_the_app(): void
     {
         $this->travelTo(Carbon::parse('2026-08-03 08:50:00'));

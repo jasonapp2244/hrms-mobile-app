@@ -25,6 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Every API route sits under the 'api' limiter defined in
+        // AppServiceProvider. Laravel does not apply one by default, so without
+        // this a single client could hammer any endpoint without limit; the
+        // stricter per-route limiters stack on top of it.
+        $middleware->throttleApi();
+
         // Spatie permission middleware aliases
         $middleware->alias([
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,

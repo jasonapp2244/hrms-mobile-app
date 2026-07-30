@@ -56,9 +56,22 @@ class AuthController extends ApiController
         return $this->ok(['user' => $this->userPayload($request->user())]);
     }
 
-    /** Sign out this device only. */
+    /**
+     * Sign out this device only.
+     *
+     * The app should send the push token it registered with. Revoking the
+     * access token stops this handset reading anything, but says nothing about
+     * where notifications go — and a phone that keeps receiving somebody's
+     * leave approvals after they signed out is a leak, not a loose end.
+     */
     public function logout(Request $request): JsonResponse
     {
+        $data = $request->validate(['push_token' => 'nullable|string|max:255']);
+
+        if (! empty($data['push_token'])) {
+            $request->user()->pushDevices()->where('token', $data['push_token'])->delete();
+        }
+
         $request->user()->currentAccessToken()->delete();
 
         return $this->ok(['message' => 'Signed out.']);
@@ -70,9 +83,14 @@ class AuthController extends ApiController
         $count = $request->user()->tokens()->count();
         $request->user()->tokens()->delete();
 
+        // Every handset, not just the one asking: this is the endpoint for a
+        // phone that is gone, and it must stop pushing to it as well.
+        $devices = $request->user()->pushDevices()->delete();
+
         return $this->ok([
             'message'          => 'Signed out on all devices.',
             'tokens_revoked'   => $count,
+            'devices_removed'  => (int) $devices,
         ]);
     }
 

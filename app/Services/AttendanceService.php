@@ -43,6 +43,7 @@ class AttendanceService
         $status = $this->determineStatus($type, $now, $employee, $workDate);
 
         $log = AttendanceLog::create([
+            'company_id'  => $employee->company_id,
             'employee_id' => $employee->id,
             'office_id'   => $office->id,
             'type'        => $type,
