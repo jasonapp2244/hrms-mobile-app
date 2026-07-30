@@ -139,8 +139,7 @@ class Employee extends Model
     {
         return $this->leaveRequests()
             ->approved()
-            ->where('start_date', '<=', $date)
-            ->where('end_date', '>=', $date)
+            ->overlapping($date, $date)
             ->first();
     }
 

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AttendanceLog;
+use App\Models\Company;
 use App\Models\Employee;
 use Illuminate\Support\Collection;
 
@@ -13,6 +14,10 @@ use Illuminate\Support\Collection;
  */
 class ReportService
 {
+    public function __construct(
+        protected LeaveService $leave,
+    ) {}
+
     /**
      * Per-employee attendance stats for the period, keyed by employee id.
      * @return Collection<int,array>
@@ -30,17 +35,29 @@ class ReportService
             ->get()
             ->groupBy('employee_id');
 
-        return $employees->map(function (Employee $e) use ($insByEmp) {
+        // Absence is measured against the days the company works, with approved
+        // leave accounted for rather than held against anyone.
+        $expected   = count($this->leave->workingDatesBetween(Company::find($companyId), $from, $to));
+        $leaveDates = $this->leave->leaveDatesByEmployee($companyId, $from, $to);
+
+        return $employees->map(function (Employee $e) use ($insByEmp, $expected, $leaveDates) {
             $ins = $insByEmp->get($e->id, collect());
-            $presentDays = $ins->pluck('work_date')->map->toDateString()->unique()->count();
+            $presentDates = $ins->pluck('work_date')->map->toDateString()->unique();
+            $presentDays = $presentDates->count();
             $late = $ins->where('status', 'late')->count();
             $ontime = $ins->where('status', 'ontime')->count();
             $totalIns = $ins->count();
             $ontimePct = $totalIns > 0 ? round($ontime / $totalIns * 100, 1) : null;
 
+            $onLeave = collect($leaveDates[$e->id] ?? []);
+            // Union so a day both worked and booked off is not deducted twice.
+            $covered = $presentDates->merge($onLeave)->unique()->count();
+
             return [
                 'employee'     => $e,
                 'present_days' => $presentDays,
+                'leave_days'   => $onLeave->count(),
+                'absent_days'  => max(0, $expected - $covered),
                 'late'         => $late,
                 'ontime'       => $ontime,
                 'total_ins'    => $totalIns,
@@ -156,6 +173,8 @@ class ReportService
                 'Department'   => $deptName,
                 'Employees'    => $employees,
                 'Present (emp-days)' => $presentDays,
+                'Leave (emp-days)'   => $group->sum('leave_days'),
+                'Absent (emp-days)'  => $group->sum('absent_days'),
                 'Late Count'   => $late,
                 'On-time %'    => $ontimePct . '%',
             ];
@@ -163,13 +182,17 @@ class ReportService
 
         return [
             'title'    => 'Department Attendance Report',
-            'subtitle' => 'Attendance rolled up by department',
+            'subtitle' => 'Attendance rolled up by department. Approved leave is reported separately '
+                . 'from absence, and neither counts weekends or company holidays.',
             'tiles'    => [
                 ['label' => 'Departments', 'value' => count($rows)],
                 ['label' => 'Employees', 'value' => $stats->count()],
                 ['label' => 'Total Present Days', 'value' => $stats->sum('present_days')],
+                ['label' => 'Total Leave Days', 'value' => $stats->sum('leave_days')],
+                ['label' => 'Total Absent Days', 'value' => $stats->sum('absent_days')],
             ],
-            'headings' => ['Department', 'Employees', 'Present (emp-days)', 'Late Count', 'On-time %'],
+            'headings' => ['Department', 'Employees', 'Present (emp-days)', 'Leave (emp-days)',
+                'Absent (emp-days)', 'Late Count', 'On-time %'],
             'rows'     => $rows,
         ];
     }

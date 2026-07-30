@@ -27,8 +27,9 @@
 			['label'=>'Total Employees','value'=>$stats['employees'],'icon'=>'ti-users-group','bg'=>'primary'],
 			['label'=>'Present Today','value'=>$stats['present'],'icon'=>'ti-user-check','bg'=>'success'],
 			['label'=>'Late Today','value'=>$stats['late'],'icon'=>'ti-clock-exclamation','bg'=>'warning'],
+			['label'=>'On Leave Today','value'=>$stats['on_leave'],'icon'=>'ti-beach','bg'=>'info'],
 			['label'=>'Absent Today','value'=>$stats['absent'],'icon'=>'ti-user-x','bg'=>'danger'],
-			['label'=>'Departments','value'=>$stats['departments'],'icon'=>'ti-building','bg'=>'info'],
+			['label'=>'Departments','value'=>$stats['departments'],'icon'=>'ti-building','bg'=>'secondary'],
 			['label'=>'Offices','value'=>$stats['offices'],'icon'=>'ti-building-community','bg'=>'dark'],
 		];
 	@endphp

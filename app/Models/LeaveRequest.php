@@ -141,10 +141,17 @@ class LeaveRequest extends Model
         return $query->where('status', 'approved');
     }
 
-    /** Requests overlapping a date range — used for conflict detection. */
+    /**
+     * Requests overlapping a date range — used for conflict detection.
+     *
+     * whereDate rather than a plain comparison: the date casts mean the stored
+     * value carries a 00:00:00 time on any engine without a real DATE type, and
+     * "2026-08-05 00:00:00" <= "2026-08-05" is false as a string. MySQL truncates
+     * so it never showed there; matching on the date holds on both.
+     */
     public function scopeOverlapping($query, string $from, string $to)
     {
-        return $query->where('start_date', '<=', $to)
-            ->where('end_date', '>=', $from);
+        return $query->whereDate('start_date', '<=', $to)
+            ->whereDate('end_date', '>=', $from);
     }
 }

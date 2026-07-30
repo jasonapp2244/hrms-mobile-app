@@ -26,12 +26,13 @@
 		$tiles = [
 			['label'=>'Present','value'=>$summary['present'],'icon'=>'ti-user-check','bg'=>'success'],
 			['label'=>'Late','value'=>$summary['late'],'icon'=>'ti-clock-exclamation','bg'=>'warning'],
+			['label'=>'On Leave','value'=>$summary['on_leave'],'icon'=>'ti-beach','bg'=>'info'],
 			['label'=>'Absent','value'=>$summary['absent'],'icon'=>'ti-user-x','bg'=>'danger'],
 			['label'=>'Total','value'=>$summary['total'],'icon'=>'ti-users-group','bg'=>'primary'],
 		];
 	@endphp
 	@foreach($tiles as $t)
-	<div class="col-xl-3 col-sm-6 mb-3">
+	<div class="col-xl col-md-4 col-sm-6 mb-3">
 		<div class="card h-100">
 			<div class="card-body text-center">
 				<span class="avatar avatar-lg bg-{{ $t['bg'] }}-transparent text-{{ $t['bg'] }} rounded-circle mb-2">
@@ -44,6 +45,34 @@
 	</div>
 	@endforeach
 </div>
+
+<!-- Off today -->
+@if($onLeave->isNotEmpty())
+<div class="card mb-3">
+	<div class="card-header d-flex align-items-center justify-content-between">
+		<h5 class="mb-0"><i class="ti ti-beach me-1 text-info"></i>Off Today</h5>
+		@can('manage-leave')
+			<a href="{{ route('leave.index') }}" class="btn btn-sm btn-light">Leave register</a>
+		@endcan
+	</div>
+	<div class="card-body">
+		<p class="text-muted small">
+			These are approved absences. They are not counted in the Absent tile.
+		</p>
+		<div class="d-flex flex-wrap gap-2">
+			@foreach($onLeave as $r)
+				<span class="badge bg-light text-dark border p-2">
+					<span class="d-inline-block me-1" style="width:8px;height:8px;border-radius:50%;background:{{ $r->leaveType?->color }}"></span>
+					{{ $r->employee?->full_name }}
+					<span class="text-muted">· {{ $r->leaveType?->name }}</span>
+					@if($r->is_half_day)<span class="text-muted">· half day</span>@endif
+					<span class="text-muted">· to {{ $r->end_date->format('M j') }}</span>
+				</span>
+			@endforeach
+		</div>
+	</div>
+</div>
+@endif
 
 <!-- Recent Scans -->
 <div class="card">

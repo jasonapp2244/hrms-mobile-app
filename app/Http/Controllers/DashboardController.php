@@ -25,6 +25,7 @@ class DashboardController extends Controller
             'offices'     => Office::where('company_id', $companyId)->count(),
             'present'     => $summary['present'],
             'late'        => $summary['late'],
+            'on_leave'    => $summary['on_leave'],
             'absent'      => $summary['absent'],
         ];
 

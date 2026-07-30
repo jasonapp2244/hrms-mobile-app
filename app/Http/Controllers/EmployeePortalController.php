@@ -29,7 +29,7 @@ class EmployeePortalController extends Controller
         $today = now($employee->company?->tz() ?? config('app.timezone'))->toDateString();
 
         $todayLogs = AttendanceLog::where('employee_id', $employee->id)
-            ->where('work_date', $today)
+            ->whereDate('work_date', $today)
             ->orderBy('scanned_at')
             ->get();
 
@@ -42,7 +42,12 @@ class EmployeePortalController extends Controller
             ->latest('scanned_at')
             ->paginate(15);
 
-        return view('employee.dashboard', compact('employee', 'todayLogs', 'nextAction', 'logs'));
+        // Approved leave covering today. The button still works — someone on
+        // leave who comes in anyway should be recorded as present — but the
+        // page says why they are not expected rather than prompting them.
+        $leaveToday = $employee->leaveOn($today);
+
+        return view('employee.dashboard', compact('employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday'));
     }
 
     /**

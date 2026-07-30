@@ -5,12 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceLog;
 use App\Models\Office;
 use App\Services\AttendanceService;
+use App\Services\LeaveService;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
 {
     public function __construct(
         protected AttendanceService $attendance,
+        protected LeaveService $leave,
     ) {}
 
     protected function companyId(): int
@@ -30,7 +32,11 @@ class AttendanceController extends Controller
             ->limit(15)
             ->get();
 
-        return view('attendance.index', compact('summary', 'recent'));
+        // Named, not just counted: an absence tile nobody can drill into is the
+        // first thing HR asks about.
+        $onLeave = $this->leave->onLeaveOn($companyId)->sortBy(fn ($r) => $r->employee?->first_name);
+
+        return view('attendance.index', compact('summary', 'recent', 'onLeave'));
     }
 
     /** Full, filterable attendance log table. */
@@ -40,7 +46,7 @@ class AttendanceController extends Controller
 
         $logs = AttendanceLog::with(['employee', 'office'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))
-            ->when($request->filled('date'), fn ($q) => $q->where('work_date', $request->date))
+            ->when($request->filled('date'), fn ($q) => $q->whereDate('work_date', $request->date))
             ->when($request->filled('office_id'), fn ($q) => $q->where('office_id', $request->office_id))
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->type))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
@@ -72,6 +78,10 @@ class AttendanceController extends Controller
             'late'        => $logs->where('type', 'in')->where('status', 'late')->count(),
             'ontime'      => $logs->where('type', 'in')->where('status', 'ontime')->count(),
             'days'        => $logs->pluck('work_date')->unique()->count(),
+            // Employee-days of approved leave in the window, so a thin-looking
+            // period is explainable rather than just looking like poor turnout.
+            'leave_days'  => collect($this->leave->leaveDatesByEmployee($companyId, $from, $to))
+                                ->flatten()->count(),
         ];
 
         $offices = Office::where('company_id', $companyId)->get();

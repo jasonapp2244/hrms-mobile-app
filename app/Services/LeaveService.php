@@ -47,19 +47,21 @@ class LeaveService
     }
 
     /**
-     * Days actually charged for a leave range.
+     * The dates in a range the company actually works, as 'Y-m-d' strings.
      *
-     * Weekends and company holidays are free — an employee who books Friday to
-     * Monday over a two-day weekend spends two days, not four. A half day is
-     * always a single date and always costs 0.5.
+     * The single definition of a working day. Leave charges against it and
+     * attendance measures absence against it, so the two cannot disagree about
+     * whether a Saturday counts.
+     *
+     * @return array<int, string>
      */
-    public function chargeableDays(?Company $company, string $from, string $to, bool $halfDay = false): float
+    public function workingDatesBetween(?Company $company, string $from, string $to): array
     {
         $start = Carbon::parse($from)->startOfDay();
         $end   = Carbon::parse($to)->startOfDay();
 
         if ($end->lt($start)) {
-            return 0.0;
+            return [];
         }
 
         $weekend  = $this->weekendDays($company);
@@ -67,7 +69,7 @@ class LeaveService
             ? Holiday::datesBetween($company->id, $start->toDateString(), $end->toDateString())
             : [];
 
-        $days = 0.0;
+        $dates = [];
 
         for ($day = $start->copy(); $day->lte($end); $day->addDay()) {
             if (in_array($day->dayOfWeek, $weekend, true)) {
@@ -76,8 +78,22 @@ class LeaveService
             if (in_array($day->toDateString(), $holidays, true)) {
                 continue;
             }
-            $days++;
+            $dates[] = $day->toDateString();
         }
+
+        return $dates;
+    }
+
+    /**
+     * Days actually charged for a leave range.
+     *
+     * Weekends and company holidays are free — an employee who books Friday to
+     * Monday over a two-day weekend spends two days, not four. A half day is
+     * always a single date and always costs 0.5.
+     */
+    public function chargeableDays(?Company $company, string $from, string $to, bool $halfDay = false): float
+    {
+        $days = (float) count($this->workingDatesBetween($company, $from, $to));
 
         // A half day is validated to a single date, so this only ever halves a
         // one-day request — and stays 0 if that date was a weekend or holiday.
@@ -86,6 +102,75 @@ class LeaveService
         }
 
         return $days;
+    }
+
+    /**
+     * Who is on approved leave on a given date, keyed by employee id.
+     *
+     * The request itself is returned, not just the id, so callers can name the
+     * leave type on screen without a second lookup.
+     *
+     * @return \Illuminate\Support\Collection<int, LeaveRequest>
+     */
+    public function onLeaveOn(int $companyId, ?string $date = null): \Illuminate\Support\Collection
+    {
+        $date ??= now()->toDateString();
+
+        return LeaveRequest::with('leaveType', 'employee')
+            ->where('company_id', $companyId)
+            ->approved()
+            ->overlapping($date, $date)
+            ->get()
+            ->keyBy('employee_id');
+    }
+
+    /**
+     * Working dates covered by approved leave in a range, per employee.
+     *
+     * Weekends and holidays inside a leave range are excluded, because they were
+     * never charged for either — a week off does not make somebody "on leave" on
+     * the Sunday in the middle of it.
+     *
+     * A half day appears as a full date here. The employee was legitimately away
+     * for part of it, and the only question this answers is whether to hold their
+     * absence against them.
+     *
+     * @return array<int, array<int, string>> employee_id => ['Y-m-d', …]
+     */
+    public function leaveDatesByEmployee(int $companyId, string $from, string $to): array
+    {
+        $company = Company::find($companyId);
+
+        // One pass over the calendar for the whole window, then intersect each
+        // request with it — rather than recomputing weekends per request.
+        $working = array_flip($this->workingDatesBetween($company, $from, $to));
+
+        $requests = LeaveRequest::where('company_id', $companyId)
+            ->approved()
+            ->overlapping($from, $to)
+            ->get();
+
+        $out = [];
+
+        foreach ($requests as $request) {
+            $start = $request->start_date->toDateString();
+            $end   = $request->end_date->toDateString();
+
+            $span = Carbon::parse(max($start, $from));
+            $last = Carbon::parse(min($end, $to));
+
+            for ($day = $span->copy(); $day->lte($last); $day->addDay()) {
+                $date = $day->toDateString();
+
+                if (isset($working[$date])) {
+                    $out[$request->employee_id][$date] = $date;
+                }
+            }
+        }
+
+        // Keyed by date while building so overlapping requests cannot count the
+        // same day twice; handed back as plain lists.
+        return array_map('array_values', $out);
     }
 
     /**

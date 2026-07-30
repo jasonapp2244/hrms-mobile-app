@@ -36,6 +36,20 @@
 		</div>
 	</div>
 
+	@if($leaveToday)
+		<div class="alert alert-info d-flex align-items-center">
+			<i class="ti ti-beach me-2 fs-20"></i>
+			<div>
+				You are on approved <strong>{{ $leaveToday->leaveType?->name }}</strong> today
+				@if(! $leaveToday->start_date->isSameDay($leaveToday->end_date))
+					(until {{ $leaveToday->end_date->format('M j') }})
+				@endif
+				@if($leaveToday->is_half_day) — half day @endif.
+				You are not marked absent. Check in below only if you do work today.
+			</div>
+		</div>
+	@endif
+
 	{{-- Check in / out --}}
 	<div class="card mb-3">
 		<div class="card-header d-flex align-items-center justify-content-between">

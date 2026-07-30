@@ -58,6 +58,7 @@
 			['label'=>'On Time','value'=>$stats['ontime'],'icon'=>'ti-user-check','bg'=>'success'],
 			['label'=>'Late','value'=>$stats['late'],'icon'=>'ti-clock-exclamation','bg'=>'warning'],
 			['label'=>'Days','value'=>$stats['days'],'icon'=>'ti-calendar','bg'=>'info'],
+			['label'=>'Leave (emp-days)','value'=>$stats['leave_days'],'icon'=>'ti-beach','bg'=>'secondary'],
 		];
 	@endphp
 	@foreach($tiles as $t)

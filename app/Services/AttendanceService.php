@@ -10,6 +10,10 @@ use Illuminate\Support\Facades\DB;
 
 class AttendanceService
 {
+    public function __construct(
+        protected LeaveService $leave,
+    ) {}
+
     /**
      * Record a clock in/out event from a check-in button press.
      * Determines type (in/out) automatically and computes late/early status.
@@ -24,8 +28,12 @@ class AttendanceService
 
         // Determine whether this scan is a clock-in or clock-out:
         // if the last event today was an "in", this one is an "out", else "in".
+        // whereDate, not a plain equality: work_date is cast to a date, so the
+        // value written carries a 00:00:00 time on any engine without a real
+        // DATE type. MySQL truncates it, SQLite does not — matching on the date
+        // itself works on both.
         $lastToday = AttendanceLog::where('employee_id', $employee->id)
-            ->where('work_date', $workDate)
+            ->whereDate('work_date', $workDate)
             ->orderByDesc('scanned_at')
             ->first();
 
@@ -93,7 +101,11 @@ class AttendanceService
     /**
      * Aggregate summary tiles for a date (company-wide or per office).
      *
-     * @return array{present:int,late:int,absent:int,total:int}
+     * Approved leave is not absence. Somebody who booked the day off and did not
+     * clock in is reported as on leave; only the remainder — nobody knows where
+     * they are — counts as absent.
+     *
+     * @return array{present:int,late:int,on_leave:int,absent:int,total:int}
      */
     public function daySummary(int $companyId, ?string $date = null): array
     {
@@ -104,47 +116,81 @@ class AttendanceService
         $rows = AttendanceLog::query()
             ->select('employee_id', DB::raw("MIN(CASE WHEN type='in' THEN status END) as in_status"))
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))
-            ->where('work_date', $date)
+            ->whereDate('work_date', $date)
             ->where('type', 'in')
             ->groupBy('employee_id')
             ->get();
 
         $present = $rows->count();
         $late = $rows->where('in_status', 'late')->count();
-        $absent = max(0, $totalEmployees - $present);
+
+        // Anyone who turned up despite booking the day off is counted present,
+        // not on leave — otherwise the three tiles would sum past the headcount.
+        $onLeave = $this->leave->onLeaveOn($companyId, $date)
+            ->keys()
+            ->diff($rows->pluck('employee_id'))
+            ->count();
+
+        $absent = max(0, $totalEmployees - $present - $onLeave);
 
         return [
-            'present' => $present,
-            'late'    => $late,
-            'absent'  => $absent,
-            'total'   => $totalEmployees,
+            'present'  => $present,
+            'late'     => $late,
+            'on_leave' => $onLeave,
+            'absent'   => $absent,
+            'total'    => $totalEmployees,
         ];
     }
 
     /**
      * Recompute and store a monthly attendance score for an employee.
+     *
+     * Absence is measured against the days the company actually works, and an
+     * approved leave day is accounted for rather than counted against the
+     * employee. Only a working day with no punch and no leave is an absence.
      */
     public function computeMonthlyScore(Employee $employee, string $period): void
     {
         [$year, $month] = explode('-', $period);
+
+        $start = Carbon::create((int) $year, (int) $month, 1)->startOfMonth();
+        $end   = $start->copy()->endOfMonth();
+
         $logs = AttendanceLog::where('employee_id', $employee->id)
             ->whereYear('work_date', $year)
             ->whereMonth('work_date', $month)
             ->where('type', 'in')
             ->get();
 
-        $presentDays = $logs->pluck('work_date')->unique()->count();
+        $presentDates = $logs->pluck('work_date')
+            ->map(fn ($d) => $d instanceof Carbon ? $d->toDateString() : (string) $d)
+            ->unique();
+
+        $presentDays = $presentDates->count();
         $lateCount = $logs->where('status', 'late')->count();
         $ontime = max(0, $presentDays - $lateCount);
         $ontimePct = $presentDays > 0 ? round($ontime / $presentDays * 100, 2) : 0;
 
-        $employee->company; // ensure relation available
+        $expected = count($this->leave->workingDatesBetween(
+            $employee->company, $start->toDateString(), $end->toDateString(),
+        ));
+
+        $leaveDates = collect($this->leave->leaveDatesByEmployee(
+            $employee->company_id, $start->toDateString(), $end->toDateString(),
+        )[$employee->id] ?? []);
+
+        // Union, not a subtraction of both counts: somebody who clocked in on a
+        // day they had also booked off would otherwise be subtracted twice and
+        // pull the absence count below what it should be.
+        $covered = $presentDates->merge($leaveDates)->unique()->count();
+
         \App\Models\AttendanceScore::updateOrCreate(
             ['employee_id' => $employee->id, 'period' => $period, 'period_type' => 'monthly'],
             [
                 'present_days' => $presentDays,
                 'late_count'   => $lateCount,
-                'absent_count' => 0,
+                'leave_days'   => $leaveDates->count(),
+                'absent_count' => max(0, $expected - $covered),
                 'ontime_pct'   => $ontimePct,
                 'score'        => $ontimePct,
             ]
