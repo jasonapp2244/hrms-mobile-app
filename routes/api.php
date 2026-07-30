@@ -1,7 +1,8 @@
 <?php
 
+use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -37,4 +38,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('api.auth.logout-all');
     Route::get('auth/devices', [AuthController::class, 'devices'])->name('api.auth.devices');
+
+    // Attendance. The punch itself is throttled on top of the service's own
+    // cooldown: the cooldown stops a double tap, this stops a loop.
+    Route::post('attendance/check', [AttendanceController::class, 'check'])
+        ->middleware('throttle:20,1')
+        ->name('api.attendance.check');
+    Route::get('attendance/today', [AttendanceController::class, 'today'])->name('api.attendance.today');
+    Route::get('attendance/history', [AttendanceController::class, 'history'])->name('api.attendance.history');
+
+    Route::get('profile', [ProfileController::class, 'show'])->name('api.profile.show');
+    Route::put('profile', [ProfileController::class, 'update'])->name('api.profile.update');
+    Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('api.profile.password');
 });

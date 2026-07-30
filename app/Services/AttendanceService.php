@@ -82,8 +82,12 @@ class AttendanceService
      * stretch of work share a work_date instead of being split across two — a
      * split that would break in/out pairing and leave the night worker looking
      * absent on one day and half-present on the next.
+     *
+     * Public because the screens have to agree with the record: a night worker
+     * opening the app at 02:00 must be shown the day their punch would land on,
+     * not the calendar date on their phone.
      */
-    protected function workDateFor(Employee $employee, Carbon $now): string
+    public function workDateFor(Employee $employee, Carbon $now): string
     {
         if ($now->hour >= Shift::NIGHT_CUTOFF_HOUR) {
             return $now->toDateString();
@@ -140,6 +144,66 @@ class AttendanceService
         }
 
         return $now->lessThan($end) ? 'early_leave' : 'ontime';
+    }
+
+    /**
+     * Read a stored scan time as the wall clock it actually is.
+     *
+     * scanned_at is written in the company's timezone but read back as if it
+     * were the app's, so the value is a wall-clock reading with the wrong zone
+     * bolted on. Anything that compares it to a real instant, or hands it to a
+     * client that will convert it, has to restate it first:
+     *
+     *   wallClock($log->scanned_at, $company->tz())  → the true instant, for display
+     *   wallClock(now($company->tz()))               → "now" in the stored frame, for maths
+     *
+     * Without this a punch made one second ago in New York looks four hours
+     * old. recentlyScanned() sidesteps the same trap by comparing created_at,
+     * which is genuinely UTC.
+     */
+    public function wallClock(Carbon $moment, ?string $timezone = null): Carbon
+    {
+        return Carbon::parse($moment->format('Y-m-d H:i:s'), $timezone ?? config('app.timezone'));
+    }
+
+    /**
+     * Minutes worked across a day's punches.
+     *
+     * Pairs each "in" with the "out" that follows it. Logs must already be in
+     * chronological order — this walks them once rather than sorting, because
+     * every caller is reading them back out of an ordered query anyway.
+     *
+     * A stretch still open at the end of the list only counts when $openUntil is
+     * given: on today that is "worked so far", but on a past day where somebody
+     * forgot to clock out there is no honest number to report, so it counts as
+     * nothing rather than as a guess.
+     *
+     * @param  iterable<int, AttendanceLog>  $logs
+     */
+    public function workedMinutes(iterable $logs, ?Carbon $openUntil = null): int
+    {
+        $minutes = 0;
+        $openedAt = null;
+
+        foreach ($logs as $log) {
+            if ($log->type === 'in') {
+                // Two "in"s in a row: the first one is the stretch that is still
+                // running, so the later one is ignored rather than restarting it.
+                $openedAt ??= $log->scanned_at;
+                continue;
+            }
+
+            if ($openedAt) {
+                $minutes += max(0, $openedAt->diffInMinutes($log->scanned_at));
+                $openedAt = null;
+            }
+        }
+
+        if ($openedAt && $openUntil) {
+            $minutes += max(0, $openedAt->diffInMinutes($openUntil));
+        }
+
+        return (int) $minutes;
     }
 
     /**

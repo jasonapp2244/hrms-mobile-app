@@ -29,6 +29,19 @@ class Holiday extends Model
      */
     public static function datesBetween(int $companyId, string $from, string $to): array
     {
+        return array_keys(static::namedBetween($companyId, $from, $to));
+    }
+
+    /**
+     * The same range, keyed by date so a caller can name the day it landed on.
+     *
+     * Two holidays on one date collapse to the first — the date is a holiday
+     * either way, and there is one line on screen to put a name in.
+     *
+     * @return array<string, string> 'Y-m-d' => name
+     */
+    public static function namedBetween(int $companyId, string $from, string $to): array
+    {
         $start = \Carbon\Carbon::parse($from);
         $end   = \Carbon\Carbon::parse($to);
 
@@ -37,7 +50,7 @@ class Holiday extends Model
         foreach (static::where('company_id', $companyId)->get() as $holiday) {
             if (! $holiday->is_recurring) {
                 if ($holiday->date->betweenIncluded($start, $end)) {
-                    $dates[] = $holiday->date->toDateString();
+                    $dates[$holiday->date->toDateString()] ??= $holiday->name;
                 }
                 continue;
             }
@@ -46,11 +59,11 @@ class Holiday extends Model
             foreach (range($start->year, $end->year) as $year) {
                 $projected = $holiday->date->copy()->setYear($year);
                 if ($projected->betweenIncluded($start, $end)) {
-                    $dates[] = $projected->toDateString();
+                    $dates[$projected->toDateString()] ??= $holiday->name;
                 }
             }
         }
 
-        return array_values(array_unique($dates));
+        return $dates;
     }
 }

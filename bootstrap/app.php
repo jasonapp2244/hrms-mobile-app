@@ -41,6 +41,23 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;   // web routes keep Laravel's own handling
             }
 
+            // A plain abort(403) throws a generic HttpException, while a policy
+            // throws a typed one. To the client they are the same refusal, so
+            // the code is derived from the status rather than from which class
+            // happened to be thrown — otherwise one condition would arrive
+            // under two different names depending on where it was raised.
+            $byStatus = [
+                400 => 'bad_request',
+                401 => 'unauthenticated',
+                403 => 'forbidden',
+                404 => 'not_found',
+                405 => 'method_not_allowed',
+                409 => 'conflict',
+                422 => 'unprocessable',
+                429 => 'too_many_requests',
+                503 => 'unavailable',
+            ];
+
             [$status, $code, $message] = match (true) {
                 $e instanceof ValidationException      => [422, 'validation_failed', 'The given data was invalid.'],
                 $e instanceof AuthenticationException  => [401, 'unauthenticated', 'Authentication required.'],
@@ -49,7 +66,11 @@ return Application::configure(basePath: dirname(__DIR__))
                 $e instanceof ModelNotFoundException,
                 $e instanceof NotFoundHttpException    => [404, 'not_found', 'Resource not found.'],
                 $e instanceof ThrottleRequestsException => [429, 'too_many_requests', 'Too many requests. Please slow down.'],
-                $e instanceof HttpExceptionInterface   => [$e->getStatusCode(), 'http_error', $e->getMessage() ?: 'Request failed.'],
+                $e instanceof HttpExceptionInterface   => [
+                    $e->getStatusCode(),
+                    $byStatus[$e->getStatusCode()] ?? 'http_error',
+                    $e->getMessage() ?: 'Request failed.',
+                ],
                 default                                => [500, 'server_error', 'Something went wrong.'],
             };
 
