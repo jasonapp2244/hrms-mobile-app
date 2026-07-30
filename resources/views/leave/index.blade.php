@@ -25,7 +25,7 @@
 <div class="row g-3 mb-3">
 	@php
 		$tiles = [
-			['Pending Approval', $stats['pending'], 'ti-clock-hour-4', 'warning'],
+			['Awaiting Your Decision', $stats['awaiting_hr'], 'ti-clock-hour-4', 'warning'],
 			['On Leave Today', $stats['on_leave'], 'ti-user-off', 'danger'],
 			['Upcoming', $stats['upcoming'], 'ti-calendar-plus', 'info'],
 			['Approved This Month', $stats['this_month'], 'ti-calendar-check', 'success'],
@@ -48,11 +48,12 @@
 	@endforeach
 </div>
 
-@if($stats['pending'] > 0)
-	<div class="alert alert-warning">
-		<i class="ti ti-alert-triangle me-1"></i>
-		<strong>{{ $stats['pending'] }}</strong> request(s) are waiting for a decision.
-		Approvals arrive in the next release — until then this register is view-only.
+@if($stats['pending'] > $stats['awaiting_hr'])
+	<div class="alert alert-info">
+		<i class="ti ti-info-circle me-1"></i>
+		<strong>{{ $stats['pending'] - $stats['awaiting_hr'] }}</strong> further request(s) are still
+		with their line manager. They reach you once the manager passes them on — you can approve
+		them early from the table below, which bypasses that step.
 	</div>
 @endif
 
@@ -121,7 +122,7 @@
 						<th>Reason</th>
 						<th>Status</th>
 						<th>Decided By</th>
-						<th>Submitted</th>
+						@can('approve-leave')<th class="text-end">Actions</th>@endcan
 					</tr>
 				</thead>
 				<tbody>
@@ -144,20 +145,111 @@
 							@if(! $r->start_date->isSameDay($r->end_date))
 								<span class="text-muted">→</span> {{ $r->end_date->format('M j, Y') }}
 							@endif
+							<div class="text-muted small">submitted {{ $r->created_at?->format('M j, Y') }}</div>
 						</td>
 						<td>{{ rtrim(rtrim(number_format($r->days, 1), '0'), '.') }}</td>
 						<td>{{ $r->reason ? Str::limit($r->reason, 40) : '—' }}</td>
-						<td><span class="badge bg-{{ $r->status_badge }}">{{ $r->status_label }}</span></td>
+						<td>
+							@if($r->status === 'pending')
+								<span class="badge bg-{{ $r->isAwaitingManager() ? 'secondary' : 'warning' }}">{{ $r->stage_label }}</span>
+								@if($r->isAwaitingManager() && $r->employee?->manager)
+									<div class="text-muted small">with {{ $r->employee->manager->full_name }}</div>
+								@endif
+							@else
+								<span class="badge bg-{{ $r->status_badge }}">{{ $r->status_label }}</span>
+							@endif
+						</td>
 						<td>
 							@if($r->approved_at)
 								{{ $r->approver?->name ?? 'System' }}
 								<div class="text-muted small">{{ $r->approved_at->format('M j, Y') }}</div>
+							@elseif($r->manager_approved_at)
+								{{-- Not decided yet, but the manager step is on the record. --}}
+								<span class="text-muted small">manager: {{ $r->managerApprover?->name ?? '—' }}</span>
 							@else
 								<span class="text-muted">—</span>
 							@endif
 						</td>
-						<td class="text-muted small">{{ $r->created_at?->format('M j, Y') }}</td>
+						@can('approve-leave')
+						<td class="text-end text-nowrap">
+							@if($r->isPending())
+								<button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approve{{ $r->id }}">Approve</button>
+								<button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#reject{{ $r->id }}">Reject</button>
+							@else
+								<span class="text-muted small">—</span>
+							@endif
+						</td>
+						@endcan
 					</tr>
+
+					@can('approve-leave')
+					@if($r->isPending())
+					<!-- Approve -->
+					<div class="modal fade" id="approve{{ $r->id }}" tabindex="-1" aria-hidden="true">
+						<div class="modal-dialog">
+							<div class="modal-content">
+								<form action="{{ route('leave.approve', $r) }}" method="POST">
+									@csrf
+									<div class="modal-header">
+										<h5 class="modal-title">Approve leave</h5>
+										<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+									</div>
+									<div class="modal-body">
+										<p class="mb-2">
+											<strong>{{ $r->employee?->full_name }}</strong> —
+											{{ rtrim(rtrim(number_format($r->days, 1), '0'), '.') }} day(s) of
+											{{ $r->leaveType?->name }},
+											{{ $r->start_date->format('M j') }}@if(! $r->start_date->isSameDay($r->end_date)) → {{ $r->end_date->format('M j, Y') }}@else, {{ $r->start_date->format('Y') }}@endif.
+										</p>
+										@if($r->manager_note)
+											<p class="text-muted small">Manager's note: {{ $r->manager_note }}</p>
+										@endif
+										@if($r->isAwaitingManager())
+											<div class="alert alert-warning py-2 small">
+												<i class="ti ti-alert-triangle me-1"></i>
+												{{ $r->employee?->manager?->full_name ?? 'Their manager' }} has not reviewed
+												this yet. Approving now skips the manager step.
+											</div>
+										@endif
+										<p class="text-muted small mb-2">The days are deducted from their balance on approval.</p>
+										<label class="form-label">Note <span class="text-muted">(optional)</span></label>
+										<textarea name="decision_note" class="form-control" rows="2" maxlength="1000"></textarea>
+									</div>
+									<div class="modal-footer">
+										<button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+										<button type="submit" class="btn btn-success">Approve Leave</button>
+									</div>
+								</form>
+							</div>
+						</div>
+					</div>
+
+					<!-- Reject -->
+					<div class="modal fade" id="reject{{ $r->id }}" tabindex="-1" aria-hidden="true">
+						<div class="modal-dialog">
+							<div class="modal-content">
+								<form action="{{ route('leave.reject', $r) }}" method="POST">
+									@csrf
+									<div class="modal-header">
+										<h5 class="modal-title">Reject leave</h5>
+										<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+									</div>
+									<div class="modal-body">
+										<p class="mb-2"><strong>{{ $r->employee?->full_name }}</strong> — {{ $r->leaveType?->name }}</p>
+										<label class="form-label">Reason <span class="text-danger">*</span></label>
+										<textarea name="decision_note" class="form-control" rows="3" maxlength="1000" required
+											placeholder="The employee sees this."></textarea>
+									</div>
+									<div class="modal-footer">
+										<button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+										<button type="submit" class="btn btn-danger">Reject Request</button>
+									</div>
+								</form>
+							</div>
+						</div>
+					</div>
+					@endif
+					@endcan
 					@empty
 					<tr><td colspan="9" class="text-center text-muted">No leave requests match these filters.</td></tr>
 					@endforelse

@@ -34,7 +34,9 @@ class LeaveRequestController extends Controller
         $balances = $this->leave->balanceSummary($employee);
 
         $requests = $employee->leaveRequests()
-            ->with('leaveType', 'approver')
+            // employee is eager loaded because the stage label reads its
+            // manager_id — without it every row would fire its own query.
+            ->with('leaveType', 'approver', 'employee')
             ->latest('start_date')
             ->paginate(10);
 

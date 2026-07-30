@@ -83,7 +83,9 @@
 						</td>
 						<td>{{ rtrim(rtrim(number_format($r->days, 1), '0'), '.') }}</td>
 						<td>
-							<span class="badge bg-{{ $r->status_badge }}">{{ $r->status_label }}</span>
+							{{-- Pending shows which step it is on, so nobody has to ask
+							     HR why their request has not moved. --}}
+							<span class="badge bg-{{ $r->isPending() ? 'warning' : $r->status_badge }}">{{ $r->stage_label }}</span>
 							@if($r->decision_note)<div class="text-muted small">{{ Str::limit($r->decision_note, 50) }}</div>@endif
 						</td>
 						<td class="text-end">

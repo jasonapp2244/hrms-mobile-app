@@ -12,15 +12,17 @@ class LeaveRequest extends Model
         'start_date', 'end_date', 'days',
         'is_half_day', 'half_day_period',
         'reason', 'attachment', 'status',
+        'manager_approved_by', 'manager_approved_at', 'manager_note',
         'approved_by', 'approved_at', 'decision_note',
     ];
 
     protected $casts = [
-        'start_date'  => 'date',
-        'end_date'    => 'date',
-        'days'        => 'decimal:1',
-        'is_half_day' => 'boolean',
-        'approved_at' => 'datetime',
+        'start_date'          => 'date',
+        'end_date'            => 'date',
+        'days'                => 'decimal:1',
+        'is_half_day'         => 'boolean',
+        'approved_at'         => 'datetime',
+        'manager_approved_at' => 'datetime',
     ];
 
     /**
@@ -65,10 +67,16 @@ class LeaveRequest extends Model
         return $this->belongsTo(LeaveType::class);
     }
 
-    /** The user who approved or rejected this request. */
+    /** The user who made the final decision on this request. */
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /** The manager who passed this request on to HR, if it got that far. */
+    public function managerApprover(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_approved_by');
     }
 
     public function getStatusLabelAttribute(): string
@@ -92,6 +100,35 @@ class LeaveRequest extends Model
     {
         return $this->status === 'pending'
             || ($this->status === 'approved' && $this->start_date->isFuture());
+    }
+
+    /**
+     * Waiting on the employee's line manager.
+     *
+     * An employee with no manager set skips this step entirely and goes straight
+     * to HR — otherwise their request would sit in a queue that has no owner.
+     */
+    public function isAwaitingManager(): bool
+    {
+        return $this->status === 'pending'
+            && $this->manager_approved_at === null
+            && $this->employee?->manager_id !== null;
+    }
+
+    /** Waiting on HR/Admin for the final decision. */
+    public function isAwaitingHr(): bool
+    {
+        return $this->status === 'pending' && ! $this->isAwaitingManager();
+    }
+
+    /** What the request is waiting on, for the status columns. */
+    public function getStageLabelAttribute(): string
+    {
+        if ($this->status !== 'pending') {
+            return $this->status_label;
+        }
+
+        return $this->isAwaitingManager() ? 'Awaiting Manager' : 'Awaiting HR';
     }
 
     public function scopePending($query)

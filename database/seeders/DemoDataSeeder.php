@@ -157,5 +157,22 @@ class DemoDataSeeder extends Seeder
                 ]
             );
         }
+
+        // Reporting line, so the approval chain is demonstrable out of the box:
+        // the first employee leads the rest. The manager role is held *in
+        // addition to* employee — a manager is staff who also approves.
+        $lead = Employee::where('company_id', $company->id)
+            ->where('employee_code', 'EMP-0001')->first();
+
+        if ($lead) {
+            $lead->user?->assignRole('manager');
+
+            // Only fills gaps, so a reporting line set by hand in the UI is
+            // never overwritten by a re-seed.
+            Employee::where('company_id', $company->id)
+                ->where('id', '!=', $lead->id)
+                ->whereNull('manager_id')
+                ->update(['manager_id' => $lead->id]);
+        }
     }
 }

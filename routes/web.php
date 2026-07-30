@@ -8,6 +8,7 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeePortalController;
+use App\Http\Controllers\LeaveApprovalController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
@@ -49,6 +50,15 @@ Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('
     Route::get('leave', [LeaveRequestController::class, 'index'])->name('leave.index');
     Route::post('leave', [LeaveRequestController::class, 'store'])->name('leave.store');
     Route::post('leave/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])->name('leave.cancel');
+
+    // Line-manager approvals. Permission-gated *and* scoped to the manager's own
+    // direct reports in the controller — the permission alone grants no access
+    // to anyone else's request.
+    Route::middleware('permission:approve-leave')->prefix('approvals')->name('approvals.')->group(function () {
+        Route::get('/', [LeaveApprovalController::class, 'index'])->name('index');
+        Route::post('{leaveRequest}/approve', [LeaveApprovalController::class, 'approve'])->name('approve');
+        Route::post('{leaveRequest}/reject', [LeaveApprovalController::class, 'reject'])->name('reject');
+    });
 });
 
 // ---- Staff dashboard (admin + HR only) ----
@@ -84,9 +94,13 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::resource('departments', DepartmentController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-departments');
     Route::resource('designations', DesignationController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-designations');
 
-    // Leave — company-wide register. Approval actions attach here in 4.6.
+    // Leave — company-wide register and the final approval step.
     Route::get('leave', [LeaveController::class, 'index'])
         ->middleware('permission:manage-leave')->name('leave.index');
+    Route::middleware('permission:approve-leave')->group(function () {
+        Route::post('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
+        Route::post('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->name('leave.reject');
+    });
 
     // Leave — configuration (types).
     Route::resource('leave-types', LeaveTypeController::class)

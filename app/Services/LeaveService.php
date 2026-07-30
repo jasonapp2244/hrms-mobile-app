@@ -243,6 +243,33 @@ class LeaveService
     }
 
     /**
+     * The manager step: pass a request up to HR without granting it.
+     *
+     * Nothing is spent here. The days are only committed by the final decision,
+     * so a request stuck between the two steps holds no balance.
+     */
+    public function managerApprove(LeaveRequest $request, int $approverId, ?string $note = null): void
+    {
+        if (! $request->isPending()) {
+            throw ValidationException::withMessages([
+                'status' => 'This request has already been ' . strtolower($request->status_label) . '.',
+            ]);
+        }
+
+        if (! $request->isAwaitingManager()) {
+            throw ValidationException::withMessages([
+                'status' => 'This request has already passed the manager step — it is with HR.',
+            ]);
+        }
+
+        $request->update([
+            'manager_approved_by' => $approverId,
+            'manager_approved_at' => now(),
+            'manager_note'        => $note,
+        ]);
+    }
+
+    /**
      * Grant a pending request and spend the days.
      *
      * Balance is only ever moved here and in release(), so used_days cannot drift
@@ -253,6 +280,25 @@ class LeaveService
         if (! $request->isPending()) {
             throw ValidationException::withMessages([
                 'status' => 'This request has already been ' . strtolower($request->status_label) . '.',
+            ]);
+        }
+
+        // Re-check the balance at the moment of granting, not just at submission.
+        // Days can be spent in between — by an auto-approved request, or by
+        // another request approved earlier in the same queue — and without this
+        // the second approval would push used_days past the entitlement.
+        $balance = $this->balanceFor($request->employee, $request->leaveType, $request->start_date->year);
+
+        if ($this->isCapped($balance) && (float) $request->days > $balance->available) {
+            throw ValidationException::withMessages([
+                'status' => sprintf(
+                    'This request is %s day(s) but %s has only %s day(s) of %s left. '
+                    . 'Adjust their balance or reject the request.',
+                    $this->format((float) $request->days),
+                    $request->employee->first_name,
+                    $this->format($balance->available),
+                    $request->leaveType->name,
+                ),
             ]);
         }
 
