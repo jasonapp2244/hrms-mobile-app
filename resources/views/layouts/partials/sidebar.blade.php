@@ -97,8 +97,14 @@
 							</li>
 							@endcan
 							@can('manage-leave')
-							<li class="{{ request()->routeIs('leave-types.*') ? 'active' : '' }}">
-								<a href="{{ route('leave-types.index') }}"><i class="ti ti-calendar-off"></i><span>Leave Types</span></a>
+							<li class="submenu {{ request()->routeIs('leave.*') || request()->routeIs('leave-types.*') ? 'active' : '' }}">
+								<a href="javascript:void(0);" class="{{ request()->routeIs('leave.*') || request()->routeIs('leave-types.*') ? 'subdrop' : '' }}">
+									<i class="ti ti-calendar-off"></i><span>Leave</span><span class="menu-arrow"></span>
+								</a>
+								<ul style="{{ request()->routeIs('leave.*') || request()->routeIs('leave-types.*') ? 'display:block;' : '' }}">
+									<li><a class="{{ request()->routeIs('leave.index') ? 'active' : '' }}" href="{{ route('leave.index') }}">Leave Requests</a></li>
+									<li><a class="{{ request()->routeIs('leave-types.*') ? 'active' : '' }}" href="{{ route('leave-types.index') }}">Leave Types</a></li>
+								</ul>
 							</li>
 							@endcan
 							@canany(['manage-company', 'manage-offices'])
@@ -141,8 +147,7 @@
 				<li class="menu-title"><span>FUTURE PHASE</span></li>
 				<li>
 					<ul>
-						<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-calendar-off"></i><span>Leave Management</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
-												<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-robot"></i><span>AI Assistant</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
+						<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-robot"></i><span>AI Assistant</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
 					</ul>
 				</li>
 			</ul>

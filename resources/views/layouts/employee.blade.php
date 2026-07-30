@@ -34,6 +34,18 @@
 	</div>
 
 	<div class="emp-wrap">
+		{{-- Portal nav. Two destinations only — this area is deliberately small. --}}
+		<ul class="nav nav-pills mb-3 gap-2">
+			<li class="nav-item">
+				<a class="nav-link {{ request()->routeIs('employee.dashboard') ? 'active' : 'bg-white' }}"
+					href="{{ route('employee.dashboard') }}"><i class="ti ti-calendar-check me-1"></i>Attendance</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link {{ request()->routeIs('employee.leave.*') ? 'active' : 'bg-white' }}"
+					href="{{ route('employee.leave.index') }}"><i class="ti ti-calendar-off me-1"></i>My Leave</a>
+			</li>
+		</ul>
+
 		@yield('content')
 	</div>
 

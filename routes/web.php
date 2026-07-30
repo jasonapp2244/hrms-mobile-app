@@ -8,6 +8,8 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeePortalController;
+use App\Http\Controllers\LeaveController;
+use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\ProfileController;
@@ -40,6 +42,13 @@ Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('
     Route::get('dashboard', [EmployeePortalController::class, 'dashboard'])->name('dashboard');
     // One-tap button check in/out (works on mobile or PC, any location).
     Route::post('check', [EmployeePortalController::class, 'check'])->name('check');
+
+    // Own leave: balances, apply, withdraw. Every action is scoped to the
+    // signed-in employee inside the controller, so no permission is needed —
+    // holding the employee role is the authorisation.
+    Route::get('leave', [LeaveRequestController::class, 'index'])->name('leave.index');
+    Route::post('leave', [LeaveRequestController::class, 'store'])->name('leave.store');
+    Route::post('leave/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])->name('leave.cancel');
 });
 
 // ---- Staff dashboard (admin + HR only) ----
@@ -75,7 +84,11 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::resource('departments', DepartmentController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-departments');
     Route::resource('designations', DesignationController::class)->except(['create', 'show', 'edit'])->middleware('permission:manage-designations');
 
-    // Leave — configuration (types). Requests and approvals follow.
+    // Leave — company-wide register. Approval actions attach here in 4.6.
+    Route::get('leave', [LeaveController::class, 'index'])
+        ->middleware('permission:manage-leave')->name('leave.index');
+
+    // Leave — configuration (types).
     Route::resource('leave-types', LeaveTypeController::class)
         ->parameters(['leave-types' => 'leaveType'])
         ->except(['create', 'show', 'edit'])
