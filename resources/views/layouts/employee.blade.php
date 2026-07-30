@@ -25,6 +25,7 @@
 			<img src="{{ asset('assets/img/logo.svg') }}" class="logo" alt="{{ config('app.name') }}">
 			<div class="d-flex align-items-center gap-2">
 				<span class="d-none d-sm-inline text-muted small">{{ auth()->user()->name }}</span>
+				@include('layouts.partials.notification-bell')
 				<form method="POST" action="{{ route('logout') }}">
 					@csrf
 					<button type="submit" class="btn btn-sm btn-outline-secondary"><i class="ti ti-logout me-1"></i>Logout</button>

@@ -22,6 +22,10 @@ use Illuminate\Validation\ValidationException;
  */
 class LeaveService
 {
+    public function __construct(
+        protected NotificationService $notifications,
+    ) {}
+
     /**
      * Non-working days when the company has not configured its own.
      * Carbon numbers the week Sunday=0 … Saturday=6.
@@ -303,7 +307,7 @@ class LeaveService
             ]);
         }
 
-        return DB::transaction(function () use ($employee, $type, $data, $start, $end, $halfDay, $days) {
+        $request = DB::transaction(function () use ($employee, $type, $data, $start, $end, $halfDay, $days) {
             $request = LeaveRequest::create([
                 'company_id'      => $employee->company_id,
                 'employee_id'     => $employee->id,
@@ -325,6 +329,16 @@ class LeaveService
 
             return $request->refresh();
         });
+
+        // Outside the transaction: a notification is not part of the booking,
+        // and holding a database transaction open while talking to a queue or a
+        // mail server is how a lock turns into an outage. Auto-approved leave
+        // has already told the employee, and has nobody to ask.
+        if ($request->isPending()) {
+            $this->notifications->leaveSubmitted($request);
+        }
+
+        return $request;
     }
 
     /**
@@ -352,6 +366,8 @@ class LeaveService
             'manager_approved_at' => now(),
             'manager_note'        => $note,
         ]);
+
+        $this->notifications->leavePassedToHr($request->fresh());
     }
 
     /**
@@ -397,6 +413,8 @@ class LeaveService
                 'decision_note' => $note,
             ]);
         });
+
+        $this->notifications->leaveDecided($request->fresh());
     }
 
     /** Refuse a pending request. Nothing is spent, so nothing is returned. */
@@ -414,6 +432,8 @@ class LeaveService
             'approved_at'   => now(),
             'decision_note' => $note,
         ]);
+
+        $this->notifications->leaveDecided($request->fresh());
     }
 
     /**

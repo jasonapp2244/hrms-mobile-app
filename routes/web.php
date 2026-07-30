@@ -14,6 +14,7 @@ use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReportController;
@@ -36,6 +37,17 @@ Route::get('/', function () {
         return redirect()->route(auth()->user()->homeRoute());
     }
     return redirect()->route('login');
+});
+
+// ---- Notifications (everyone who can sign in) ----
+// Outside both the staff and employee groups on purpose: an approval alert
+// reaches a manager in the portal and an HR user in the dashboard, and they
+// should not need two different screens to read the same message. Every query
+// is scoped to the signed-in user by the relation itself.
+Route::middleware('auth')->group(function () {
+    Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('notifications/{id}', [NotificationController::class, 'show'])->name('notifications.show');
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
 });
 
 // ---- Employee self-service portal (employee + manager roles) ----

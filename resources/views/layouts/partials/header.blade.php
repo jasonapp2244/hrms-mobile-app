@@ -27,6 +27,8 @@
 				</div>
 
 				<div class="d-flex align-items-center">
+					@include('layouts.partials.notification-bell')
+
 					<!-- Theme toggle -->
 					<div class="me-2">
 						<a href="javascript:void(0);" id="dark-mode-toggle" class="btn btn-menubar activate">
