@@ -2,7 +2,10 @@
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\LeaveApprovalController;
+use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\ScheduleController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -46,6 +49,23 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.attendance.check');
     Route::get('attendance/today', [AttendanceController::class, 'today'])->name('api.attendance.today');
     Route::get('attendance/history', [AttendanceController::class, 'history'])->name('api.attendance.history');
+
+    // Leave — the employee's own.
+    Route::get('leave/balances', [LeaveController::class, 'balances'])->name('api.leave.balances');
+    Route::get('leave/requests', [LeaveController::class, 'index'])->name('api.leave.index');
+    Route::post('leave/requests', [LeaveController::class, 'store'])->name('api.leave.store');
+    Route::get('leave/requests/{leaveRequest}', [LeaveController::class, 'show'])->name('api.leave.show');
+    Route::post('leave/requests/{leaveRequest}/cancel', [LeaveController::class, 'cancel'])->name('api.leave.cancel');
+
+    // The line-manager inbox. Permission-gated *and* scoped to the manager's own
+    // reports in the controller — the permission alone reaches nobody else.
+    Route::middleware('permission:approve-leave')->group(function () {
+        Route::get('leave/approvals', [LeaveApprovalController::class, 'index'])->name('api.leave.approvals');
+        Route::post('leave/approvals/{leaveRequest}/approve', [LeaveApprovalController::class, 'approve'])->name('api.leave.approve');
+        Route::post('leave/approvals/{leaveRequest}/reject', [LeaveApprovalController::class, 'reject'])->name('api.leave.reject');
+    });
+
+    Route::get('schedule', [ScheduleController::class, 'index'])->name('api.schedule');
 
     Route::get('profile', [ProfileController::class, 'show'])->name('api.profile.show');
     Route::put('profile', [ProfileController::class, 'update'])->name('api.profile.update');

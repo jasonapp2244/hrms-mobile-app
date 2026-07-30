@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -27,6 +28,23 @@ abstract class ApiController extends Controller
             'error'   => $error,
             'message' => $message,
         ] + $extra, $status);
+    }
+
+    /**
+     * Paging facts a list client needs, in one predictable place.
+     *
+     * Laravel's own paginator JSON carries URLs built from the request host,
+     * which is no use to an app that builds its own — page numbers and a total
+     * are what it can actually act on.
+     */
+    protected function pageMeta(LengthAwarePaginator $page): array
+    {
+        return [
+            'current_page' => $page->currentPage(),
+            'last_page'    => $page->lastPage(),
+            'per_page'     => $page->perPage(),
+            'total'        => $page->total(),
+        ];
     }
 
     /**
