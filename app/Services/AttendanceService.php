@@ -208,6 +208,48 @@ class AttendanceService
     }
 
     /**
+     * The moment an employee's shift ended on a given work date.
+     *
+     * On a shift that crosses midnight this is the following morning, which is
+     * the whole reason it is computed here rather than pasted together from a
+     * date and a time at each call site. Null when nobody is rostered — a day
+     * off has no end to measure against.
+     */
+    public function shiftEndFor(Employee $employee, string $workDate): ?Carbon
+    {
+        $shift = $employee->shiftOn($workDate);
+
+        if (! $shift) {
+            return null;
+        }
+
+        $end = Carbon::parse($workDate . ' ' . $shift->end_time);
+
+        return $shift->crossesMidnight() ? $end->addDay() : $end;
+    }
+
+    /**
+     * Days where somebody clocked in and never clocked out.
+     *
+     * Keyed by employee so a caller can act per person. Only the most recent
+     * punch matters: an in/out/in sequence is still open, and an in/out one is
+     * not, regardless of how many pairs came before.
+     *
+     * @return \Illuminate\Support\Collection<int, AttendanceLog>
+     */
+    public function openPunches(int $companyId, string $workDate): \Illuminate\Support\Collection
+    {
+        return AttendanceLog::with('employee')
+            ->where('company_id', $companyId)
+            ->whereDate('work_date', $workDate)
+            ->orderBy('scanned_at')
+            ->get()
+            ->groupBy('employee_id')
+            ->map(fn ($logs) => $logs->last())
+            ->filter(fn (AttendanceLog $last) => $last->type === 'in');
+    }
+
+    /**
      * Aggregate summary tiles for a date (company-wide or per office).
      *
      * Approved leave is not absence. Somebody who booked the day off and did not
@@ -249,6 +291,50 @@ class AttendanceService
             'absent'   => $absent,
             'total'    => $totalEmployees,
         ];
+    }
+
+    /**
+     * Close a day somebody clocked into and never out of.
+     *
+     * Writes a real "out" punch at the shift's scheduled end, marked
+     * `source: auto` with a note saying so. Two alternatives were worse:
+     * leaving it open reports zero hours for a day that was worked, and
+     * stamping the current time would credit every hour since — somebody who
+     * forgot on Friday would show as having worked the weekend.
+     *
+     * The row is deliberately indistinguishable from a real punch to every
+     * report, and completely distinguishable to anyone looking at it: the
+     * hours are the scheduled ones, and the source says nobody pressed a
+     * button. HR corrects it from there.
+     */
+    public function autoClose(AttendanceLog $openPunch): ?AttendanceLog
+    {
+        $employee = $openPunch->employee;
+        $workDate = $openPunch->work_date->toDateString();
+
+        $end = $employee ? $this->shiftEndFor($employee, $workDate) : null;
+
+        if (! $end) {
+            return null;
+        }
+
+        // Someone who clocked in after their shift had already ended would
+        // otherwise get an "out" before their "in".
+        if ($end->lessThanOrEqualTo($openPunch->scanned_at)) {
+            return null;
+        }
+
+        return AttendanceLog::create([
+            'company_id'  => $openPunch->company_id,
+            'employee_id' => $openPunch->employee_id,
+            'office_id'   => $openPunch->office_id,
+            'type'        => 'out',
+            'scanned_at'  => $end,
+            'work_date'   => $workDate,
+            'status'      => 'ontime',
+            'source'      => 'auto',
+            'notes'       => 'Automatically closed at the scheduled shift end — no clock-out was recorded.',
+        ]);
     }
 
     /**
@@ -296,6 +382,7 @@ class AttendanceService
         \App\Models\AttendanceScore::updateOrCreate(
             ['employee_id' => $employee->id, 'period' => $period, 'period_type' => 'monthly'],
             [
+                'company_id'   => $employee->company_id,
                 'present_days' => $presentDays,
                 'late_count'   => $lateCount,
                 'leave_days'   => $leaveDates->count(),

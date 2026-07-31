@@ -29,6 +29,34 @@ class Company extends Model
             : config('app.timezone');
     }
 
+    /**
+     * Attendance policy defaults, overridable per company via `settings`.
+     *
+     * Kept as settings rather than constants so a company can be corrected with
+     * one row update instead of a deployment, and stated here rather than
+     * scattered through the commands that read them.
+     */
+    public const POLICY_DEFAULTS = [
+        // How long after a shift ends before somebody still clocked in is
+        // nudged. Short enough to catch them before they get home.
+        'checkout_reminder_after_minutes' => 30,
+
+        // How long after a shift ends before the day is closed for them.
+        // Generous — overtime is normal, and closing a day somebody is still
+        // working would understate their hours.
+        'auto_close_after_minutes' => 240,
+    ];
+
+    /** A policy value for this company, falling back to the default. */
+    public function policy(string $key): mixed
+    {
+        $value = $this->settings[$key] ?? null;
+
+        return $value === null || $value === ''
+            ? (self::POLICY_DEFAULTS[$key] ?? null)
+            : $value;
+    }
+
     public function offices(): HasMany
     {
         return $this->hasMany(Office::class);
