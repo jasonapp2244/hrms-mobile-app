@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class LeaveBalance extends Model
 {
     protected $fillable = [
-        'employee_id', 'leave_type_id', 'year',
+        'company_id', 'employee_id', 'leave_type_id', 'year',
         'entitled_days', 'carried_forward', 'used_days',
     ];
 
@@ -18,6 +18,27 @@ class LeaveBalance extends Model
         'carried_forward' => 'decimal:1',
         'used_days'       => 'decimal:1',
     ];
+
+    /**
+     * A balance always belongs to the company its employee does.
+     *
+     * Filled here rather than at each call site because balanceFor() creates a
+     * row on first use from wherever leave is touched — the portal, the mobile
+     * API, HR's generate button, seeders — and a caller that forgets produces a
+     * row no company-scoped query can see. There is nothing to decide: the
+     * answer is the employee's company, every time.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $balance) {
+            $balance->company_id ??= Employee::whereKey($balance->employee_id)->value('company_id');
+        });
+    }
+
+    public function company(): BelongsTo
+    {
+        return $this->belongsTo(Company::class);
+    }
 
     public function employee(): BelongsTo
     {

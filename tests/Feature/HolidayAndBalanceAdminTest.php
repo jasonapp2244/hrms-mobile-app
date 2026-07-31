@@ -343,4 +343,65 @@ class HolidayAndBalanceAdminTest extends TestCase
         // Leave is charged to the year it starts in, so 2027's does not count here.
         $this->assertSame('5.0', $balance->fresh()->used_days);
     }
+
+    // ================= company scoping =================
+    //
+    // leave_balances carried a NOT NULL company_id that no migration declared and
+    // no code set, so the insert in balanceFor() failed on the deployed database
+    // and took the whole leave module down for any year without balances yet.
+    // These pin the column to the employee's company on every route in.
+
+    public function test_balance_created_on_first_use_is_stamped_with_the_employees_company(): void
+    {
+        $employee = $this->makeEmployee();
+
+        $balance = app(LeaveService::class)->balanceFor($employee, $this->type, 2027);
+
+        $this->assertSame($this->company->id, $balance->company_id);
+        $this->assertDatabaseHas('leave_balances', [
+            'id' => $balance->id, 'company_id' => $this->company->id,
+        ]);
+    }
+
+    public function test_a_year_with_no_balances_yet_does_not_fail(): void
+    {
+        $employee = $this->makeEmployee();
+
+        // The production trigger: the first request of a new leave year, where
+        // balanceFor() has to create the row rather than find it.
+        $this->assertSame(0, LeaveBalance::where('year', 2028)->count());
+
+        $balance = app(LeaveService::class)->balanceFor($employee, $this->type, 2028);
+
+        $this->assertNotNull($balance->company_id);
+        $this->assertSame('20.0', $balance->entitled_days);
+    }
+
+    public function test_hr_generate_stamps_the_company_on_every_row_it_creates(): void
+    {
+        $this->makeEmployee('Ann', 'E1');
+        $this->makeEmployee('Bob', 'E2');
+
+        $this->actingAs($this->staff('hr'))
+            ->post('/leave-balances/generate', ['year' => 2027])
+            ->assertRedirect();
+
+        $rows = LeaveBalance::where('year', 2027)->get();
+
+        $this->assertNotEmpty($rows);
+        foreach ($rows as $row) {
+            $this->assertSame($this->company->id, $row->company_id);
+        }
+    }
+
+    public function test_each_balance_takes_its_own_employees_company_not_the_actors(): void
+    {
+        $other = Company::create(['name' => 'Other Co', 'timezone' => 'UTC']);
+        $theirs = $this->makeEmployee('Zed', 'Z1', $other);
+
+        $balance = app(LeaveService::class)->balanceFor($theirs, $this->type, 2027);
+
+        $this->assertSame($other->id, $balance->company_id);
+        $this->assertNotSame($this->company->id, $balance->company_id);
+    }
 }
