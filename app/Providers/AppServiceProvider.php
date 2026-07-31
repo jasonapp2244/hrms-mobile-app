@@ -2,9 +2,11 @@
 
 namespace App\Providers;
 
+use App\Jobs\SendQueuedNotification;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -17,7 +19,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Carry queued notifications in our own job class rather than the
+        // framework's. The queue reads deleteWhenMissingModels and backoff off
+        // the *job*, never off the notification, so settings placed on a
+        // notification class look right and do nothing. NotificationSender
+        // resolves this from the container, so binding it here is enough.
+        $this->app->bind(SendQueuedNotifications::class, SendQueuedNotification::class);
     }
 
     /**

@@ -41,3 +41,15 @@ Schedule::command('attendance:remind-checkout')
 Schedule::command('attendance:close-day')
     ->hourly()
     ->withoutOverlapping();
+
+// Nightly, and verified rather than assumed. Runs at 02:10 — after the last
+// hourly close has settled and well before anyone clocks in, so the dump is of
+// a quiet database and the verification restore is not competing with traffic.
+//
+// onOneServer matters if this is ever load-balanced: two servers dumping the
+// same database on the same schedule would rotate each other's backups away.
+Schedule::command('db:backup --verify')
+    ->dailyAt('02:10')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();

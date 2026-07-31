@@ -389,4 +389,52 @@ class NotificationTest extends TestCase
             ->assertOk()
             ->assertSee('Your leave was approved');
     }
+
+    // ================= queue robustness =================
+    //
+    // Found in production-shaped testing: notifications sat queued, and the ones
+    // whose leave request had since been deleted failed permanently instead of
+    // giving up quietly, filling failed_jobs with what looked like a broken mail
+    // pipeline.
+
+    public function test_notifications_are_queued_through_our_own_job_class(): void
+    {
+        // The setting that matters is read off the *job*, never off the
+        // notification — so a notification carried by the framework's own job
+        // class silently loses it. This is the binding that prevents that.
+        $job = app(\Illuminate\Notifications\SendQueuedNotifications::class, [
+            'notifiables'  => $this->employee->user,
+            'notification' => new LeaveRequestSubmitted($this->apply()),
+        ]);
+
+        $this->assertInstanceOf(\App\Jobs\SendQueuedNotification::class, $job);
+    }
+
+    public function test_the_queued_job_discards_rather_than_fails_when_the_record_is_gone(): void
+    {
+        // Mirrors exactly what Laravel's queue does when a model cannot be
+        // restored: it reflects on the job class for this default property, and
+        // fails the job outright when it is absent.
+        $reflected = (new \ReflectionClass(\App\Jobs\SendQueuedNotification::class))
+            ->getDefaultProperties();
+
+        $this->assertTrue(
+            $reflected['deleteWhenMissingModels'] ?? false,
+            'CallQueuedHandler::handleModelNotFound() reads this exact property off this exact class',
+        );
+        $this->assertNotEmpty($reflected['backoff'] ?? null, 'a failed send should back off before retrying');
+    }
+
+    public function test_a_notification_still_carries_its_own_try_count(): void
+    {
+        // tries *is* copied from the notification onto the job, so the
+        // per-notification distinction survives — the checkout reminder is
+        // deliberately less persistent than a leave decision.
+        $job = app(\Illuminate\Notifications\SendQueuedNotifications::class, [
+            'notifiables'  => $this->employee->user,
+            'notification' => new LeaveRequestSubmitted($this->apply()),
+        ]);
+
+        $this->assertSame(3, $job->tries);
+    }
 }
