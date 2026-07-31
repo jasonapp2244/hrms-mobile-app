@@ -60,6 +60,36 @@ class AttendanceService
     }
 
     /**
+     * What a day was, in one word.
+     *
+     * Turning up wins over every reason not to: somebody who books the day off
+     * and comes in anyway worked, and the record has to say so. Absence is only
+     * ever claimed for a day the company works, nobody planned off, and the
+     * employee neither booked nor showed.
+     *
+     * Lives here rather than on a controller because two endpoints now answer
+     * this question — a person's own history, and their manager's view of the
+     * team — and two copies would eventually disagree about what "absent"
+     * means for the same day.
+     */
+    public function dayStatus(
+        bool $hasPunches,
+        bool $onLeave,
+        bool $isHoliday,
+        bool $isDayOff,
+        bool $isWorkingDay,
+    ): string {
+        return match (true) {
+            $hasPunches     => 'present',
+            $onLeave        => 'leave',
+            $isHoliday      => 'holiday',
+            $isDayOff       => 'day_off',
+            ! $isWorkingDay => 'weekend',
+            default         => 'absent',
+        };
+    }
+
+    /**
      * Prevent accidental duplicate scans within a short cooldown.
      *
      * Compares against created_at (always stored/read in UTC) rather than

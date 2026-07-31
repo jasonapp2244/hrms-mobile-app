@@ -65,4 +65,16 @@ abstract class ApiController extends Controller
 
         return $employee;
     }
+
+    /**
+     * The zone every time this employee sees is expressed in.
+     *
+     * Shared rather than per-controller: attendance and the team view both
+     * answer with clock faces, and two definitions of "the company's zone"
+     * would eventually show one person two different times for one punch.
+     */
+    protected function timezone(Employee $employee): string
+    {
+        return $employee->company?->tz() ?? config('app.timezone');
+    }
 }

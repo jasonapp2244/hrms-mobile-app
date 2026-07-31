@@ -194,8 +194,8 @@ class AttendanceController extends ApiController
             $days[] = [
                 'date'    => $date,
                 'weekday' => $day->format('D'),
-                'status'  => $this->dayStatus(
-                    $date, $dayLogs->isNotEmpty(),
+                'status'  => $this->attendance->dayStatus(
+                    $dayLogs->isNotEmpty(),
                     isset($onLeave[$date]), isset($holidays[$date]),
                     $daysOff->has($date), isset($working[$date]),
                 ),
@@ -224,27 +224,6 @@ class AttendanceController extends ApiController
         ]);
     }
 
-    /**
-     * What a day was, in one word.
-     *
-     * Turning up wins over every reason not to: somebody who books the day off
-     * and comes in anyway worked, and the record has to say so. Absence is only
-     * ever claimed for a day the company works, nobody planned off, and the
-     * employee neither booked nor showed.
-     */
-    protected function dayStatus(
-        string $date, bool $hasPunches, bool $onLeave,
-        bool $isHoliday, bool $isDayOff, bool $isWorkingDay,
-    ): string {
-        return match (true) {
-            $hasPunches   => 'present',
-            $onLeave      => 'leave',
-            $isHoliday    => 'holiday',
-            $isDayOff     => 'day_off',
-            ! $isWorkingDay => 'weekend',
-            default       => 'absent',
-        };
-    }
 
     /** Why the employee is or is not expected in on a date. */
     protected function dayContext(Employee $employee, string $date): array
@@ -305,9 +284,4 @@ class AttendanceController extends ApiController
         ];
     }
 
-    /** The zone every time this employee sees is expressed in. */
-    protected function timezone(Employee $employee): string
-    {
-        return $employee->company?->tz() ?? config('app.timezone');
-    }
 }

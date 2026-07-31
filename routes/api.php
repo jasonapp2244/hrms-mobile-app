@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\ScheduleController;
+use App\Http\Controllers\Api\TeamController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -78,6 +79,11 @@ Route::middleware('auth:sanctum')->group(function () {
             ->middleware('throttle:write')->name('api.leave.approve');
         Route::post('leave/approvals/{leaveRequest}/reject', [LeaveApprovalController::class, 'reject'])
             ->middleware('throttle:write')->name('api.leave.reject');
+
+        // Who on my team is in today. Same gate as the inbox — a manager is
+        // someone who approves for a team, and this answers for that same team.
+        Route::get('team/attendance', [TeamController::class, 'attendance'])
+            ->name('api.team.attendance');
     });
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('api.schedule');
