@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\LeaveRequest;
+use App\Notifications\Messages\PushMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -38,7 +39,32 @@ class LeaveRequestDecided extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return array_values(array_filter([
+            'database',
+            'mail',
+            config('fcm.enabled') ? 'fcm' : null,
+        ]));
+    }
+
+    /**
+     * The lock-screen version.
+     *
+     * The decision note is deliberately left out, even on a rejection. It can
+     * run to a thousand characters, a notification truncates without saying so,
+     * and half a reason for a refusal is worse than none — the app shows it
+     * whole.
+     */
+    public function toPush(object $notifiable): PushMessage
+    {
+        return new PushMessage(
+            title: $this->title(),
+            body: $this->body(),
+            data: [
+                'type'             => 'leave.' . $this->outcome,
+                'leave_request_id' => $this->leaveRequest->id,
+                'route'            => 'leave',
+            ],
+        );
     }
 
     /** As with the submitted notification: the bell now, the email when a worker runs. */

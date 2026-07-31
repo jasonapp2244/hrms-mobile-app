@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\AttendanceLog;
+use App\Notifications\Messages\PushMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -45,7 +46,35 @@ class MissingCheckoutReminder extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return array_values(array_filter([
+            'database',
+            'mail',
+            config('fcm.enabled') ? 'fcm' : null,
+        ]));
+    }
+
+    /**
+     * The one notification here that genuinely needs a handset.
+     *
+     * Somebody who forgot to clock out has left the building; an email they
+     * read tomorrow is an apology rather than a reminder. The Android payload
+     * is sent high priority for the same reason — waking the device is the
+     * entire point.
+     */
+    public function toPush(object $notifiable): PushMessage
+    {
+        return new PushMessage(
+            title: 'You are still clocked in',
+            body: sprintf(
+                'You clocked in at %s. Tap to check out.',
+                $this->openPunch->scanned_at->format('h:i A'),
+            ),
+            data: [
+                'type'      => 'attendance.missing_checkout',
+                'work_date' => $this->workDate,
+                'route'     => 'clock',
+            ],
+        );
     }
 
     /** The bell now, the email when a worker runs. */

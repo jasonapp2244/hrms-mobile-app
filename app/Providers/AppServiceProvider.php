@@ -3,10 +3,13 @@
 namespace App\Providers;
 
 use App\Jobs\SendQueuedNotification;
+use App\Notifications\Channels\FcmChannel;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\ChannelManager;
 use Illuminate\Notifications\SendQueuedNotifications;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
@@ -27,11 +30,21 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(SendQueuedNotifications::class, SendQueuedNotification::class);
     }
 
+    /** Registers the push channel so notifications can list 'fcm' in via(). */
+    protected function registerPushChannel(): void
+    {
+        Notification::resolved(function (ChannelManager $service) {
+            $service->extend('fcm', fn ($app) => $app->make(FcmChannel::class));
+        });
+    }
+
     /**
      * Bootstrap any application services.
      */
     public function boot(): void
     {
+        $this->registerPushChannel();
+
         // SmartHR template is Bootstrap 5 — render pagination to match.
         Paginator::useBootstrapFive();
 

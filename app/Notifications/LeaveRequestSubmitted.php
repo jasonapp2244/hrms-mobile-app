@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\LeaveRequest;
+use App\Notifications\Messages\PushMessage;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -38,7 +39,42 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        return array_values(array_filter([
+            'database',
+            'mail',
+            // Only when push is actually configured. Listing the channel on an
+            // install with no credentials would queue work per notification
+            // that can never do anything.
+            config('fcm.enabled') ? 'fcm' : null,
+        ]));
+    }
+
+    /**
+     * The lock-screen version.
+     *
+     * Names the person and the dates and stops. A manager glancing at a phone
+     * needs to know a decision is waiting and whose it is; the reason, the
+     * clashes and the buttons are one tap away in the app.
+     */
+    public function toPush(object $notifiable): PushMessage
+    {
+        $request = $this->leaveRequest;
+
+        return new PushMessage(
+            title: sprintf('%s requested leave', $request->employee?->full_name),
+            body: sprintf(
+                '%s, %s to %s.',
+                $request->leaveType?->name,
+                $request->start_date->format('j M'),
+                $request->end_date->format('j M'),
+            ),
+            data: [
+                'type'             => 'leave.submitted',
+                'leave_request_id' => $request->id,
+                // Tells the app which screen to open when it is tapped.
+                'route' => 'approvals',
+            ],
+        );
     }
 
     /**
