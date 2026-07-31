@@ -18,6 +18,20 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    /**
+     * If the request is gone by the time a worker picks this up, say nothing.
+     *
+     * A queued notification stores the model as an id and reloads it on the way
+     * out. Without this, a request withdrawn or removed in the meantime makes the
+     * job throw ModelNotFoundException and fail for good, filling failed_jobs with
+     * entries that read like a broken mail pipeline when nothing is broken. The
+     * notification is about the request; no request, nothing worth sending.
+     */
+    public $deleteWhenMissingModels = true;
+
+    /** A mail server that is briefly unreachable should not lose the message. */
+    public $tries = 3;
+
     public function __construct(
         public LeaveRequest $leaveRequest,
     ) {}

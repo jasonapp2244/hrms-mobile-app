@@ -19,6 +19,17 @@ class LeaveRequestDecided extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    /**
+     * If the request is gone by the time a worker picks this up, say nothing.
+     *
+     * Without this a request removed between the decision and the send makes the
+     * job fail permanently rather than quietly giving up. See LeaveRequestSubmitted.
+     */
+    public $deleteWhenMissingModels = true;
+
+    /** A mail server that is briefly unreachable should not lose the message. */
+    public $tries = 3;
+
     /** @param  string  $outcome  approved|rejected|cancelled|manager_approved */
     public function __construct(
         public LeaveRequest $leaveRequest,

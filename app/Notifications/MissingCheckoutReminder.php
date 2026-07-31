@@ -18,6 +18,26 @@ class MissingCheckoutReminder extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    /**
+     * If the punch or the employee is gone by send time, say nothing.
+     *
+     * Attendance records are append-only now, so the punch itself will still be
+     * there — but an employee removed between the sweep and the send would
+     * otherwise fail this job for good. See LeaveRequestSubmitted.
+     */
+    public $deleteWhenMissingModels = true;
+
+    /**
+     * Fewer attempts than the leave notifications.
+     *
+     * This one is only useful while the shift is fresh in someone's mind. A
+     * reminder that lands hours later, after a retry queue clears, is an apology
+     * rather than a reminder — the same reason the command does not resend the
+     * next day. `tries` is one of the few settings the framework does copy from a
+     * notification onto its job; backoff is not, and lives on the job class.
+     */
+    public $tries = 2;
+
     public function __construct(
         public AttendanceLog $openPunch,
         public string $workDate,
