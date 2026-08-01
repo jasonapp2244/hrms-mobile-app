@@ -39,6 +39,23 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
+// ---- Public legal pages ----
+// No auth, deliberately. Google Play requires a privacy policy and a data
+// deletion route reachable without an account — a reviewer has no login, and
+// neither does somebody who has left the company and wants their record removed.
+// The company supplies its own name and HR address so the pages read as the
+// employer's rather than the software's — it is the employer who answers a
+// deletion request, not us. Null-safe throughout: a fresh install with no
+// company set up must still serve both pages, because a Play reviewer may
+// reach them before anyone has finished configuring anything.
+Route::get('privacy', fn () => view('legal.privacy', [
+    'company' => \App\Models\Company::query()->orderBy('id')->first(),
+]))->name('legal.privacy');
+
+Route::get('account-deletion', fn () => view('legal.deletion', [
+    'company' => \App\Models\Company::query()->orderBy('id')->first(),
+]))->name('legal.deletion');
+
 // ---- Notifications (everyone who can sign in) ----
 // Outside both the staff and employee groups on purpose: an approval alert
 // reaches a manager in the portal and an HR user in the dashboard, and they
