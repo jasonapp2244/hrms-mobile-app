@@ -1,0 +1,98 @@
+# HR & Attendance — nginx server block
+#
+# Install to /etc/nginx/sites-available/hrms and symlink into sites-enabled.
+# Replace hr.example.com and /var/www/hrms throughout.
+#
+# The TLS lines are written the way certbot rewrites them, so running
+#   certbot --nginx -d hr.example.com
+# against this file produces exactly these directives and nothing surprising.
+
+# Plain http exists only to be redirected, and to answer the ACME challenge that
+# issues and renews the certificate.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name hr.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name hr.example.com;
+
+    # The web root is public/, never the project directory. Pointing at the
+    # project root would serve .env, storage/ and vendor/ to anyone who guessed
+    # the path — the entire database password and every backup.
+    root /var/www/hrms/public;
+    index index.php;
+
+    ssl_certificate     /etc/letsencrypt/live/hr.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/hr.example.com/privkey.pem;
+    include             /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Uncomment once the site is confirmed working over https, and not before.
+    # Until then a misconfiguration is a page that fails to load; with HSTS set
+    # it is a page that keeps failing for a year, because browsers remember this
+    # per-domain for its full duration and it cannot be withdrawn quickly.
+    # add_header Strict-Transport-Security "max-age=31536000" always;
+
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    # Employee CSV imports and any future document upload. Laravel's own limits
+    # apply on top; this is only the point at which nginx refuses to read more.
+    client_max_body_size 20M;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # Health endpoint registered by bootstrap/app.php. Handy for an uptime check
+    # that does not need to log in.
+    location = /up {
+        try_files $uri /index.php?$query_string;
+        access_log off;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    # The SmartHR bundle is static and versioned by deploy. Serving it from cache
+    # keeps the dashboard quick on a phone browser over mobile data.
+    location ^~ /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        # Match the socket to the installed PHP version: ls /run/php/
+        fastcgi_pass unix:/run/php/php8.3-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+
+        # PDF and Excel exports over a wide date range are the slow requests
+        # here. The default 60s cuts a large report off mid-render.
+        fastcgi_read_timeout 300;
+    }
+
+    # Nothing dotted is ever served. .env is the one that matters.
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}

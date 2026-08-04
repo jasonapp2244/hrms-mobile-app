@@ -1,0 +1,51 @@
+# HR & Attendance — queue worker
+#
+# Install:
+#   sudo cp deploy/hrms-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now hrms-worker
+#
+# Without this running, email and push are queued and never sent. The in-app
+# notification bell writes directly and keeps working, which is exactly what
+# makes the omission hard to notice: the dashboard looks correct while no
+# employee is being told anything.
+
+[Unit]
+Description=HR & Attendance queue worker
+After=network.target mysql.service
+
+[Service]
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/hrms
+
+# --max-time=3600 retires the worker every hour and lets systemd start a fresh
+# one. A long-lived PHP process holds the code it booted with, so without this a
+# deploy leaves the old code running until someone restarts it by hand; it also
+# caps any slow memory growth.
+#
+# --tries=3 with --backoff spaces out retries rather than burning all three
+# attempts in the same second a provider happens to be down.
+ExecStart=/usr/bin/php /var/www/hrms/artisan queue:work \
+    --queue=default \
+    --sleep=3 \
+    --tries=3 \
+    --backoff=10,60,300 \
+    --max-time=3600 \
+    --max-jobs=1000
+
+# Expected: --max-time exits 0 on purpose, so 'always' is required — 'on-failure'
+# would treat the hourly retirement as success and never start a replacement.
+Restart=always
+RestartSec=5
+
+# Give an in-flight send time to finish before the process is killed, so a
+# deploy does not turn a half-sent notification into a failed job.
+KillSignal=SIGTERM
+TimeoutStopSec=90
+
+StandardOutput=append:/var/log/hrms-worker.log
+StandardError=append:/var/log/hrms-worker.log
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,26 @@
+# HR & Attendance — the scheduler
+#
+# Install:
+#   sudo cp deploy/hrms-scheduler.cron /etc/cron.d/hrms
+#   sudo chmod 644 /etc/cron.d/hrms
+#
+# One line, running every minute. Laravel decides internally what is actually
+# due — routes/console.php holds the real schedule, so nothing here changes when
+# a job is added or its timing moves.
+#
+# What stops if this line is missing:
+#   attendance:remind-checkout   every 15 min  — nobody is reminded they are still clocked in
+#   attendance:close-day         hourly        — open punches are never closed, hours stay wrong
+#   db:backup --verify           02:10 daily   — there are no backups at all
+#
+# The failure is silent in all three cases. Nothing errors; the work simply
+# never happens, and the first sign is a month of unclosed shifts.
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# MAILTO makes cron email its own failures — a PHP fatal before Laravel boots
+# would otherwise leave no trace anywhere. Set it to a real inbox.
+MAILTO=ops@example.com
+
+* * * * * www-data cd /var/www/hrms && /usr/bin/php artisan schedule:run >> /var/log/hrms-scheduler.log 2>&1
