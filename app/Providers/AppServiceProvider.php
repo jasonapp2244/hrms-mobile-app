@@ -12,6 +12,7 @@ use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -30,6 +31,25 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(SendQueuedNotifications::class, SendQueuedNotification::class);
     }
 
+    /**
+     * Generate https:// links whenever APP_URL says the site is served over TLS.
+     *
+     * Driven by APP_URL rather than by APP_ENV so that local development, a
+     * staging box on plain http, and production all behave correctly without a
+     * per-environment branch — the setting that already records how the site is
+     * reached is the one that decides.
+     *
+     * This matters beyond tidiness: a password-reset or email link built as
+     * http:// is a link that either fails or briefly carries a token in clear,
+     * and a mixed-content asset is one the browser refuses to load.
+     */
+    protected function forceHttpsWhenConfigured(): void
+    {
+        if (Str::startsWith(config('app.url'), 'https://')) {
+            URL::forceScheme('https');
+        }
+    }
+
     /** Registers the push channel so notifications can list 'fcm' in via(). */
     protected function registerPushChannel(): void
     {
@@ -43,6 +63,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->forceHttpsWhenConfigured();
+
         $this->registerPushChannel();
 
         // SmartHR template is Bootstrap 5 — render pagination to match.

@@ -25,6 +25,24 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // In production the app sits behind nginx, so every request arrives from
+        // the proxy rather than from the person making it. Without this, two
+        // things break quietly: attendance records the proxy's address as the
+        // punch location instead of the employee's, and generated URLs come out
+        // http:// because Laravel cannot see that TLS terminated upstream.
+        //
+        // Configured rather than hardcoded because the correct value depends on
+        // the deployment. A proxy on the same host is '127.0.0.1'; behind a load
+        // balancer or Cloudflare it is that network's ranges. '*' trusts any
+        // proxy — right only when nothing but the proxy can reach the app port,
+        // since a reachable app would otherwise let a caller forge its own IP by
+        // sending an X-Forwarded-For header.
+        if ($proxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(
+                at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)),
+            );
+        }
+
         // Every API route sits under the 'api' limiter defined in
         // AppServiceProvider. Laravel does not apply one by default, so without
         // this a single client could hammer any endpoint without limit; the
