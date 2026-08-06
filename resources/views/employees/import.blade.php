@@ -17,17 +17,39 @@
 @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
 @if($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
+{{-- Every problem in the file at once. One upload per mistake is a miserable
+     way to load two hundred people. --}}
+@if(session('import_errors'))
+  <div class="alert alert-danger">
+    <div class="fw-semibold mb-2"><i class="ti ti-alert-triangle me-1"></i>Fix these and upload again &mdash; nothing was imported.</div>
+    <ul class="mb-0" style="max-height:340px;overflow-y:auto">
+      @foreach(session('import_errors') as $e)<li>{{ $e }}</li>@endforeach
+    </ul>
+  </div>
+@endif
+
 <div class="row">
   <div class="col-lg-8">
     <div class="card">
-      <div class="card-header"><h5 class="mb-0">Upload CSV File</h5></div>
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Upload CSV File</h5>
+        <a href="{{ route('employees.import.template') }}" class="btn btn-sm btn-outline-primary">
+          <i class="ti ti-download me-1"></i>Download template
+        </a>
+      </div>
       <div class="card-body">
         <div class="alert alert-info">
-          <p class="mb-2"><i class="ti ti-info-circle me-1"></i>The CSV file must include the following header columns:</p>
-          <p class="mb-2"><code>employee_code, first_name, last_name, email, phone</code> &mdash; <strong>employee_code</strong> is optional and will be auto-generated when left blank.</p>
-          <pre class="mb-0 bg-light p-2 rounded">employee_code,first_name,last_name,email,phone
-EMP001,John,Doe,john@example.com,1234567890
-,Jane,Smith,jane@example.com,0987654321</pre>
+          <p class="mb-2"><i class="ti ti-info-circle me-1"></i>Accepted columns &mdash; only <strong>first_name</strong> and <strong>department</strong> are required:</p>
+          <p class="mb-2"><code>employee_code, first_name, last_name, email, phone, gender, hire_date, office, department, designation, manager_code</code></p>
+          <pre class="mb-2 bg-light p-2 rounded">employee_code,first_name,last_name,email,phone,gender,hire_date,office,department,designation,manager_code
+EMP-0101,Jane,Doe,jane@example.com,+1 212 555 0142,female,2024-03-01,Head Office,Engineering,Software Engineer,
+,John,Smith,john@example.com,,male,2025-11-17,Head Office,Engineering,,EMP-0101</pre>
+          <ul class="mb-0 small">
+            <li><strong>employee_code</strong> is generated when blank. <strong>manager_code</strong> refers to one &mdash; the manager may appear anywhere in the file.</li>
+            <li><strong>office</strong>, <strong>department</strong> and <strong>designation</strong> are matched by name against what this company has. An unrecognised name is reported, not ignored.</li>
+            <li><strong>department</strong> is required because it carries the shift. Without one there is no start time to be late against, so that person's attendance is never judged &mdash; and nothing on screen would tell you.</li>
+            <li>The whole file is checked before anything is written. If any row is wrong, nothing is imported.</li>
+          </ul>
         </div>
         <form action="{{ route('employees.import.store') }}" method="POST" enctype="multipart/form-data">
           @csrf

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Notifications\PasswordResetLink;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -63,6 +64,18 @@ class User extends Authenticatable
         return $this->hasAnyRole(['admin', 'hr'])
             ? 'dashboard'
             : 'employee.dashboard';
+    }
+
+    /**
+     * Send the reset link through our own notification rather than Laravel's.
+     *
+     * Overriding here rather than swapping the class in a service provider is
+     * what the framework expects, and it keeps the decision visible on the
+     * model that receives it.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new PasswordResetLink($token));
     }
 
     /**

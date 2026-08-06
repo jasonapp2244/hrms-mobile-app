@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 
 /**
  * Token authentication for the mobile app.
@@ -47,6 +48,32 @@ class AuthController extends ApiController
         return $this->ok([
             'token' => $token->plainTextToken,
             'user'  => $this->userPayload($user),
+        ]);
+    }
+
+    /**
+     * Start a password reset from the app.
+     *
+     * The app's part ends here. The link in the email opens the web reset page
+     * rather than deep-linking back into the app: a token entry screen on the
+     * handset would be a second implementation of the same flow, and the reset
+     * has to work from a borrowed laptop anyway — the phone is often the thing
+     * the person has lost access to.
+     */
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate(['email' => 'required|email']);
+
+        $user = User::where('email', $data['email'])->first();
+
+        // Same rule as the web flow: a disabled account cannot let itself back
+        // in, and the response never says whether the address exists.
+        if ($user && $user->is_active !== false) {
+            Password::sendResetLink(['email' => $data['email']]);
+        }
+
+        return $this->ok([
+            'message' => 'If that email address has an account, a reset link is on its way.',
         ]);
     }
 

@@ -40,6 +40,14 @@ Route::post('auth/login', [AuthController::class, 'login'])
     ->middleware('throttle:login')
     ->name('api.auth.login');
 
+// Unauthenticated by necessity — somebody who could authenticate would not need
+// it. Shares the login limiter for that reason: it is the other door into the
+// same account, and leaving it on the general ceiling would make it the cheaper
+// one to hammer.
+Route::post('auth/forgot-password', [AuthController::class, 'forgotPassword'])
+    ->middleware('throttle:login')
+    ->name('api.auth.forgot-password');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('auth/me', [AuthController::class, 'me'])->name('api.auth.me');
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');

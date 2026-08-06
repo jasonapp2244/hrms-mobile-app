@@ -7,6 +7,7 @@ use App\Models\Designation;
 use App\Models\Employee;
 use App\Models\Office;
 use App\Models\Shift;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -95,7 +96,53 @@ class EmployeeController extends Controller
         return view('employees.import');
     }
 
-    /** Handle a CSV upload of employees. */
+    /** A CSV of the accepted columns, filled in with this company's real options. */
+    public function importTemplate()
+    {
+        $companyId = $this->companyId();
+
+        $office     = Office::where('company_id', $companyId)->value('name') ?? 'Head Office';
+        $department = Department::where('company_id', $companyId)->value('name') ?? 'Engineering';
+        $designation = Designation::where('company_id', $companyId)->value('name') ?? '';
+
+        $rows = [
+            self::IMPORT_COLUMNS,
+            ['EMP-0101', 'Jane', 'Doe', 'jane.doe@example.com', '+1 212 555 0142', 'female', '2024-03-01', $office, $department, $designation, ''],
+            ['', 'John', 'Smith', 'john.smith@example.com', '', 'male', '2025-11-17', $office, $department, '', 'EMP-0101'],
+        ];
+
+        $csv = '';
+        foreach ($rows as $row) {
+            $csv .= implode(',', array_map(fn ($v) => str_contains((string) $v, ',') ? '"' . $v . '"' : $v, $row)) . "\n";
+        }
+
+        return response($csv, 200, [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="employee-import-template.csv"',
+        ]);
+    }
+
+    /** Columns the import understands. Only first_name is required. */
+    public const IMPORT_COLUMNS = [
+        'employee_code', 'first_name', 'last_name', 'email', 'phone',
+        'gender', 'hire_date', 'office', 'department', 'designation', 'manager_code',
+    ];
+
+    /**
+     * Handle a CSV upload of employees.
+     *
+     * Checks the whole file before writing any of it. A part-imported staff
+     * list is the worst outcome here: you cannot tell by looking which of two
+     * hundred people made it in, and re-uploading the corrected file duplicates
+     * everyone who did. So problems are collected and reported together, and
+     * nothing is created until the file is clean.
+     *
+     * `office` and `department` are matched by name against what this company
+     * actually has, and an unknown one is an error rather than a blank. The
+     * department is what carries the shift, and an employee with no shift has
+     * no start time to be late against — their attendance is never judged, and
+     * nothing about the screen says so.
+     */
     public function import(Request $request)
     {
         $request->validate([
@@ -103,42 +150,206 @@ class EmployeeController extends Controller
         ]);
 
         $companyId = $this->companyId();
+
         $handle = fopen($request->file('file')->getRealPath(), 'r');
         $header = null;
-        $created = 0;
-        $skipped = 0;
+        $rows   = [];
+        $errors = [];
+        $line   = 1;
 
-        DB::beginTransaction();
-        try {
-            while (($row = fgetcsv($handle)) !== false) {
-                if (!$header) {
-                    $header = array_map(fn ($h) => strtolower(trim($h)), $row);
+        // Name -> id, lower-cased, so "head office" and "Head Office" both land.
+        $offices      = $this->lookup(Office::where('company_id', $companyId)->get());
+        $departments  = $this->lookup(Department::where('company_id', $companyId)->get());
+        $designations = $this->lookup(Designation::where('company_id', $companyId)->get());
+
+        $existingEmails = Employee::where('company_id', $companyId)
+            ->whereNotNull('email')->pluck('email')
+            ->map(fn ($e) => strtolower($e))->flip();
+        $existingCodes = Employee::where('company_id', $companyId)
+            ->pluck('employee_code')->flip();
+
+        $seenEmails = [];
+        $seenCodes  = [];
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $line++;
+
+            if (! $header) {
+                $header = array_map(fn ($h) => strtolower(trim($h)), $row);
+                $line   = 1;
+
+                if (! in_array('first_name', $header, true)) {
+                    fclose($handle);
+
+                    return back()->with('error',
+                        'That file has no first_name column. Expected: ' . implode(', ', self::IMPORT_COLUMNS));
+                }
+
+                continue;
+            }
+
+            if (count(array_filter($row, fn ($v) => trim((string) $v) !== '')) === 0) {
+                continue;   // blank line, usually the end of the file
+            }
+
+            // A short row is a real mistake (an unquoted comma in an address),
+            // not something to pad silently and import wrong.
+            $r = array_combine(
+                $header,
+                array_pad(array_slice($row, 0, count($header)), count($header), null)
+            );
+
+            $get = fn (string $key) => trim((string) ($r[$key] ?? ''));
+
+            $name = $get('first_name');
+
+            if ($name === '') {
+                $errors[] = "Row {$line}: first_name is empty.";
+                continue;
+            }
+
+            $record = [
+                'company_id' => $companyId,
+                'first_name' => $name,
+                'last_name'  => $get('last_name') ?: null,
+                'phone'      => $get('phone') ?: null,
+                'status'     => 'active',
+            ];
+
+            // --- email: unique in the file and in the company ---------------
+            if ($email = $get('email')) {
+                $key = strtolower($email);
+
+                if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $errors[] = "Row {$line}: '{$email}' is not a valid email address.";
+                } elseif (isset($existingEmails[$key])) {
+                    $errors[] = "Row {$line}: {$email} already belongs to an employee.";
+                } elseif (isset($seenEmails[$key])) {
+                    $errors[] = "Row {$line}: {$email} appears twice in this file (also row {$seenEmails[$key]}).";
+                } else {
+                    $seenEmails[$key] = $line;
+                    $record['email']  = $email;
+                }
+            }
+
+            // --- code: unique, or generated later ---------------------------
+            if ($code = $get('employee_code')) {
+                if (isset($existingCodes[$code])) {
+                    $errors[] = "Row {$line}: employee code {$code} is already used.";
+                } elseif (isset($seenCodes[$code])) {
+                    $errors[] = "Row {$line}: employee code {$code} appears twice in this file.";
+                } else {
+                    $seenCodes[$code] = $line;
+                    $record['employee_code'] = $code;
+                }
+            }
+
+            // --- gender -----------------------------------------------------
+            if ($gender = strtolower($get('gender'))) {
+                if (! in_array($gender, ['male', 'female', 'other'], true)) {
+                    $errors[] = "Row {$line}: gender '{$gender}' should be male, female or other.";
+                } else {
+                    $record['gender'] = $gender;
+                }
+            }
+
+            // --- hire date --------------------------------------------------
+            if ($hired = $get('hire_date')) {
+                try {
+                    $record['hire_date'] = Carbon::parse($hired)->toDateString();
+                } catch (\Throwable) {
+                    $errors[] = "Row {$line}: '{$hired}' is not a date the importer understands. Use YYYY-MM-DD.";
+                }
+            }
+
+            // --- the three that decide whether attendance works -------------
+            foreach ([
+                'office'      => [$offices, 'office_id'],
+                'department'  => [$departments, 'department_id'],
+                'designation' => [$designations, 'designation_id'],
+            ] as $column => [$options, $field]) {
+                if (! $value = $get($column)) {
                     continue;
                 }
-                $r = array_combine($header, $row);
-                if (empty($r['first_name'])) { $skipped++; continue; }
 
-                Employee::create([
-                    'company_id'    => $companyId,
-                    'employee_code' => $r['employee_code'] ?? $this->nextCode($companyId),
-                    'first_name'    => $r['first_name'],
-                    'last_name'     => $r['last_name'] ?? null,
-                    'email'         => $r['email'] ?? null,
-                    'phone'         => $r['phone'] ?? null,
-                    'status'        => 'active',
-                ]);
-                $created++;
+                $id = $options[strtolower($value)] ?? null;
+
+                if ($id === null) {
+                    $errors[] = "Row {$line}: there is no {$column} called '{$value}'. "
+                        . 'Known: ' . (implode(', ', array_keys($options)) ?: 'none yet');
+                } else {
+                    $record[$field] = $id;
+                }
             }
-            DB::commit();
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            fclose($handle);
-            return back()->with('error', 'Import failed: ' . $e->getMessage());
+
+            if (empty($record['department_id'])) {
+                $errors[] = "Row {$line}: department is required — it is what gives {$name} a shift, "
+                    . 'and without one their attendance is never judged.';
+            }
+
+            $rows[] = ['record' => $record, 'manager_code' => $get('manager_code'), 'line' => $line];
         }
+
         fclose($handle);
 
+        if ($rows === [] && $errors === []) {
+            return back()->with('error', 'That file has a header but no rows.');
+        }
+
+        if ($errors !== []) {
+            // Everything wrong with the file, in one go — so it is fixed once
+            // rather than one upload per mistake.
+            return back()
+                ->with('error', count($errors) . ' problem(s) found. Nothing was imported.')
+                ->with('import_errors', array_slice($errors, 0, 50));
+        }
+
+        try {
+            $created = DB::transaction(function () use ($rows, $companyId) {
+                $byCode = [];
+
+                foreach ($rows as $i => $row) {
+                    $record = $row['record'];
+                    $record['employee_code'] ??= $this->nextCode($companyId);
+
+                    $employee = Employee::create($record);
+                    $byCode[$employee->employee_code] = $employee->id;
+                    $rows[$i]['id'] = $employee->id;
+                }
+
+                // Managers second, so a manager listed further down the file
+                // than their report still resolves.
+                foreach ($rows as $row) {
+                    if (! $row['manager_code']) {
+                        continue;
+                    }
+
+                    $managerId = $byCode[$row['manager_code']]
+                        ?? Employee::where('company_id', $companyId)
+                            ->where('employee_code', $row['manager_code'])
+                            ->value('id');
+
+                    if ($managerId && $managerId !== $row['id']) {
+                        Employee::whereKey($row['id'])->update(['manager_id' => $managerId]);
+                    }
+                }
+
+                return count($rows);
+            });
+        } catch (\Throwable $e) {
+            return back()->with('error', 'Import failed, nothing was created: ' . $e->getMessage());
+        }
+
         return redirect()->route('employees.index')
-            ->with('success', "Imported {$created} employees ({$skipped} skipped).");
+            ->with('success', "Imported {$created} employees.");
+    }
+
+    /** name (lower-cased) => id, for matching CSV text against real records. */
+    protected function lookup($models): array
+    {
+        return $models
+            ->mapWithKeys(fn ($m) => [strtolower($m->name) => $m->id])
+            ->all();
     }
 
     // ---- helpers ----

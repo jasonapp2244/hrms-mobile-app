@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
@@ -29,6 +30,18 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('guest')->group(function () {
     Route::get('login', [LoginController::class, 'show'])->name('login');
     Route::post('login', [LoginController::class, 'login']);
+
+    // Password reset. The broker enforces its own 60-second gap between links
+    // for one address; these limiters are the other half — they stop one client
+    // walking a list of addresses, which the per-address throttle does nothing
+    // about. Names are Laravel's defaults because Password::reset and the mail
+    // template both resolve them.
+    Route::get('forgot-password', [PasswordResetController::class, 'request'])->name('password.request');
+    Route::post('forgot-password', [PasswordResetController::class, 'email'])
+        ->middleware('throttle:6,1')->name('password.email');
+    Route::get('reset-password/{token}', [PasswordResetController::class, 'reset'])->name('password.reset');
+    Route::post('reset-password', [PasswordResetController::class, 'update'])
+        ->middleware('throttle:6,1')->name('password.update');
 });
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
 
@@ -133,6 +146,7 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
 
     // Employees (+ bulk import)
     Route::get('employees/import', [EmployeeController::class, 'importForm'])->middleware('permission:import-employees')->name('employees.import');
+    Route::get('employees/import/template', [EmployeeController::class, 'importTemplate'])->middleware('permission:import-employees')->name('employees.import.template');
     Route::post('employees/import', [EmployeeController::class, 'import'])->middleware('permission:import-employees')->name('employees.import.store');
     Route::resource('employees', EmployeeController::class)->middleware('permission:manage-employees');
 
