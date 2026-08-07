@@ -174,12 +174,6 @@
 				</li>
 				@endcanany
 
-				<li class="menu-title"><span>FUTURE PHASE</span></li>
-				<li>
-					<ul>
-						<li><a href="javascript:void(0);" class="text-muted"><i class="ti ti-robot"></i><span>AI Assistant</span><span class="badge badge-warning fs-10 ms-2">Soon</span></a></li>
-					</ul>
-				</li>
 			</ul>
 		</div>
 	</div>
