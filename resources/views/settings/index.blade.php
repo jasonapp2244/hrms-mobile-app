@@ -98,9 +98,6 @@
                   <div class="fw-semibold">{{ $phase['title'] }}</div>
                   <div class="text-muted small">{{ $phase['detail'] }}</div>
                 </td>
-                <td class="text-end pe-0" style="width:1%; white-space:nowrap;">
-                  <span class="text-muted small">{{ $phase['covers'] }}</span>
-                </td>
               </tr>
               @endforeach
             </tbody>

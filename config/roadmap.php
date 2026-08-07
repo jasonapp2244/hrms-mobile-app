@@ -12,12 +12,19 @@
 | months after all three shipped, while the sidebar beside it linked straight
 | into them.
 |
-| Each phase maps to sections of `Feature-List_Web-and-App.md`, which stays the
-| detailed record. A phase is 'delivered' when its module works end to end, not
-| when every row under it is ticked — depth keeps arriving after a module is
-| usable, and the note on each phase says so where it matters.
+| This is the web dashboard's own record. The mobile app phases, the deployment
+| phase and the parked AI phase were taken out deliberately: the panel is read
+| by people using the dashboard, and work that is either not theirs or not
+| happening reads as an unfinished product rather than as a plan.
 |
-| Statuses: delivered | active | planned. Exactly one phase should be 'active'.
+| Each phase maps to sections of `Feature-List_Web-and-App.md`, which stays the
+| detailed record — including the mobile app and everything parked. A phase is
+| 'delivered' when its module works end to end, not when every row under it is
+| ticked: depth keeps arriving after a module is usable, and the note on each
+| phase says so where it matters.
+|
+| Statuses: delivered | active | planned. At most one phase should be 'active';
+| every phase here is currently delivered.
 |
 */
 
@@ -25,95 +32,58 @@ return [
 
     'phases' => [
         [
-            'no'      => 1,
-            'title'   => 'Foundation',
-            'detail'  => 'Sign-in for all four roles, company & offices, departments, designations, employees with bulk import',
-            'covers'  => 'A1–A3',
-            'status'  => 'delivered',
+            'no'     => 1,
+            'title'  => 'Foundation',
+            'detail' => 'Sign-in for all four roles, company & offices, departments, designations, employees with bulk import',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 2,
-            'title'   => 'Attendance',
-            'detail'  => 'One-tap check in/out, server-authoritative times, auto on-time/late/early-leave, append-only log with audit events',
-            'covers'  => 'A4',
-            'status'  => 'delivered',
+            'no'     => 2,
+            'title'  => 'Attendance',
+            'detail' => 'One-tap check in/out, server-authoritative times, auto on-time/late/early-leave, append-only log with audit events',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 3,
-            'title'   => 'Leave management',
-            'detail'  => 'Leave types, balances, two-step approval chain, holiday calendar, weekend- and holiday-aware',
-            'covers'  => 'A6',
-            'status'  => 'delivered',
+            'no'     => 3,
+            'title'  => 'Leave management',
+            'detail' => 'Leave types, balances, two-step approval chain, holiday calendar, weekend- and holiday-aware',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 4,
-            'title'   => 'Shifts & schedule',
-            'detail'  => 'Per-department shifts, per-employee overrides, night and rotating patterns, weekly roster with draft/publish, shift swaps',
-            'covers'  => 'A5',
-            'status'  => 'delivered',
+            'no'     => 4,
+            'title'  => 'Shifts & schedule',
+            'detail' => 'Per-department shifts, per-employee overrides, night and rotating patterns, weekly roster with draft/publish, shift swaps',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 5,
-            'title'   => 'Mobile app',
-            'detail'  => 'Flutter client for Android & iOS on the v1 API, with push notifications',
-            'covers'  => 'B1–B6',
-            'status'  => 'delivered',
+            'no'     => 5,
+            'title'  => 'Attendance depth',
+            'detail' => 'Manual correction by HR with an audit reason, employee regularisation requests, overtime, break punches',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 6,
-            'title'   => 'Attendance depth',
-            'detail'  => 'Manual correction by HR with an audit reason, employee regularisation requests, overtime, break punches',
-            'covers'  => 'A4.12–A4.15',
-            'status'  => 'delivered',
+            'no'     => 6,
+            'title'  => 'Reporting & payroll',
+            'detail' => 'Payroll-ready hours export, leave reports, scheduled email delivery, and a builder for the reports nobody anticipated',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 7,
-            'title'   => 'Reporting & payroll',
-            'detail'  => 'Payroll-ready hours export, leave reports, scheduled email delivery, and a builder for the reports nobody anticipated',
-            'covers'  => 'A7.10–A7.14',
-            'status'  => 'delivered',
+            'no'     => 7,
+            'title'  => 'Security & policy',
+            'detail' => 'Two-factor sign-in, a login audit trail, session timeout, rate-limited sign-in, the working-week editor and geofence enforcement',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 8,
-            'title'   => 'Security & policy',
-            'detail'  => 'Two-factor sign-in, a login audit trail, session timeout, the working-week editor and geofence enforcement',
-            'covers'  => 'A1.7–A1.9, A2.3, A2.8, A4.16',
-            'status'  => 'delivered',
+            'no'     => 8,
+            'title'  => 'Employee records & leave depth',
+            'detail' => 'Photos, a document vault with expiry alerts, emergency contacts, the org chart, the roster export, leave accrual and carry-forward, the leave calendar, the live board and the late-arrival digest',
+            'status' => 'delivered',
         ],
         [
-            'no'      => 9,
-            'title'   => 'Employee records & leave depth',
-            'detail'  => 'Photos, a document vault with expiry alerts, emergency contacts, the org chart, the roster export, leave accrual and carry-forward, the leave calendar, the live board and the late-arrival digest',
-            'covers'  => 'A3.7–A3.11, A6.4/A6.7/A6.9, A4.19, A9.3',
-            'status'  => 'delivered',
-        ],
-        [
-            'no'      => 10,
-            'title'   => 'Dashboards & checklists',
-            'detail'  => 'Dashboards per role and per person, week-on-week trends, weekly rollups, schedule-change alerts and on/offboarding checklists',
-            'covers'  => 'A3.12, A4.11, A8.4–A8.6, A9.5',
-            'status'  => 'delivered',
-        ],
-        [
-            'no'      => 11,
-            'title'   => 'Manager mode in the app',
-            'detail'  => 'Team roster inside the mobile app; approvals and team attendance already shipped',
-            'covers'  => 'B7',
-            'status'  => 'delivered',
-        ],
-        [
-            'no'      => 12,
-            'title'   => 'Production deployment',
-            'detail'  => 'HTTPS on a real domain, real email, the scheduler and queue worker running — the tooling is written and tested, the server is not yet built',
-            'covers'  => 'C1.14',
-            'status'  => 'active',
-        ],
-        [
-            'no'      => 13,
-            'title'   => 'AI assistant',
-            'detail'  => 'Natural-language questions over attendance and leave data — out of scope for the current phase, by decision',
-            'covers'  => '—',
-            'status'  => 'planned',
+            'no'     => 9,
+            'title'  => 'Dashboards & checklists',
+            'detail' => 'Dashboards per role and per person, week-on-week trends, weekly rollups, schedule-change alerts and on/offboarding checklists',
+            'status' => 'delivered',
         ],
     ],
 
