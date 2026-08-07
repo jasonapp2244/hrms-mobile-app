@@ -85,7 +85,12 @@ class BackupDatabase extends Command
 
             $this->info(sprintf('Wrote %s (%s)', $filename, $this->humanSize($size)));
 
-            if ($this->option('verify') && ! $this->verify($credentials, $db, $target, $gzip)) {
+            // false is a dump that failed to restore, which is a real problem.
+            // null is a dump that could not be checked at all because the
+            // database user may not create databases — normal on managed
+            // hosting, and not a reason to fail a deploy over a dump that was
+            // written perfectly well.
+            if ($this->option('verify') && $this->verify($credentials, $db, $target, $gzip) === false) {
                 return self::FAILURE;
             }
 
@@ -138,6 +143,12 @@ class BackupDatabase extends Command
             // Without this a dump taken mid-write can restore into a different
             // row order and mask the problem.
             '--order-by-primary',
+            // MySQL 8 reads INFORMATION_SCHEMA.FILES for tablespaces, which
+            // needs the global PROCESS privilege. Managed hosting does not
+            // grant it, so every dump came back with an "Access denied ...
+            // PROCESS" warning on stderr for information this application has
+            // no use for — InnoDB tables in the default tablespace.
+            '--no-tablespaces',
             $db['database'],
         ];
 
@@ -187,8 +198,10 @@ class BackupDatabase extends Command
      * The scratch name carries the timestamp so two runs cannot collide, and it
      * is dropped whether or not the load succeeded — a verification that leaves
      * databases behind would eventually fill the server.
+     *
+     * @return bool|null true verified, false the dump is bad, null could not check
      */
-    protected function verify(string $credentials, array $db, string $target, bool $gzip): bool
+    protected function verify(string $credentials, array $db, string $target, bool $gzip): ?bool
     {
         $scratch = substr('vrfy_' . $db['database'] . '_' . now()->format('His'), 0, 60);
         $expected = count(DB::select('SHOW TABLES'));
@@ -198,6 +211,19 @@ class BackupDatabase extends Command
         try {
             DB::statement("CREATE DATABASE `{$scratch}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         } catch (\Throwable $e) {
+            // Managed hosting hands out a user with rights to one database and
+            // nothing else, so there is nowhere to restore a test copy to. That
+            // says nothing about the dump — treating it as a bad backup meant
+            // every deploy on such a host aborted at the backup step, which is
+            // how people end up deploying with no backup at all.
+            if ($this->looksLikeAPrivilegeProblem($e)) {
+                $this->warn('Cannot verify on this host: the database user may not create databases.');
+                $this->warn('The dump was written but has NOT been restored to prove it reads back.');
+                $this->line('  Verify it yourself on a machine that can: gunzip -c <dump> | mysql <scratch-db>');
+
+                return null;
+            }
+
             $this->error('Could not create the scratch database: ' . $e->getMessage());
             $this->warn('The dump was written but has NOT been verified.');
 
@@ -232,6 +258,28 @@ class BackupDatabase extends Command
         } finally {
             DB::statement("DROP DATABASE IF EXISTS `{$scratch}`");
         }
+    }
+
+    /**
+     * Is this "you are not allowed", rather than "that did not work"?
+     *
+     * MySQL reports a denied CREATE DATABASE as error 1044 and a denied
+     * connection as 1045; both arrive wrapped in a PDOException whose message
+     * carries the text. Matched on the code where there is one, and on the
+     * wording as a fallback, because the driver does not always surface it.
+     */
+    protected function looksLikeAPrivilegeProblem(\Throwable $e): bool
+    {
+        $message = $e->getMessage();
+
+        foreach (['1044', '1045', '1142'] as $code) {
+            if (str_contains($message, $code)) {
+                return true;
+            }
+        }
+
+        return str_contains($message, 'Access denied')
+            || str_contains($message, 'command denied');
     }
 
     protected function rotate(string $dir, string $database, int $keep): void

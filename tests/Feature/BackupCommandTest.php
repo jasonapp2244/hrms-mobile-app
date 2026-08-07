@@ -125,4 +125,55 @@ class BackupCommandTest extends TestCase
         (new ReflectionMethod(BackupDatabase::class, 'rotate'))
             ->invoke($command, $dir, $database, $keep);
     }
+
+    // -------------------------------------------------------------------------
+    // Telling "cannot check" apart from "the dump is bad"
+    //
+    // Managed hosting hands out a user with rights to one database, so there is
+    // nowhere to restore a test copy to. Reading that as a failed backup aborted
+    // every deploy at the backup step, which is how somebody ends up deploying
+    // with no backup at all.
+    // -------------------------------------------------------------------------
+
+    private function isPrivilegeProblem(string $message): bool
+    {
+        return (new ReflectionMethod(BackupDatabase::class, 'looksLikeAPrivilegeProblem'))
+            ->invoke(new BackupDatabase(), new \RuntimeException($message));
+    }
+
+    public function test_a_denied_create_database_is_read_as_a_privilege_problem(): void
+    {
+        // Verbatim from a CloudPanel host.
+        $this->assertTrue($this->isPrivilegeProblem(
+            "SQLSTATE[42000]: Syntax error or access violation: 1044 Access denied for user "
+            . "'hrams-users'@'%' to database 'vrfy_hrams_205636'"
+        ));
+    }
+
+    public function test_a_denied_connection_is_read_as_a_privilege_problem(): void
+    {
+        $this->assertTrue($this->isPrivilegeProblem(
+            "SQLSTATE[28000]: Invalid authorization: 1045 Access denied for user 'x'@'localhost'"
+        ));
+    }
+
+    public function test_a_real_failure_is_not_excused_as_a_privilege_problem(): void
+    {
+        // The distinction that matters: these must still fail the backup, or the
+        // escape hatch above swallows genuinely broken dumps.
+        $this->assertFalse($this->isPrivilegeProblem('Table storage is full'));
+        $this->assertFalse($this->isPrivilegeProblem('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away'));
+        $this->assertFalse($this->isPrivilegeProblem('Unknown database'));
+    }
+
+    public function test_the_dump_does_not_ask_for_tablespaces(): void
+    {
+        // MySQL 8 reads INFORMATION_SCHEMA.FILES for these, which needs the global
+        // PROCESS privilege that managed hosting does not grant. Every dump came
+        // back with an access-denied warning for information this application has
+        // no use for.
+        $source = file_get_contents(app_path('Console/Commands/BackupDatabase.php'));
+
+        $this->assertStringContainsString('--no-tablespaces', $source);
+    }
 }
