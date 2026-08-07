@@ -86,6 +86,11 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        // A serialised user goes to the mobile API, to log context and to
+        // queued jobs. The secret is the whole of somebody's second factor and
+        // belongs in none of those.
+        'two_factor_secret',
+        'two_factor_recovery_codes',
     ];
 
     /**
@@ -102,6 +107,84 @@ class User extends Authenticatable
             // check against false never matched and a disabled account could
             // still sign in through the API.
             'is_active' => 'boolean',
+
+            // Encrypted at rest (A1.7). A database dump on its own is then not
+            // enough to generate anybody's codes — the app key is needed too,
+            // and that does not live in the database.
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'encrypted:array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Is two-factor actually in force for this account?
+     *
+     * Confirmed, not merely started. Somebody halfway through setup — secret
+     * generated, never verified — signs in exactly as before, which is what
+     * stops a mistyped setup from locking them out.
+     */
+    public function hasTwoFactor(): bool
+    {
+        return $this->two_factor_secret !== null && $this->two_factor_confirmed_at !== null;
+    }
+
+    /**
+     * Does the company insist this account uses it?
+     *
+     * Applies to admin and HR only. They are the accounts that can read and
+     * change everybody's records; an employee whose access is their own
+     * attendance is not worth locking out of a phone-based clock-in over.
+     */
+    public function mustUseTwoFactor(): bool
+    {
+        return (bool) $this->company?->policy('require_two_factor_for_staff')
+            && $this->hasAnyRole(['admin', 'hr']);
+    }
+
+    /** Fresh single-use recovery codes, replacing any that existed. */
+    public function generateRecoveryCodes(int $count = 8): array
+    {
+        $codes = collect(range(1, $count))
+            // Two groups so they are readable when written down, which is
+            // exactly what people do with them.
+            ->map(fn () => strtoupper(bin2hex(random_bytes(4)) . '-' . bin2hex(random_bytes(4))))
+            ->all();
+
+        $this->forceFill(['two_factor_recovery_codes' => $codes])->save();
+
+        return $codes;
+    }
+
+    /**
+     * Spend a recovery code, if it is one.
+     *
+     * Single use: the code is struck off before this returns, so the same slip
+     * of paper cannot be used twice — which is the only thing that makes a
+     * written-down code acceptable in the first place.
+     */
+    public function consumeRecoveryCode(string $code): bool
+    {
+        $code = strtoupper(trim($code));
+        $codes = $this->two_factor_recovery_codes ?? [];
+
+        $match = null;
+
+        foreach ($codes as $candidate) {
+            if (hash_equals($candidate, $code)) {
+                $match = $candidate;
+                break;
+            }
+        }
+
+        if ($match === null) {
+            return false;
+        }
+
+        $this->forceFill([
+            'two_factor_recovery_codes' => array_values(array_filter($codes, fn ($c) => $c !== $match)),
+        ])->save();
+
+        return true;
     }
 }

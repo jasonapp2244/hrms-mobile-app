@@ -101,6 +101,18 @@ class Preflight extends Command
             'set',
         );
 
+        // The demo panel publishes working credentials, an administrator's
+        // among them, on a page that needs no account to reach. config/demo.php
+        // already forces it off when APP_ENV is production — this catches the
+        // case that slips past: a config cache built on a developer machine,
+        // where the flag was true, shipped as part of the release.
+        $this->assert(
+            'Demo quick-login',
+            config('demo.quick_login') ? self::FAIL : self::PASS,
+            'is ON — the login page is publishing working credentials to visitors',
+            'off',
+        );
+
         // Deliberately UTC: timestamps are stored in UTC and each company
         // applies its own timezone on top (Company::tz), so a company-specific
         // value here would be wrong for every other company. Only flag a change

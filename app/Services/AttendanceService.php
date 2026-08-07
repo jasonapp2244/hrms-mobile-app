@@ -23,6 +23,8 @@ class AttendanceService
      */
     public function record(Employee $employee, Office $office, array $meta = []): array
     {
+        $this->assertInsideGeofence($employee, $office, $meta);
+
         // Server-authoritative time — never trust the device clock
         $now = Carbon::now($office->company?->tz() ?? config('app.timezone'));
         $workDate = $this->workDateFor($employee, $now);
@@ -33,8 +35,13 @@ class AttendanceService
         // value written carries a 00:00:00 time on any engine without a real
         // DATE type. MySQL truncates it, SQLite does not — matching on the date
         // itself works on both.
+        // Only in/out decide what comes next. Without the whereIn, a break taken
+        // after checking in would leave 'break_end' as the last punch, and the
+        // next press would be read as a fresh check-in — quietly starting a
+        // second attendance stretch and losing the whole morning's pairing.
         $lastToday = AttendanceLog::where('employee_id', $employee->id)
             ->whereDate('work_date', $workDate)
+            ->whereIn('type', ['in', 'out'])
             ->orderByDesc('scanned_at')
             ->first();
 
@@ -57,6 +64,221 @@ class AttendanceService
         ]);
 
         return ['log' => $log, 'type' => $type, 'status' => $status];
+    }
+
+    /**
+     * Refuse a punch made outside the office, when the company asks for that.
+     *
+     * Off unless `enforce_geofence` is set, and off by default. The product's
+     * premise is that people clock in from their own phone — the coordinates
+     * are a record, not a gate — so switching this on is a deliberate change of
+     * policy and not a default anybody backs into.
+     *
+     * Three things exempt a punch even when enforcement is on, and each is the
+     * difference between a control and an obstacle:
+     *
+     *  - An employee whose work mode is WFH or hybrid. Fencing somebody to an
+     *    office they were told not to come to is simply a bug.
+     *  - An office with no coordinates set. There is no fence to be outside of,
+     *    and refusing everybody at a branch whose address was never geocoded
+     *    would take that branch offline.
+     *  - A punch that arrived with no coordinates — services off, permission
+     *    refused, no signal indoors. Refusing these would make the feature a
+     *    denial-of-service on anybody whose phone cannot see the sky, and the
+     *    missing location is itself recorded on the punch for HR to look at.
+     *
+     * @throws \RuntimeException when the punch is outside the fence
+     */
+    protected function assertInsideGeofence(Employee $employee, Office $office, array $meta): void
+    {
+        if (! $office->company?->policy('enforce_geofence')) {
+            return;
+        }
+
+        if (in_array($employee->work_mode, ['wfh', 'hybrid'], true)) {
+            return;
+        }
+
+        if ($office->latitude === null || $office->longitude === null) {
+            return;
+        }
+
+        $lat = $meta['latitude'] ?? null;
+        $lng = $meta['longitude'] ?? null;
+
+        if ($lat === null || $lng === null) {
+            return;
+        }
+
+        $radius = (int) ($office->geofence_radius ?: 100);
+        $distance = $this->metresBetween((float) $lat, (float) $lng, (float) $office->latitude, (float) $office->longitude);
+
+        if ($distance > $radius) {
+            throw new \RuntimeException(sprintf(
+                'You appear to be %s from %s, which is outside the %dm check-in area. '
+                . 'Move closer, or ask HR to record this punch for you.',
+                $distance >= 1000
+                    ? round($distance / 1000, 1) . 'km'
+                    : round($distance) . 'm',
+                $office->name,
+                $radius,
+            ));
+        }
+    }
+
+    /**
+     * Great-circle distance in metres.
+     *
+     * Haversine on a spherical earth. Accurate to a few metres over the
+     * distances a geofence cares about, which is well inside the error of the
+     * phone GPS producing the reading in the first place — a more exact
+     * ellipsoidal formula would be false precision.
+     */
+    public function metresBetween(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earth = 6_371_000;
+
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+
+        $a = sin($dLat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+
+        return $earth * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
+    /**
+     * Start or end a break (A4.15).
+     *
+     * Refuses rather than guesses when the day is not in a state where a break
+     * makes sense — off the clock, or ending a break nobody started. A break
+     * marker with no partner is worse than no marker at all: workedMinutes has
+     * to discard it, so the employee sees a button that appeared to work and a
+     * total that did not change.
+     *
+     * @return array{log: AttendanceLog, type: string}
+     * @throws \RuntimeException when the break would not make sense
+     */
+    public function recordBreak(Employee $employee, Office $office, array $meta = []): array
+    {
+        $now = Carbon::now($office->company?->tz() ?? config('app.timezone'));
+        $workDate = $this->workDateFor($employee, $now);
+
+        $state = $this->breakState($employee, $workDate);
+
+        if (! $state['clocked_in']) {
+            throw new \RuntimeException('You need to be checked in before starting a break.');
+        }
+
+        $type = $state['on_break'] ? 'break_end' : 'break_start';
+
+        $log = AttendanceLog::create([
+            'company_id'  => $employee->company_id,
+            'employee_id' => $employee->id,
+            'office_id'   => $office->id,
+            'type'        => $type,
+            'scanned_at'  => $now,
+            'work_date'   => $workDate,
+            // Breaks are not early or late — there is nothing to judge them
+            // against, and reusing the in/out statuses here would put a
+            // meaningless "late" badge on a lunch break.
+            'status'      => 'ontime',
+            'source'      => $meta['source'] ?? 'button',
+            'latitude'    => $meta['latitude'] ?? null,
+            'longitude'   => $meta['longitude'] ?? null,
+            'ip_address'  => $meta['ip_address'] ?? null,
+        ]);
+
+        return ['log' => $log, 'type' => $type];
+    }
+
+    /**
+     * Whether the employee is currently clocked in, and whether they are on a
+     * break — the two facts the portal button needs to label itself.
+     *
+     * @return array{clocked_in: bool, on_break: bool, break_started_at: ?Carbon}
+     */
+    public function breakState(Employee $employee, ?string $workDate = null): array
+    {
+        $workDate ??= $this->workDateFor($employee, Carbon::now(
+            $employee->company?->tz() ?? config('app.timezone'),
+        ));
+
+        $logs = AttendanceLog::where('employee_id', $employee->id)
+            ->whereDate('work_date', $workDate)
+            ->orderBy('scanned_at')
+            ->get();
+
+        $clockedIn = false;
+        $onBreak = false;
+        $breakStartedAt = null;
+
+        foreach ($logs as $log) {
+            match ($log->type) {
+                // Checking out ends any break that was still open: whatever the
+                // employee did between the two, they are off the clock now.
+                'in'          => $clockedIn = true,
+                'out'         => [$clockedIn, $onBreak, $breakStartedAt] = [false, false, null],
+                'break_start' => [$onBreak, $breakStartedAt] = [true, $log->scanned_at],
+                'break_end'   => [$onBreak, $breakStartedAt] = [false, null],
+                default       => null,
+            };
+        }
+
+        return [
+            'clocked_in'       => $clockedIn,
+            'on_break'         => $onBreak,
+            'break_started_at' => $breakStartedAt,
+        ];
+    }
+
+    /**
+     * Enter a punch on somebody's behalf, for a moment that has already passed.
+     *
+     * Everything HR needs when the button was not pressed: a forgotten
+     * check-out, a badge that failed, a day worked off-site. It differs from
+     * record() in three ways that all matter.
+     *
+     * The time is supplied rather than taken from the clock, so status is
+     * judged against the shift as it was at that moment — a 09:40 entry keyed
+     * in at 16:00 is 'late', not 'ontime'.
+     *
+     * The type is supplied rather than inferred. record() alternates in/out
+     * from the last punch of the day, which is right for a button pressed in
+     * sequence and wrong for a row being slotted into a gap.
+     *
+     * And the reason is required. A manual punch is the one kind a reader has
+     * no other way to explain, so it carries its justification on the row and
+     * into the trail.
+     *
+     * Who did it is not a parameter: AttendanceLog's created hook stamps the
+     * signed-in user onto the audit event for every punch, however it arrived,
+     * and a second way of saying the same thing could disagree with the first.
+     */
+    public function recordManual(
+        Employee $employee,
+        Office $office,
+        string $type,
+        Carbon $at,
+        string $reason,
+    ): AttendanceLog {
+        $workDate = $this->workDateFor($employee, $at);
+
+        return AttendanceLog::create([
+            'company_id'  => $employee->company_id,
+            'employee_id' => $employee->id,
+            'office_id'   => $office->id,
+            'type'        => $type,
+            'scanned_at'  => $at,
+            'work_date'   => $workDate,
+            'status'      => $this->determineStatus($type, $at, $employee, $workDate),
+            // 'manual' is what tells every later reader — reports, exports, the
+            // employee's own history — that a person keyed this in rather than
+            // a device recording it.
+            'source'      => 'manual',
+            'ip_address'  => request()?->ip(),
+            'notes'       => $reason,
+        ]);
     }
 
     /**
@@ -215,8 +437,26 @@ class AttendanceService
     {
         $minutes = 0;
         $openedAt = null;
+        $breakStartedAt = null;
 
         foreach ($logs as $log) {
+            // Breaks (A4.15) are deducted from the stretch they sit inside
+            // rather than closing it: somebody on their lunch has not clocked
+            // out, and treating it as a check-out would make the afternoon look
+            // like a second attendance for the day.
+            if ($log->type === 'break_start') {
+                $breakStartedAt ??= $log->scanned_at;
+                continue;
+            }
+
+            if ($log->type === 'break_end') {
+                if ($breakStartedAt) {
+                    $minutes -= max(0, $breakStartedAt->diffInMinutes($log->scanned_at));
+                    $breakStartedAt = null;
+                }
+                continue;
+            }
+
             if ($log->type === 'in') {
                 // Two "in"s in a row: the first one is the stretch that is still
                 // running, so the later one is ignored rather than restarting it.
@@ -227,14 +467,139 @@ class AttendanceService
             if ($openedAt) {
                 $minutes += max(0, $openedAt->diffInMinutes($log->scanned_at));
                 $openedAt = null;
+
+                // A break left open when the day was closed out is discarded
+                // rather than deducted to the check-out: its length is unknown,
+                // and guessing it long would silently cut somebody's hours.
+                $breakStartedAt = null;
             }
         }
 
         if ($openedAt && $openUntil) {
             $minutes += max(0, $openedAt->diffInMinutes($openUntil));
+
+            // Still on a break right now — deduct what has elapsed so "worked
+            // today" does not tick upward while somebody is at lunch.
+            if ($breakStartedAt) {
+                $minutes -= max(0, $breakStartedAt->diffInMinutes($openUntil));
+            }
         }
 
-        return (int) $minutes;
+        return (int) max(0, $minutes);
+    }
+
+    /** Whether a day's punches include a completed break. */
+    public function hasBreakPunches(iterable $logs): bool
+    {
+        foreach ($logs as $log) {
+            if ($log->type === 'break_end') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * How long the employee was scheduled to work on a date, in minutes.
+     *
+     * End minus start, less the unpaid break. Null when nobody was rostered —
+     * a day off has no schedule to measure against, and returning 0 instead
+     * would make "not expected in" indistinguishable from "expected in for no
+     * time at all", which is the distinction overtime turns on.
+     */
+    public function scheduledMinutesFor(Employee $employee, string $workDate): ?int
+    {
+        $shift = $employee->shiftOn($workDate);
+
+        if (! $shift) {
+            return null;
+        }
+
+        $start = Carbon::parse($workDate . ' ' . $shift->start_time);
+        $end   = Carbon::parse($workDate . ' ' . $shift->end_time);
+
+        // A shift ending before it starts runs past midnight.
+        if ($end->lessThanOrEqualTo($start)) {
+            $end->addDay();
+        }
+
+        return max(0, (int) $start->diffInMinutes($end) - (int) ($shift->break_minutes ?? 0));
+    }
+
+    /**
+     * Overtime for one employee on one day (A4.14).
+     *
+     * Worked time beyond what the day was scheduled for. Four cases, and the
+     * awkward ones are the point:
+     *
+     * - Rostered day, worked past the end: the excess, less a threshold, so
+     *   packing up two minutes late does not earn overtime every day.
+     * - Unrostered day: every minute is beyond schedule, so all of it counts.
+     * - Forgot to check out: workedMinutes reports 0 for a stretch left open on
+     *   a past day rather than guessing, so overtime is 0 too. Silence beats an
+     *   invented number that ends up in a payroll export.
+     * - Implausible day: capped, because one bad punch closed by a later manual
+     *   entry should not become a 14-hour claim.
+     *
+     * @param  iterable<int, AttendanceLog>  $logs  the day's punches, in order
+     * @return array{worked: int, scheduled: int|null, overtime: int, rostered: bool, capped: bool}
+     *         `worked` is paid time — present time with the unpaid break already
+     *         taken out — so that it and `scheduled` are on the same footing and
+     *         the difference between them is the overtime.
+     */
+    public function overtimeFor(Employee $employee, string $workDate, iterable $logs): array
+    {
+        $logs      = collect($logs);
+        $worked    = $this->workedMinutes($logs);
+        $scheduled = $this->scheduledMinutesFor($employee, $workDate);
+        $rostered  = $scheduled !== null;
+
+        // Compare like with like. `scheduled` already excludes the unpaid
+        // break, so `worked` has to as well.
+        //
+        // Where the day has break punches, workedMinutes has taken the real
+        // break out already. Where it has none — every day before A4.15, and
+        // every day since where nobody pressed the button — the shift's nominal
+        // break is deducted instead.
+        //
+        // Without this an ordinary 09:00–17:00 day reports 480 worked against
+        // 450 scheduled and manufactures 30 minutes of overtime for everybody,
+        // every day. It would also mean the staff who diligently punch their
+        // breaks earn less overtime than the ones who do not, which is exactly
+        // the wrong incentive to build into a payroll figure.
+        if ($rostered && ! $this->hasBreakPunches($logs)) {
+            $shift = $employee->shiftOn($workDate);
+            $worked = max(0, $worked - (int) ($shift->break_minutes ?? 0));
+        }
+
+        $threshold = (int) config('attendance.overtime.threshold_minutes', 15);
+        $cap       = config('attendance.overtime.daily_cap_minutes');
+
+        if (! $rostered) {
+            $overtime = config('attendance.overtime.count_unrostered_days', true) ? $worked : 0;
+        } else {
+            $over = $worked - $scheduled;
+            // The threshold decides whether it counts, not how much: once the
+            // day is genuinely long, the whole excess is owed. Subtracting the
+            // threshold as well would quietly short every claim by 15 minutes.
+            $overtime = $over > $threshold ? $over : 0;
+        }
+
+        $capped = false;
+
+        if ($cap !== null && $overtime > (int) $cap) {
+            $overtime = (int) $cap;
+            $capped = true;
+        }
+
+        return [
+            'worked'    => $worked,
+            'scheduled' => $scheduled,
+            'overtime'  => max(0, $overtime),
+            'rostered'  => $rostered,
+            'capped'    => $capped,
+        ];
     }
 
     /**

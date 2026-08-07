@@ -22,13 +22,7 @@
 	</div>
 </div>
 
-<!-- Report switcher -->
-<ul class="nav nav-pills mb-3">
-	<li class="nav-item"><a class="nav-link {{ $type=='late' ? 'active' : '' }}" href="{{ route('reports.late', request()->only('from','to','office_id')) }}">Late Arrivals</a></li>
-	<li class="nav-item"><a class="nav-link {{ $type=='outliers' ? 'active' : '' }}" href="{{ route('reports.outliers', request()->only('from','to','office_id')) }}">Outliers</a></li>
-	<li class="nav-item"><a class="nav-link {{ $type=='department' ? 'active' : '' }}" href="{{ route('reports.department', request()->only('from','to','office_id')) }}">Department</a></li>
-	<li class="nav-item"><a class="nav-link" href="{{ route('attendance.report', request()->only('from','to','office_id')) }}">Attendance Summary</a></li>
-</ul>
+@include('reports.partials.nav')
 
 <!-- Filters -->
 <div class="card mb-3">
@@ -58,52 +52,5 @@
 	</div>
 </div>
 
-<p class="text-muted mb-3">{{ $subtitle }}</p>
-
-<!-- Summary tiles -->
-<div class="row">
-	@foreach($tiles as $t)
-	<div class="col-md-3 col-6 mb-3">
-		<div class="card"><div class="card-body text-center">
-			<h3 class="mb-0">{{ $t['value'] }}</h3>
-			<p class="text-muted mb-0 fs-13">{{ $t['label'] }}</p>
-		</div></div>
-	</div>
-	@endforeach
-</div>
-
-<!-- Table -->
-<div class="card">
-	<div class="card-body">
-		<div class="table-responsive">
-			<table class="table table-hover">
-				<thead>
-					<tr>@foreach($headings as $h)<th>{{ $h }}</th>@endforeach</tr>
-				</thead>
-				<tbody>
-					@forelse($rows as $row)
-					<tr>
-						@foreach($headings as $h)
-							@php $val = $row[$h]; @endphp
-							<td>
-								@if($h === 'On-time %')
-									<span class="badge bg-{{ (float)$val < 70 ? 'danger' : ((float)$val < 90 ? 'warning' : 'success') }}-transparent">{{ $val }}</span>
-								@elseif($h === 'Late %' || $h === 'Late Count')
-									<span class="badge bg-warning-transparent">{{ $val }}</span>
-								@elseif($h === 'Flag')
-									<span class="badge bg-danger-transparent">{{ $val }}</span>
-								@else
-									{{ $val }}
-								@endif
-							</td>
-						@endforeach
-					</tr>
-					@empty
-					<tr><td colspan="{{ count($headings) }}" class="text-center text-muted py-4">No data for the selected filters — everyone is on track. 🎉</td></tr>
-					@endforelse
-				</tbody>
-			</table>
-		</div>
-	</div>
-</div>
+@include('reports.partials.results')
 @endsection

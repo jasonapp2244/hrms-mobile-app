@@ -1,12 +1,28 @@
-@extends('layouts.app')
+{{--
+  Reached by all four roles, so it cannot assume the admin chrome. Staff get
+  the dashboard layout with its sidebar; employees and managers get the portal
+  layout. Handing an employee the admin sidebar would fill their screen with
+  links that every one of them 403s on.
+
+  The home crumb follows the same rule via homeRoute() — it used to point at
+  route('dashboard'), which is precisely the page a non-staff user is refused.
+--}}
+@php($staffLayout = auth()->user()->hasAnyRole(['admin', 'hr']))
+@extends($staffLayout ? 'layouts.app' : 'layouts.employee')
 @section('title','My Profile')
 @section('content')
 <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
   <div class="my-auto mb-2"><h2 class="mb-1">My Profile</h2>
+    {{-- Staff only. The portal draws its own nav pills, so a breadcrumb there
+         is a second way to say the same thing — and its separator glyph comes
+         from Font Awesome, which that layout does not load, so it rendered as
+         an empty box. Not worth a whole icon font for one character. --}}
+    @if($staffLayout)
     <nav><ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="ti ti-smart-home"></i></a></li>
+      <li class="breadcrumb-item"><a href="{{ route(auth()->user()->homeRoute()) }}"><i class="ti ti-smart-home"></i></a></li>
       <li class="breadcrumb-item active">My Profile</li>
-    </ol></nav></div>
+    </ol></nav>
+    @endif</div>
 </div>
 
 @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif
@@ -68,6 +84,24 @@
           </div>
           <button type="submit" class="btn btn-primary">Change Password</button>
         </form>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-header">
+        <h5 class="mb-0"><i class="ti ti-shield-lock me-1"></i>Two-Factor Authentication</h5>
+      </div>
+      <div class="card-body d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+          @if(auth()->user()->hasTwoFactor())
+            <span class="badge bg-success me-1">On</span>
+            <span class="text-muted">A code from your authenticator is required at sign-in.</span>
+          @else
+            <span class="badge bg-secondary me-1">Off</span>
+            <span class="text-muted">Your password is currently the only thing protecting this account.</span>
+          @endif
+        </div>
+        <a href="{{ route('two-factor.show') }}" class="btn btn-outline-primary">Manage</a>
       </div>
     </div>
   </div>

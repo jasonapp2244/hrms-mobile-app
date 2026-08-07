@@ -3,9 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Models\AttendanceLog;
+use App\Models\Employee;
 use App\Models\Office;
 use App\Services\AttendanceService;
 use App\Services\LeaveService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AttendanceController extends Controller
@@ -46,6 +48,10 @@ class AttendanceController extends Controller
 
         $logs = AttendanceLog::with(['employee', 'office'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))
+            // Voided punches are hidden by a global scope. Shown here on request
+            // so HR can see what was struck out and why — the trail is worth
+            // nothing if the only screen that lists punches cannot display it.
+            ->when($request->boolean('show_voided'), fn ($q) => $q->withVoided())
             ->when($request->filled('date'), fn ($q) => $q->whereDate('work_date', $request->date))
             ->when($request->filled('office_id'), fn ($q) => $q->where('office_id', $request->office_id))
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->type))
@@ -56,7 +62,73 @@ class AttendanceController extends Controller
 
         $offices = Office::where('company_id', $companyId)->get();
 
-        return view('attendance.logs', compact('logs', 'offices'));
+        $employees = Employee::where('company_id', $companyId)
+            ->where('status', 'active')
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name', 'employee_code']);
+
+        return view('attendance.logs', compact('logs', 'offices', 'employees'));
+    }
+
+    /**
+     * Strike out a punch that should not count.
+     *
+     * The row is kept. Correcting attendance is void-then-re-enter, never an
+     * edit, so both the wrong reading and the right one stay on the record —
+     * which is the only version of this feature that survives someone
+     * disputing their pay.
+     */
+    public function void(Request $request, AttendanceLog $log)
+    {
+        abort_unless($log->employee?->company_id === $this->companyId(), 404);
+
+        $data = $request->validate([
+            // Not nullable and not trivially satisfiable: a void with no stated
+            // cause is indistinguishable from a mistake six months later.
+            'reason' => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $log->void(auth()->user(), $data['reason']);
+
+        return back()->with('success', 'Punch voided. It no longer counts towards worked hours.');
+    }
+
+    /** Key in a punch that was never recorded — a missed check-out, a failed badge. */
+    public function storeManual(Request $request)
+    {
+        $companyId = $this->companyId();
+
+        $data = $request->validate([
+            'employee_id' => ['required', 'integer', 'exists:employees,id'],
+            'office_id'   => ['required', 'integer', 'exists:offices,id'],
+            'type'        => ['required', 'in:in,out'],
+            'scanned_at'  => ['required', 'date'],
+            'reason'      => ['required', 'string', 'min:5', 'max:500'],
+        ]);
+
+        $employee = Employee::where('company_id', $companyId)->findOrFail($data['employee_id']);
+        $office   = Office::where('company_id', $companyId)->findOrFail($data['office_id']);
+
+        // Read in the company's timezone: HR types a wall-clock reading, and
+        // parsing it as the app's UTC would silently shift the punch by the
+        // office's offset and change whether it counts as late.
+        $at = Carbon::parse($data['scanned_at'], $employee->company?->tz() ?? config('app.timezone'));
+
+        if ($at->isFuture()) {
+            return back()
+                ->withInput()
+                ->withErrors(['scanned_at' => 'A punch cannot be recorded for a time that has not happened yet.']);
+        }
+
+        $log = $this->attendance->recordManual($employee, $office, $data['type'], $at, $data['reason']);
+
+        return back()->with('success', sprintf(
+            'Manual %s recorded for %s at %s (%s).',
+            strtoupper($log->type),
+            $employee->first_name . ' ' . $employee->last_name,
+            $at->format('d M Y H:i'),
+            $log->status,
+        ));
     }
 
     /** Build the filtered report dataset shared by the view + exports. */
@@ -68,7 +140,7 @@ class AttendanceController extends Controller
 
         $logs = AttendanceLog::with(['employee', 'office'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))
-            ->whereBetween('work_date', [$from, $to])
+            ->forDates($from, $to)
             ->when($request->filled('office_id'), fn ($q) => $q->where('office_id', $request->office_id))
             ->latest('scanned_at')
             ->get();

@@ -57,8 +57,10 @@ class EmployeePortalController extends Controller
             ->orderBy('date')
             ->get();
 
+        $breakState = $this->attendance->breakState($employee, $today);
+
         return view('employee.dashboard', compact(
-            'employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday', 'schedule',
+            'employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday', 'schedule', 'breakState',
         ));
     }
 
@@ -92,12 +94,19 @@ class EmployeePortalController extends Controller
             return response()->json(['ok' => false, 'message' => 'No office is set up for your company yet. Please contact HR.'], 422);
         }
 
-        $result = $this->attendance->record($employee, $office, [
-            'source'     => 'button',
-            'latitude'   => $data['latitude'] ?? null,
-            'longitude'  => $data['longitude'] ?? null,
-            'ip_address' => $request->ip(),
-        ]);
+        try {
+            $result = $this->attendance->record($employee, $office, [
+                'source'     => 'button',
+                'latitude'   => $data['latitude'] ?? null,
+                'longitude'  => $data['longitude'] ?? null,
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\RuntimeException $e) {
+            // Geofence enforcement (A4.16), when the company has switched it on.
+            // 422 with the reason, same shape the break button already returns,
+            // so the front end needs no new branch to display it.
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
 
         return response()->json([
             'ok'      => true,
@@ -106,6 +115,57 @@ class EmployeePortalController extends Controller
             'time'    => $result['log']->scanned_at->format('h:i A'),
             'message' => sprintf('You clocked %s (%s) at %s.',
                 strtoupper($result['type']), $result['status'], $result['log']->scanned_at->format('h:i A')),
+        ]);
+    }
+
+    /**
+     * AJAX: start or end a break (A4.15).
+     *
+     * Separate from check() rather than folded into it: the one-tap button
+     * alternates in and out, and a break has to sit inside that pair without
+     * disturbing it. Which of the two this is gets decided server-side from the
+     * day's punches, so a stale page cannot start a second break.
+     */
+    public function break(Request $request)
+    {
+        $data = $request->validate([
+            'latitude'  => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+        ]);
+
+        $employee = $this->currentEmployee();
+
+        if ($this->attendance->recentlyScanned($employee)) {
+            return response()->json(['ok' => false, 'message' => 'Already recorded moments ago. Please wait a minute.'], 429);
+        }
+
+        $office = $employee->office
+            ?? Office::where('company_id', $employee->company_id)->orderBy('id')->first();
+
+        if (! $office) {
+            return response()->json(['ok' => false, 'message' => 'No office is set up for your company yet. Please contact HR.'], 422);
+        }
+
+        try {
+            $result = $this->attendance->recordBreak($employee, $office, [
+                'source'     => 'button',
+                'latitude'   => $data['latitude'] ?? null,
+                'longitude'  => $data['longitude'] ?? null,
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\RuntimeException $e) {
+            return response()->json(['ok' => false, 'message' => $e->getMessage()], 422);
+        }
+
+        $started = $result['type'] === 'break_start';
+
+        return response()->json([
+            'ok'      => true,
+            'type'    => $result['type'],
+            'time'    => $result['log']->scanned_at->format('h:i A'),
+            'message' => $started
+                ? sprintf('Break started at %s. Your worked time pauses until you return.', $result['log']->scanned_at->format('h:i A'))
+                : sprintf('Break ended at %s. Welcome back.', $result['log']->scanned_at->format('h:i A')),
         ]);
     }
 }

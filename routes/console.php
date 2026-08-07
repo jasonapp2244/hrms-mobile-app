@@ -42,6 +42,15 @@ Schedule::command('attendance:close-day')
     ->hourly()
     ->withoutOverlapping();
 
+// Hourly, because "07:00" means a different instant in every timezone a company
+// might be in, and the command works that out per company. The subscription's
+// last_sent_at is what stops the other 23 runs sending anything.
+Schedule::command('reports:send')
+    ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
 // Nightly, and verified rather than assumed. Runs at 02:10 — after the last
 // hourly close has settled and well before anyone clocks in, so the dump is of
 // a quiet database and the verification restore is not competing with traffic.

@@ -106,6 +106,29 @@
 				@endif
 			</button>
 
+			{{-- Break (A4.15). Only while clocked in: off the clock there is
+				 nothing to pause, and the server refuses it anyway. --}}
+			@if($breakState['clocked_in'])
+			<div class="mt-3">
+				<button id="break-btn"
+					class="btn {{ $breakState['on_break'] ? 'btn-warning' : 'btn-outline-secondary' }}"
+					style="min-width:220px;border-radius:12px">
+					@if($breakState['on_break'])
+						<i class="ti ti-player-play me-1"></i>End break
+					@else
+						<i class="ti ti-coffee me-1"></i>Start break
+					@endif
+				</button>
+				@if($breakState['on_break'] && $breakState['break_started_at'])
+					<div class="small text-warning mt-2">
+						On break since {{ $breakState['break_started_at']->format('h:i A') }} — worked time is paused.
+					</div>
+				@else
+					<div class="small text-muted mt-2">Breaks are not counted as worked time.</div>
+				@endif
+			</div>
+			@endif
+
 			<div id="result" class="mt-3"></div>
 
 			<div class="alert alert-info mt-4 mb-0 text-start" style="font-size:12.5px">
@@ -226,6 +249,44 @@
 			busy = false;
 		}
 	});
+
+	// Break (A4.15). No location is sent: a break marker records that worked
+	// time paused, not where anybody went, and asking for GPS to start a lunch
+	// break would be collecting something the feature has no use for.
+	const breakBtn = document.getElementById('break-btn');
+
+	if (breakBtn) {
+		breakBtn.addEventListener('click', async function () {
+			if (busy) return;
+			busy = true;
+			const original = breakBtn.innerHTML;
+			breakBtn.disabled = true;
+			breakBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Recording…';
+
+			try {
+				const res = await fetch("{{ route('employee.break') }}", {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': csrf, 'X-Requested-With': 'XMLHttpRequest' },
+					body: JSON.stringify({})
+				});
+				const data = await res.json();
+				if (data.ok) {
+					show('success', (data.type === 'break_start' ? '☕ ' : '👋 ') + data.message);
+					setTimeout(() => window.location.reload(), 1500);
+				} else {
+					show('danger', data.message || 'Could not record. Please try again.');
+					breakBtn.disabled = false;
+					breakBtn.innerHTML = original;
+					busy = false;
+				}
+			} catch (e) {
+				show('danger', 'Network error, please try again.');
+				breakBtn.disabled = false;
+				breakBtn.innerHTML = original;
+				busy = false;
+			}
+		});
+	}
 })();
 </script>
 @endpush

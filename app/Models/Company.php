@@ -45,6 +45,25 @@ class Company extends Model
         // Generous — overtime is normal, and closing a day somebody is still
         // working would understate their hours.
         'auto_close_after_minutes' => 240,
+
+        // Minutes of inactivity before somebody is signed out (A1.9). Zero is
+        // off, and off is the default: an idle timeout is a policy a company
+        // adopts, not one imposed on it, and imposing one silently would start
+        // logging people out of a system that had never done that before.
+        'session_idle_timeout_minutes' => 0,
+
+        // Require admin and HR accounts to carry a second factor (A1.7). Off by
+        // default: turning it on locks every such account out of the dashboard
+        // until they have set an authenticator up, which is the right policy but
+        // has to be somebody's decision and not a surprise after an update.
+        'require_two_factor_for_staff' => false,
+
+        // Refuse a punch made outside the office's geofence (A4.16). Off by
+        // default and deliberately so — the client's whole premise is that
+        // staff clock in from their own phone, including from home, and the
+        // coordinates are a record rather than a gate. A company that wants
+        // office-only attendance turns this on knowing what it costs.
+        'enforce_geofence' => false,
     ];
 
     /** A policy value for this company, falling back to the default. */

@@ -26,6 +26,13 @@
 			<div class="d-flex align-items-center gap-2">
 				<span class="d-none d-sm-inline text-muted small">{{ auth()->user()->name }}</span>
 				@include('layouts.partials.notification-bell')
+				{{-- Deliberately its own icon rather than hanging off the name
+					 above: that name is d-none below sm, which would leave a
+					 phone user — most of this portal's traffic — with no way
+					 to change their own password. --}}
+				<a href="{{ route('profile.index') }}"
+					class="btn btn-sm {{ request()->routeIs('profile.*') ? 'btn-primary' : 'btn-outline-secondary' }}"
+					title="My profile" aria-label="My profile"><i class="ti ti-user"></i></a>
 				<form method="POST" action="{{ route('logout') }}">
 					@csrf
 					<button type="submit" class="btn btn-sm btn-outline-secondary"><i class="ti ti-logout me-1"></i>Logout</button>
@@ -48,6 +55,10 @@
 			<li class="nav-item">
 				<a class="nav-link {{ request()->routeIs('employee.swaps.*') ? 'active' : 'bg-white' }}"
 					href="{{ route('employee.swaps.index') }}"><i class="ti ti-arrows-exchange me-1"></i>Shift Swaps</a>
+			</li>
+			<li class="nav-item">
+				<a class="nav-link {{ request()->routeIs('employee.regularisations.*') ? 'active' : 'bg-white' }}"
+					href="{{ route('employee.regularisations.index') }}"><i class="ti ti-edit me-1"></i>Fix Attendance</a>
 			</li>
 			@can('approve-leave')
 			<li class="nav-item">

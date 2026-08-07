@@ -65,12 +65,19 @@ class AttendanceController extends ApiController
             );
         }
 
-        $result = $this->attendance->record($employee, $office, [
-            'source'     => 'mobile',
-            'latitude'   => $data['latitude'] ?? null,
-            'longitude'  => $data['longitude'] ?? null,
-            'ip_address' => $request->ip(),
-        ]);
+        try {
+            $result = $this->attendance->record($employee, $office, [
+                'source'     => 'mobile',
+                'latitude'   => $data['latitude'] ?? null,
+                'longitude'  => $data['longitude'] ?? null,
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\RuntimeException $e) {
+            // Geofence enforcement (A4.16). Given its own error code rather than
+            // a generic refusal so the app can say "move closer" instead of
+            // "something went wrong" — the one message the person can act on.
+            return $this->fail('outside_geofence', $e->getMessage(), 422);
+        }
 
         $log = $result['log'];
 

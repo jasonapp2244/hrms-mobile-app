@@ -15,7 +15,12 @@
 
 <div class="alert alert-info d-flex align-items-center">
   <i class="ti ti-info-circle me-2"></i>
-  <div>Phase 1 is admin-only for login. The 'hr' and 'employee' roles are fully structured here and can be enabled later without any code changes.</div>
+  {{-- This used to say login was admin-only and that hr/employee were
+       structure waiting to be switched on. All four roles sign in today —
+       LoginController admits admin, hr, employee and manager, and routes
+       each to its own home — so the note was telling an administrator the
+       opposite of what the system does. --}}
+  <div>All four roles can sign in. Admin and HR reach this dashboard; employees and managers reach the self-service portal, with managers also seeing team approvals.</div>
 </div>
 
 @foreach($roles as $role)

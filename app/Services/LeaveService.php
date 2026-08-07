@@ -43,7 +43,10 @@ class LeaveService
     {
         $configured = $company?->settings['weekend_days'] ?? null;
 
-        if (! is_array($configured) || $configured === []) {
+        // An empty list means "we work every day", which is a real answer and
+        // has to be distinguishable from never having been asked. Only a
+        // missing or malformed value falls back to Saturday and Sunday.
+        if (! is_array($configured)) {
             return self::DEFAULT_WEEKEND;
         }
 

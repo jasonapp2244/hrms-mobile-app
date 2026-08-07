@@ -26,6 +26,9 @@
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
+        <!-- Off by default so the suite does not inherit whatever a developer
+             left in .env; QuickLoginTest switches it on through config(). -->
+        <env name="DEMO_QUICK_LOGIN" value="false"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

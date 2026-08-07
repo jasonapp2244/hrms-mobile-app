@@ -37,6 +37,9 @@
 								@can('view-attendance')
 								<li><a class="{{ request()->routeIs('attendance.index') ? 'active' : '' }}" href="{{ route('attendance.index') }}">Overview</a></li>
 								<li><a class="{{ request()->routeIs('attendance.logs') ? 'active' : '' }}" href="{{ route('attendance.logs') }}">Attendance Logs</a></li>
+								@can('manage-attendance')
+								<li><a class="{{ request()->routeIs('attendance.regularisations*') ? 'active' : '' }}" href="{{ route('attendance.regularisations') }}">Corrections</a></li>
+								@endcan
 								@endcan
 							</ul>
 						</li>
@@ -48,15 +51,22 @@
 				<li class="menu-title"><span>REPORTS</span></li>
 				<li>
 					<ul>
-						<li class="submenu {{ request()->routeIs('attendance.report') || request()->routeIs('reports.*') ? 'active' : '' }}">
-							<a href="javascript:void(0);" class="{{ request()->routeIs('attendance.report') || request()->routeIs('reports.*') ? 'subdrop' : '' }}">
+						<li class="submenu {{ request()->routeIs('attendance.report') || request()->routeIs('reports.*') || request()->routeIs('report-subscriptions.*') ? 'active' : '' }}">
+							<a href="javascript:void(0);" class="{{ request()->routeIs('attendance.report') || request()->routeIs('reports.*') || request()->routeIs('report-subscriptions.*') ? 'subdrop' : '' }}">
 								<i class="ti ti-file-report"></i><span>HR Reports</span><span class="menu-arrow"></span>
 							</a>
-							<ul style="{{ request()->routeIs('attendance.report') || request()->routeIs('reports.*') ? 'display:block;' : '' }}">
+							<ul style="{{ request()->routeIs('attendance.report') || request()->routeIs('reports.*') || request()->routeIs('report-subscriptions.*') ? 'display:block;' : '' }}">
 								<li><a class="{{ request()->routeIs('attendance.report') ? 'active' : '' }}" href="{{ route('attendance.report') }}">Attendance Summary</a></li>
 								<li><a class="{{ request()->routeIs('reports.late') ? 'active' : '' }}" href="{{ route('reports.late') }}">Late Arrivals</a></li>
 								<li><a class="{{ request()->routeIs('reports.outliers') ? 'active' : '' }}" href="{{ route('reports.outliers') }}">Outliers</a></li>
+								<li><a class="{{ request()->routeIs('reports.overtime') ? 'active' : '' }}" href="{{ route('reports.overtime') }}">Overtime</a></li>
+								<li><a class="{{ request()->routeIs('reports.payroll') ? 'active' : '' }}" href="{{ route('reports.payroll') }}">Payroll Hours</a></li>
+								<li><a class="{{ request()->routeIs('reports.leave') ? 'active' : '' }}" href="{{ route('reports.leave') }}">Leave Report</a></li>
+								@can('export-reports')
+								<li><a class="{{ request()->routeIs('report-subscriptions.*') ? 'active' : '' }}" href="{{ route('report-subscriptions.index') }}">Scheduled Reports</a></li>
+								@endcan
 								<li><a class="{{ request()->routeIs('reports.department') ? 'active' : '' }}" href="{{ route('reports.department') }}">Department Report</a></li>
+								<li><a class="{{ request()->routeIs('reports.custom') ? 'active' : '' }}" href="{{ route('reports.custom') }}">Report Builder</a></li>
 							</ul>
 						</li>
 					</ul>
@@ -145,6 +155,12 @@
 						</li>
 						@endcan
 						@can('manage-settings')
+						<li class="{{ request()->routeIs('policies.*') ? 'active' : '' }}">
+							<a href="{{ route('policies.edit') }}"><i class="ti ti-calendar-cog"></i><span>Working Week &amp; Policies</span></a>
+						</li>
+						<li class="{{ request()->routeIs('activity.*') ? 'active' : '' }}">
+							<a href="{{ route('activity.index') }}"><i class="ti ti-list-check"></i><span>Activity Log</span></a>
+						</li>
 						<li class="{{ request()->routeIs('settings.*') ? 'active' : '' }}">
 							<a href="{{ route('settings.index') }}"><i class="ti ti-settings"></i><span>Settings</span></a>
 						</li>

@@ -76,29 +76,40 @@
       <div class="card-header">
         <h5 class="mb-0"><i class="ti ti-map-2 me-1"></i>Phase / Roadmap</h5>
       </div>
+      {{-- Driven from config/roadmap.php. The previous version was hard-coded
+           here and drifted: it advertised Leave, Shift/Schedule and the mobile
+           app as "coming soon" long after all three shipped, on the one screen
+           a client is most likely to read. --}}
+      @php($styles = config('roadmap.styles'))
       <div class="card-body">
-        <ul class="list-unstyled mb-0">
-          <li class="mb-2">
-            <span class="badge bg-success me-2">Active</span>
-            Phase 1 &mdash; Admin dashboard + Attendance
-          </li>
-          <li class="mb-2">
-            <span class="badge bg-secondary me-2">Coming soon</span>
-            Leave Management
-          </li>
-          <li class="mb-2">
-            <span class="badge bg-secondary me-2">Coming soon</span>
-            Shift / Schedule
-          </li>
-          <li class="mb-2">
-            <span class="badge bg-secondary me-2">Coming soon</span>
-            AI Assistant
-          </li>
-          <li class="mb-0">
-            <span class="badge bg-secondary me-2">Coming soon</span>
-            Mobile Apps
-          </li>
-        </ul>
+        <div class="table-responsive">
+          <table class="table table-borderless align-middle mb-0">
+            <tbody>
+              @foreach(config('roadmap.phases') as $phase)
+              @php($style = $styles[$phase['status']] ?? $styles['planned'])
+              <tr class="{{ $phase['status'] === 'planned' ? 'opacity-75' : '' }}">
+                <td class="ps-0" style="width:1%; white-space:nowrap;">
+                  <span class="text-muted small">Phase {{ $phase['no'] }}</span>
+                </td>
+                <td style="width:1%; white-space:nowrap;">
+                  <span class="badge {{ $style['class'] }}">{{ $style['label'] }}</span>
+                </td>
+                <td>
+                  <div class="fw-semibold">{{ $phase['title'] }}</div>
+                  <div class="text-muted small">{{ $phase['detail'] }}</div>
+                </td>
+                <td class="text-end pe-0" style="width:1%; white-space:nowrap;">
+                  <span class="text-muted small">{{ $phase['covers'] }}</span>
+                </td>
+              </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+        <p class="text-muted small mb-0 mt-2">
+          A phase is marked delivered when its module works end to end. Feature-level
+          detail lives in <code>Feature-List_Web-and-App.md</code>.
+        </p>
       </div>
     </div>
   </div>

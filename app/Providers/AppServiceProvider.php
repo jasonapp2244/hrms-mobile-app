@@ -3,10 +3,18 @@
 namespace App\Providers;
 
 use App\Jobs\SendQueuedNotification;
+use App\Models\ActivityLog;
+use App\Models\User;
 use App\Notifications\Channels\FcmChannel;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Lockout;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Notification;
@@ -78,6 +86,78 @@ class AppServiceProvider extends ServiceProvider
         });
 
         $this->defineRateLimits();
+
+        $this->recordAuthenticationEvents();
+    }
+
+    /**
+     * Write sign-in, sign-out and failed attempts to the security trail (A1.8).
+     *
+     * Hung off the framework's own auth events rather than added to
+     * LoginController, because there is more than one door: the web form, the
+     * mobile API's token endpoint, the password-reset flow and the "remember
+     * me" cookie all authenticate, and only the framework sees all four.
+     *
+     * A failed attempt is recorded with the address that was tried and no user
+     * id — the point of the entry is that the credentials matched nobody, and
+     * the pattern of addresses being tried is what somebody investigating is
+     * actually reading.
+     */
+    protected function recordAuthenticationEvents(): void
+    {
+        Event::listen(function (Login $event) {
+            ActivityLog::record(
+                event: ActivityLog::LOGIN,
+                description: 'Signed in via ' . $event->guard,
+                actor: $event->user,
+            );
+        });
+
+        Event::listen(function (Logout $event) {
+            // Null on a session that had already expired server-side; there is
+            // nobody to attribute it to and nothing worth recording.
+            if ($event->user) {
+                ActivityLog::record(
+                    event: ActivityLog::LOGOUT,
+                    actor: $event->user,
+                );
+            }
+        });
+
+        Event::listen(function (Failed $event) {
+            ActivityLog::record(
+                event: ActivityLog::LOGIN_FAILED,
+                description: $event->user
+                    // Distinguished because they mean different things to
+                    // whoever reads this: a wrong password on a real account is
+                    // somebody guessing at a person, an unknown address is
+                    // somebody guessing at the door.
+                    ? 'Wrong password for a known account'
+                    : 'No account matches that email address',
+                // Attributed to the account when one exists, so "show me
+                // everything about this user" includes the attempts on them.
+                // The label stays the address that was actually typed.
+                actor: $event->user instanceof User ? $event->user : null,
+                actorLabel: (string) ($event->credentials['email'] ?? 'unknown'),
+            );
+        });
+
+        Event::listen(function (Lockout $event) {
+            ActivityLog::record(
+                event: ActivityLog::LOCKOUT,
+                description: 'Too many failed attempts — further tries refused for a while',
+                actorLabel: (string) $event->request->input('email', 'unknown'),
+                request: $event->request,
+            );
+        });
+
+        Event::listen(function (PasswordReset $event) {
+            ActivityLog::record(
+                event: ActivityLog::PASSWORD_RESET,
+                description: 'Password set from a reset link',
+                actor: $event->user,
+            );
+        });
     }
 
     /**

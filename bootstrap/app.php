@@ -49,6 +49,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // stricter per-route limiters stack on top of it.
         $middleware->throttleApi();
 
+        // Sign people out after the inactivity their company allows (A1.9).
+        // Appended to the web group rather than aliased onto routes: a timeout
+        // that applies to most screens and not the one somebody happened to
+        // leave open is not a timeout.
+        $middleware->web(append: [
+            \App\Http\Middleware\EnforceIdleTimeout::class,
+            // Held before the timeout would matter, and after authentication:
+            // an admin the company requires a second factor from goes to the
+            // setup screen and nowhere else (A1.7).
+            \App\Http\Middleware\RequireTwoFactor::class,
+        ]);
+
         // Spatie permission middleware aliases
         $middleware->alias([
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,

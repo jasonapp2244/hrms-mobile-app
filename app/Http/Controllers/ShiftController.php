@@ -53,7 +53,7 @@ class ShiftController extends Controller
 
         // Attendance status per employee per date (from the day's first IN scan).
         $logs = AttendanceLog::where('type', 'in')
-            ->whereBetween('work_date', [$weekStart->toDateString(), $weekEnd->toDateString()])
+            ->forDates($weekStart->toDateString(), $weekEnd->toDateString())
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))
             ->get(['employee_id', 'work_date', 'status']);
 

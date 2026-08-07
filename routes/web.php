@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
+use App\Http\Controllers\Auth\TwoFactorController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
@@ -17,8 +19,12 @@ use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficeController;
+use App\Http\Controllers\PolicyController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\RegularisationController;
+use App\Http\Controllers\RegularisationRequestController;
 use App\Http\Controllers\ReportController;
+use App\Http\Controllers\ReportSubscriptionController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShiftController;
@@ -42,8 +48,25 @@ Route::middleware('guest')->group(function () {
     Route::get('reset-password/{token}', [PasswordResetController::class, 'reset'])->name('password.reset');
     Route::post('reset-password', [PasswordResetController::class, 'update'])
         ->middleware('throttle:6,1')->name('password.update');
+
+    // The second factor at sign-in (A1.7). Under 'guest' because nobody is
+    // signed in yet — the password was accepted and then deliberately dropped,
+    // so the only thing carrying the half-finished attempt is the session.
+    // Throttled: without it the six digits are guessable at machine speed.
+    Route::get('two-factor', [LoginController::class, 'challenge'])->name('two-factor.challenge');
+    Route::post('two-factor', [LoginController::class, 'verify'])
+        ->middleware('throttle:10,1')->name('two-factor.verify');
 });
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
+
+// Enrolling in two-factor, from an ordinary signed-in session.
+Route::middleware('auth')->group(function () {
+    Route::get('profile/two-factor', [TwoFactorController::class, 'show'])->name('two-factor.show');
+    Route::post('profile/two-factor', [TwoFactorController::class, 'enable'])->name('two-factor.enable');
+    Route::post('profile/two-factor/confirm', [TwoFactorController::class, 'confirm'])->name('two-factor.confirm');
+    Route::post('profile/two-factor/recovery-codes', [TwoFactorController::class, 'regenerate'])->name('two-factor.regenerate');
+    Route::delete('profile/two-factor', [TwoFactorController::class, 'disable'])->name('two-factor.disable');
+});
 
 Route::get('/', function () {
     if (auth()->check()) {
@@ -78,6 +101,16 @@ Route::middleware('auth')->group(function () {
     Route::get('notifications', [NotificationController::class, 'index'])->name('notifications.index');
     Route::get('notifications/{id}', [NotificationController::class, 'show'])->name('notifications.show');
     Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+
+    // Own profile and own password. Here for the same reason as notifications:
+    // this used to sit in the admin|hr group, which meant an employee or a
+    // manager could not change their own password anywhere in the browser —
+    // the one account action nobody should have to raise a ticket for. Every
+    // action is scoped to auth()->user() inside the controller, so being
+    // signed in is the whole authorisation.
+    Route::get('profile', [ProfileController::class, 'index'])->name('profile.index');
+    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 });
 
 // ---- Employee self-service portal (employee + manager roles) ----
@@ -89,6 +122,9 @@ Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('
     Route::get('dashboard', [EmployeePortalController::class, 'dashboard'])->name('dashboard');
     // One-tap button check in/out (works on mobile or PC, any location).
     Route::post('check', [EmployeePortalController::class, 'check'])->name('check');
+    // Break start/end (A4.15). Which one it is comes from the day's punches,
+    // not from the client, so a stale page cannot open a second break.
+    Route::post('break', [EmployeePortalController::class, 'break'])->name('break');
 
     // Own leave: balances, apply, withdraw. Every action is scoped to the
     // signed-in employee inside the controller, so no permission is needed —
@@ -96,6 +132,13 @@ Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('
     Route::get('leave', [LeaveRequestController::class, 'index'])->name('leave.index');
     Route::post('leave', [LeaveRequestController::class, 'store'])->name('leave.store');
     Route::post('leave/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel'])->name('leave.cancel');
+
+    // Own attendance corrections (A4.13). Raising one changes nothing by
+    // itself; it asks HR to apply a correction. Scoped to the signed-in
+    // employee in the controller, like the rest of the portal.
+    Route::get('regularisations', [RegularisationRequestController::class, 'index'])->name('regularisations.index');
+    Route::post('regularisations', [RegularisationRequestController::class, 'store'])->name('regularisations.store');
+    Route::post('regularisations/{regularisation}/cancel', [RegularisationRequestController::class, 'cancel'])->name('regularisations.cancel');
 
     // Shift swaps. Requesting, accepting and withdrawing are open to any
     // employee — each action is scoped to the record in the controller, since
@@ -135,14 +178,44 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::get('report', [AttendanceController::class, 'report'])->middleware('permission:view-reports')->name('report');
         Route::get('report/pdf', [AttendanceController::class, 'exportPdf'])->middleware('permission:export-reports')->name('report.pdf');
         Route::get('report/excel', [AttendanceController::class, 'exportExcel'])->middleware('permission:export-reports')->name('report.excel');
+
+        // Correcting the record (A4.12). Both gated on manage-attendance, not
+        // view-attendance: an employee holds the latter for their own history
+        // and must never be able to key in or strike out a punch.
+        Route::middleware('permission:manage-attendance')->group(function () {
+            Route::post('manual', [AttendanceController::class, 'storeManual'])->name('manual');
+            Route::post('{log}/void', [AttendanceController::class, 'void'])->name('void');
+
+            // Regularisation queue (A4.13). Same permission as keying a
+            // correction in by hand, because approving one does exactly that.
+            Route::get('regularisations', [RegularisationController::class, 'index'])->name('regularisations');
+            Route::post('regularisations/{regularisation}/approve', [RegularisationController::class, 'approve'])->name('regularisations.approve');
+            Route::post('regularisations/{regularisation}/reject', [RegularisationController::class, 'reject'])->name('regularisations.reject');
+        });
     });
 
     // HR Reporting — analytics variants (late / outliers / department)
     Route::prefix('reports')->name('reports.')->middleware('permission:view-reports')->group(function () {
         Route::get('late', [ReportController::class, 'late'])->name('late');
         Route::get('outliers', [ReportController::class, 'outliers'])->name('outliers');
+        Route::get('overtime', [ReportController::class, 'overtime'])->name('overtime');
+        Route::get('payroll', [ReportController::class, 'payroll'])->name('payroll');
+        Route::get('leave', [ReportController::class, 'leave'])->name('leave');
         Route::get('department', [ReportController::class, 'department'])->name('department');
+        Route::get('custom', [ReportController::class, 'custom'])->name('custom');
     });
+
+    // Scheduled report delivery (A7.12). Gated on export-reports rather than
+    // view-reports: arranging for a report to be posted out every month is
+    // exporting it, just on a timer.
+    Route::prefix('reports/scheduled')->name('report-subscriptions.')
+        ->middleware('permission:export-reports')->group(function () {
+            Route::get('/', [ReportSubscriptionController::class, 'index'])->name('index');
+            Route::post('/', [ReportSubscriptionController::class, 'store'])->name('store');
+            Route::put('{subscription}', [ReportSubscriptionController::class, 'update'])->name('update');
+            Route::delete('{subscription}', [ReportSubscriptionController::class, 'destroy'])->name('destroy');
+            Route::post('{subscription}/send', [ReportSubscriptionController::class, 'send'])->name('send');
+        });
 
     // Employees (+ bulk import)
     Route::get('employees/import', [EmployeeController::class, 'importForm'])->middleware('permission:import-employees')->name('employees.import');
@@ -210,8 +283,12 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     });
     Route::get('settings', [SettingsController::class, 'index'])->middleware('permission:manage-settings')->name('settings.index');
 
-    // Profile (any authenticated staff user)
-    Route::get('profile', [ProfileController::class, 'index'])->name('profile.index');
-    Route::put('profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
+    // The working week and the attendance/security policies (A1.9, A2.8, A4.16),
+    // and the security trail (A1.8). All admin-only: they decide how the system
+    // treats everybody, and who tried to sign in as whom.
+    Route::middleware('permission:manage-settings')->group(function () {
+        Route::get('settings/policies', [PolicyController::class, 'edit'])->name('policies.edit');
+        Route::put('settings/policies', [PolicyController::class, 'update'])->name('policies.update');
+        Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
+    });
 });
