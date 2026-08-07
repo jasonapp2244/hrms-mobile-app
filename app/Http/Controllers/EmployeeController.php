@@ -194,9 +194,35 @@ class EmployeeController extends Controller
         return redirect()->route('employees.index')->with('success', 'Employee updated successfully.');
     }
 
+    /**
+     * Delete an employee who has no history behind them.
+     *
+     * `attendance_logs.employee_id` is ON DELETE CASCADE, so deleting somebody
+     * who has ever clocked in silently takes every punch they ever made with
+     * them — the hours another month's payroll was calculated from, and the
+     * audit trail that was the evidence for it. That contradicts the rule the
+     * rest of the system is built on: attendance is append-only, punches are
+     * voided rather than removed.
+     *
+     * So deletion stays available for the case it is actually for — a record
+     * typed in by mistake — and anybody with history is deactivated instead,
+     * which is what "this person has left" has always meant here.
+     */
     public function destroy(Employee $employee)
     {
         $this->authorizeCompany($employee);
+
+        $punches = $employee->attendanceLogs()->count();
+
+        if ($punches > 0) {
+            return redirect()->route('employees.show', $employee)->with(
+                'error',
+                "{$employee->full_name} has {$punches} attendance record(s) and cannot be deleted — "
+                . 'deleting them would destroy the hours those records are the evidence for. '
+                . 'Set their status to Terminated instead, and disable their sign-in account.'
+            );
+        }
+
         $employee->delete();
 
         return redirect()->route('employees.index')->with('success', 'Employee deleted.');

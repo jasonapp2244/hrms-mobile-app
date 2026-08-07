@@ -100,6 +100,119 @@
       </ul>
     </div>
     @endif
+
+    {{-- Sign-in account (the login), which is not the same thing as the
+         employee record above. Creating an employee deliberately does not mint
+         a login; this is where one is minted when the person actually needs to
+         use the portal or the phone app. --}}
+    @php
+      $account     = $employee->user;
+      $assignable  = \App\Http\Controllers\EmployeeAccountController::assignableBy(auth()->user());
+      $currentRole = $account?->getRoleNames()->first();
+      $locked      = $currentRole && ! in_array($currentRole, $assignable, true);
+      $lastLogin   = $account
+        ? \App\Models\ActivityLog::where('user_id', $account->id)
+            ->where('event', \App\Models\ActivityLog::LOGIN)
+            ->latest('created_at')->value('created_at')
+        : null;
+    @endphp
+    <div class="card mt-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="ti ti-key me-1"></i>Sign-in Account</h6>
+        @if($account)
+          <span class="badge bg-{{ $account->is_active ? 'success' : 'secondary' }}">{{ $account->is_active ? 'Active' : 'Disabled' }}</span>
+        @else
+          <span class="badge bg-warning-transparent text-warning">None</span>
+        @endif
+      </div>
+      <div class="card-body">
+
+        {{-- Shown once, right after it is generated. It is not stored in
+             readable form anywhere, so this is the only chance to copy it. --}}
+        @if(session('generated_password'))
+          <div class="alert alert-warning">
+            <div class="fw-semibold mb-1"><i class="ti ti-alert-triangle me-1"></i>Temporary password — shown once</div>
+            <code class="fs-6">{{ session('generated_password') }}</code>
+            <div class="small mt-1 mb-0">Hand this to {{ $employee->first_name }} directly. It cannot be shown again; use Reset password if it is lost.</div>
+          </div>
+        @endif
+
+        @if(! $account)
+          <p class="text-muted small">
+            {{ $employee->first_name }} has no login and cannot sign in to the portal or the mobile app.
+          </p>
+          <form method="POST" action="{{ route('employees.account.store', $employee) }}">
+            @csrf
+            <div class="mb-2">
+              <label class="form-label small mb-1">Sign-in email <span class="text-danger">*</span></label>
+              <input type="email" name="email" class="form-control form-control-sm @error('email') is-invalid @enderror"
+                     value="{{ old('email', $employee->email) }}" required>
+              @error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+            <div class="mb-2">
+              <label class="form-label small mb-1">Role <span class="text-danger">*</span></label>
+              <select name="role" class="form-select form-select-sm @error('role') is-invalid @enderror" required>
+                @foreach($assignable as $role)
+                  <option value="{{ $role }}" @selected(old('role', 'employee') === $role)>{{ \App\Http\Controllers\EmployeeAccountController::roleLabel($role) }}</option>
+                @endforeach
+              </select>
+              @error('role')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              @unless(auth()->user()->can('manage-roles'))
+                <div class="form-text small">Only an administrator can grant the HR or admin roles.</div>
+              @endunless
+            </div>
+            <div class="mb-2">
+              <label class="form-label small mb-1">Password</label>
+              <input type="password" name="password" class="form-control form-control-sm @error('password') is-invalid @enderror"
+                     placeholder="Leave blank to generate one" autocomplete="new-password">
+              @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+            <div class="mb-3">
+              <input type="password" name="password_confirmation" class="form-control form-control-sm"
+                     placeholder="Confirm password" autocomplete="new-password">
+            </div>
+            <button class="btn btn-primary btn-sm w-100"><i class="ti ti-user-plus me-1"></i>Create sign-in account</button>
+          </form>
+        @else
+          <ul class="list-group list-group-flush mb-3">
+            <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">Email</span><span>{{ $account->email }}</span></li>
+            <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">Role</span><span>{{ $currentRole ? \App\Http\Controllers\EmployeeAccountController::roleLabel($currentRole) : '—' }}</span></li>
+            <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">Last signed in</span><span>{{ $lastLogin?->diffForHumans() ?? 'Never' }}</span></li>
+          </ul>
+
+          @if($locked)
+            <p class="text-muted small mb-2">
+              This account holds the {{ $currentRole }} role. Only an administrator can change or reset it.
+            </p>
+          @else
+            <form method="POST" action="{{ route('employees.account.role', $employee) }}" class="mb-2">
+              @csrf
+              <label class="form-label small mb-1">Change role</label>
+              <div class="input-group input-group-sm">
+                <select name="role" class="form-select">
+                  @foreach($assignable as $role)
+                    <option value="{{ $role }}" @selected($currentRole === $role)>{{ \App\Http\Controllers\EmployeeAccountController::roleLabel($role) }}</option>
+                  @endforeach
+                </select>
+                <button class="btn btn-outline-secondary">Save</button>
+              </div>
+            </form>
+
+            <form method="POST" action="{{ route('employees.account.password', $employee) }}" class="mb-2">
+              @csrf
+              <button class="btn btn-outline-warning btn-sm w-100"><i class="ti ti-refresh me-1"></i>Reset password</button>
+            </form>
+
+            <form method="POST" action="{{ route('employees.account.toggle', $employee) }}">
+              @csrf
+              <button class="btn btn-outline-{{ $account->is_active ? 'danger' : 'success' }} btn-sm w-100">
+                <i class="ti ti-{{ $account->is_active ? 'lock' : 'lock-open' }} me-1"></i>{{ $account->is_active ? 'Disable sign-in' : 'Enable sign-in' }}
+              </button>
+            </form>
+          @endif
+        @endif
+      </div>
+    </div>
   </div>
 
   <div class="col-lg-8">

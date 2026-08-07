@@ -10,6 +10,7 @@ use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
+use App\Http\Controllers\EmployeeAccountController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeePortalController;
@@ -262,6 +263,16 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::get('employees/{employee}/documents/{document}', [EmployeeDocumentController::class, 'download'])->name('employees.documents.download');
         Route::delete('employees/{employee}/documents/{document}', [EmployeeDocumentController::class, 'destroy'])->name('employees.documents.destroy');
     });
+    // Sign-in accounts for employees. `manage-employees` because onboarding is
+    // HR's job; which roles they may actually grant is decided inside the
+    // controller, where `manage-roles` gates the elevated ones.
+    Route::middleware('permission:manage-employees')->group(function () {
+        Route::post('employees/{employee}/account', [EmployeeAccountController::class, 'store'])->name('employees.account.store');
+        Route::post('employees/{employee}/account/password', [EmployeeAccountController::class, 'resetPassword'])->name('employees.account.password');
+        Route::post('employees/{employee}/account/role', [EmployeeAccountController::class, 'updateRole'])->name('employees.account.role');
+        Route::post('employees/{employee}/account/toggle', [EmployeeAccountController::class, 'toggleActive'])->name('employees.account.toggle');
+    });
+
     Route::resource('employees', EmployeeController::class)->middleware('permission:manage-employees');
 
     // Departments / Designations

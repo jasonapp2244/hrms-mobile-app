@@ -7,8 +7,11 @@ use App\Models\ActivityLog;
 use App\Models\User;
 use App\Support\QuickLogin;
 use App\Support\Totp;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class LoginController extends Controller
@@ -16,6 +19,18 @@ class LoginController extends Controller
     /** Where the half-authenticated user waits between password and code. */
     public const PENDING_KEY = 'two_factor_pending_user';
     public const PENDING_REMEMBER_KEY = 'two_factor_pending_remember';
+
+    /**
+     * How many wrong passwords one address may try from one place per minute.
+     *
+     * Password reset and the two-factor code were both throttled; the password
+     * form itself was not, which left the one door that opens on a guess as the
+     * only one nobody was counting knocks at. Five is enough for somebody who
+     * genuinely cannot remember which password they used.
+     */
+    public const MAX_ATTEMPTS = 5;
+
+    public const DECAY_SECONDS = 60;
 
     public function show()
     {
@@ -34,11 +49,20 @@ class LoginController extends Controller
             'password' => ['required'],
         ]);
 
+        $this->ensureIsNotRateLimited($request);
+
         if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+            RateLimiter::hit($this->throttleKey($request), self::DECAY_SECONDS);
+
             throw ValidationException::withMessages([
                 'email' => 'These credentials do not match our records.',
             ]);
         }
+
+        // The password was right, so this was not a guess. Whatever happens
+        // after this — inactive account, wrong role, a second factor still to
+        // come — is no longer the brute-force case the counter exists for.
+        RateLimiter::clear($this->throttleKey($request));
 
         $user = Auth::user();
 
@@ -76,6 +100,47 @@ class LoginController extends Controller
         $request->session()->regenerate();
 
         return $this->landing($user);
+    }
+
+    /**
+     * Refuse the attempt outright once the counter is full.
+     *
+     * Fires Laravel's Lockout event rather than returning a bare 429, because
+     * AppServiceProvider already listens for it and writes the audit row that
+     * the Security panel's "Lockouts (24h)" tile counts. Route-level
+     * `throttle` middleware would have blocked the requests and left that tile
+     * reading zero through an attack.
+     */
+    protected function ensureIsNotRateLimited(Request $request): void
+    {
+        if (! RateLimiter::tooManyAttempts($this->throttleKey($request), self::MAX_ATTEMPTS)) {
+            return;
+        }
+
+        event(new Lockout($request));
+
+        $seconds = RateLimiter::availableIn($this->throttleKey($request));
+
+        throw ValidationException::withMessages([
+            'email' => trans('auth.throttle', [
+                'seconds' => $seconds,
+                'minutes' => ceil($seconds / 60),
+            ]),
+        ]);
+    }
+
+    /**
+     * Counted per address *and* per source.
+     *
+     * Not by address alone: a whole office behind one NAT address would then
+     * let one person's fat fingers lock a colleague out. Not by source alone
+     * either: everyone in that office shares it.
+     */
+    protected function throttleKey(Request $request): string
+    {
+        return Str::transliterate(
+            Str::lower((string) $request->input('email')) . '|' . $request->ip()
+        );
     }
 
     /** The "enter your code" screen. */
