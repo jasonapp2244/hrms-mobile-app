@@ -271,10 +271,13 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     // Leave — company-wide register and the final approval step.
     Route::get('leave', [LeaveController::class, 'index'])
         ->middleware('permission:manage-leave')->name('leave.index');
-    // The month view (A6.7). Open to anybody who can approve as well as to HR:
-    // deciding on cover is exactly what it is for.
+    // The month view (A6.7). manage-leave only, despite approvers being the
+    // other obvious audience: this whole group is already behind role:admin|hr,
+    // so adding |approve-leave advertised access a manager can never actually
+    // reach — they hold the permission but not the role. Managers see conflicts
+    // flagged on the request itself, in the portal, which is where they work.
     Route::get('leave/calendar', [LeaveController::class, 'calendar'])
-        ->middleware('permission:manage-leave|approve-leave')->name('leave.calendar');
+        ->middleware('permission:manage-leave')->name('leave.calendar');
     Route::middleware('permission:approve-leave')->group(function () {
         Route::post('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
         Route::post('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->name('leave.reject');
