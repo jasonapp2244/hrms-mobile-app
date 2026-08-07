@@ -11,10 +11,15 @@
 # What stops if this line is missing:
 #   attendance:remind-checkout   every 15 min  — nobody is reminded they are still clocked in
 #   attendance:close-day         hourly        — open punches are never closed, hours stay wrong
+#   reports:send                 hourly        — no scheduled report is ever emailed
+#   attendance:report-late       10:30 daily   — HR is never told who was late
+#   documents:check-expiry       06:45 daily   — a visa or permit lapses with nobody warned
+#   leave:process                01:30 daily   — no monthly accrual, and no year-end carry-forward
 #   db:backup --verify           02:10 daily   — there are no backups at all
 #
-# The failure is silent in all three cases. Nothing errors; the work simply
-# never happens, and the first sign is a month of unclosed shifts.
+# The failure is silent in every case. Nothing errors; the work simply never
+# happens, and the first sign is a month of unclosed shifts — or, worse, an
+# expired right-to-work document nobody was told about.
 
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
