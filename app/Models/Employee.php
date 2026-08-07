@@ -208,6 +208,12 @@ class Employee extends Model
         return $this->hasMany(EmployeeDocument::class);
     }
 
+    /** Their joining and leaving steps (A3.12). */
+    public function checklistItems(): HasMany
+    {
+        return $this->hasMany(EmployeeChecklistItem::class);
+    }
+
     /**
      * Take the filed documents — and their files — with the record.
      *

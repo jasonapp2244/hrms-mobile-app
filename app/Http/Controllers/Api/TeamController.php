@@ -146,6 +146,132 @@ class TeamController extends ApiController
     }
 
     /**
+     * The team's published roster over a stretch of days (B7.3).
+     *
+     * Published only, exactly like the employee's own /schedule. A manager
+     * seeing draft shifts their team cannot see would tell somebody to come in
+     * on a day that is still being planned, and the roster's whole draft /
+     * publish distinction exists to prevent that.
+     *
+     * Returned employee-major rather than date-major — a manager reads down a
+     * person to see their week, not across a day to see who is on it, and the
+     * day view is what /team/attendance already answers.
+     */
+    public function roster(Request $request): JsonResponse
+    {
+        $manager = $this->employee();
+
+        $data = $request->validate([
+            'from' => 'nullable|date_format:Y-m-d',
+            'days' => 'nullable|integer|between:1,31',
+        ]);
+
+        $timezone = $this->timezone($manager);
+
+        $from = Carbon::parse($data['from'] ?? now($timezone)->toDateString());
+        $days = (int) ($data['days'] ?? 7);
+        $to   = $from->copy()->addDays($days - 1);
+
+        $team = Employee::query()
+            ->where('manager_id', $manager->id)
+            ->where('company_id', $manager->company_id)
+            ->active()
+            ->orderBy('first_name')
+            ->get();
+
+        if ($team->isEmpty()) {
+            return $this->ok([
+                'from' => $from->toDateString(),
+                'to'   => $to->toDateString(),
+                'timezone' => $timezone,
+                'team' => [],
+            ]);
+        }
+
+        $assignments = \App\Models\ShiftAssignment::with('shift')
+            ->whereIn('employee_id', $team->pluck('id'))
+            // The model's own scope, not whereBetween: `date` is a date cast and
+            // carries a time component on any engine without a real DATE type,
+            // so a plain string range silently misses rows.
+            ->between($from->toDateString(), $to->toDateString())
+            ->whereNotNull('published_at')
+            ->get()
+            ->groupBy('employee_id');
+
+        $holidays = $manager->company
+            ? Holiday::namedBetween($manager->company_id, $from->toDateString(), $to->toDateString())
+            : [];
+
+        $working = array_flip($this->leave->workingDatesBetween(
+            $manager->company, $from->toDateString(), $to->toDateString(),
+        ));
+
+        $leaveByEmployee = $this->leave->leaveDatesByEmployee(
+            $manager->company_id, $from->toDateString(), $to->toDateString(),
+        );
+
+        $rows = $team->map(function (Employee $employee) use (
+            $assignments, $holidays, $working, $leaveByEmployee, $from, $to
+        ) {
+            $planned = $assignments->get($employee->id, collect())
+                ->keyBy(fn ($a) => $a->date->toDateString());
+
+            $onLeave = array_flip($leaveByEmployee[$employee->id] ?? []);
+
+            $schedule = [];
+
+            for ($day = $from->copy(); $day->lte($to); $day->addDay()) {
+                $date = $day->toDateString();
+                $assignment = $planned->get($date);
+
+                // Leave outranks the roster: somebody rostered on a day they
+                // later booked off is not working it, and showing the shift
+                // would have a manager expecting them.
+                $status = match (true) {
+                    isset($onLeave[$date])          => 'leave',
+                    isset($holidays[$date])         => 'holiday',
+                    (bool) $assignment?->is_day_off => 'day_off',
+                    $assignment !== null            => 'working',
+                    ! isset($working[$date])        => 'weekend',
+                    // Nothing planned on a working day falls back to their
+                    // standing shift, which is what actually happens.
+                    default                         => 'working',
+                };
+
+                $shift = $status === 'working' ? $employee->shiftOn($date) : null;
+
+                $schedule[] = [
+                    'date'    => $date,
+                    'status'  => $status,
+                    'holiday' => $holidays[$date] ?? null,
+                    'shift'   => $shift ? [
+                        'name'       => $shift->name,
+                        'start_time' => $shift->start_time,
+                        'end_time'   => $shift->end_time,
+                    ] : null,
+                    // So the app can show "rostered" apart from "their usual
+                    // hours" without a second call.
+                    'is_rostered' => $assignment !== null,
+                ];
+            }
+
+            return [
+                'employee_id'   => $employee->id,
+                'name'          => $employee->full_name,
+                'employee_code' => $employee->employee_code,
+                'schedule'      => $schedule,
+            ];
+        });
+
+        return $this->ok([
+            'from'     => $from->toDateString(),
+            'to'       => $to->toDateString(),
+            'timezone' => $timezone,
+            'team'     => $rows->values(),
+        ]);
+    }
+
+    /**
      * The counts a manager reads before the list.
      *
      * `in_now` is separate from `present` on purpose: somebody who worked this

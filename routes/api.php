@@ -92,6 +92,12 @@ Route::middleware('auth:sanctum')->group(function () {
         // someone who approves for a team, and this answers for that same team.
         Route::get('team/attendance', [TeamController::class, 'attendance'])
             ->name('api.team.attendance');
+
+        // The team's published roster (B7.3). Same gate and same team as the
+        // line above; published only, so a manager never sees a draft their
+        // staff cannot.
+        Route::get('team/roster', [TeamController::class, 'roster'])
+            ->name('api.team.roster');
     });
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('api.schedule');

@@ -5,6 +5,7 @@ use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
+use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
@@ -171,6 +172,10 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
 
     Route::get('dashboard', [DashboardController::class, 'index'])
         ->middleware('permission:view-dashboard')->name('dashboard');
+    // Which panels this person keeps (A8.5). Same gate as the dashboard: it
+    // only ever writes the viewer's own preference.
+    Route::post('dashboard/widgets', [DashboardController::class, 'widgets'])
+        ->middleware('permission:view-dashboard')->name('dashboard.widgets');
 
     // Attendance module
     Route::prefix('attendance')->name('attendance.')->group(function () {
@@ -206,6 +211,7 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::get('payroll', [ReportController::class, 'payroll'])->name('payroll');
         Route::get('leave', [ReportController::class, 'leave'])->name('leave');
         Route::get('department', [ReportController::class, 'department'])->name('department');
+        Route::get('weekly', [ReportController::class, 'weekly'])->name('weekly');
         Route::get('custom', [ReportController::class, 'custom'])->name('custom');
     });
 
@@ -234,6 +240,20 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::get('employees/org-chart', [EmployeeController::class, 'orgChart'])
         ->middleware('permission:manage-employees')->name('employees.org-chart');
 
+    // Joining and leaving checklists (A3.12). Ticking "building access revoked"
+    // is a claim somebody may later be asked to stand behind, so it sits with
+    // whoever owns the employee record.
+    Route::middleware('permission:manage-employees')->group(function () {
+        Route::get('checklists', [ChecklistController::class, 'templates'])->name('checklists.templates');
+        Route::post('checklists', [ChecklistController::class, 'storeTemplate'])->name('checklists.templates.store');
+        Route::put('checklists/{template}', [ChecklistController::class, 'updateTemplate'])->name('checklists.templates.update');
+        Route::delete('checklists/{template}', [ChecklistController::class, 'destroyTemplate'])->name('checklists.templates.destroy');
+
+        Route::get('employees/{employee}/checklist', [ChecklistController::class, 'forEmployee'])->name('checklists.employee');
+        Route::post('employees/{employee}/checklist', [ChecklistController::class, 'generate'])->name('checklists.generate');
+        Route::post('employees/{employee}/checklist/{item}/toggle', [ChecklistController::class, 'toggle'])->name('checklists.toggle');
+        Route::delete('employees/{employee}/checklist/{item}', [ChecklistController::class, 'destroyItem'])->name('checklists.items.destroy');
+    });
     // The document vault (A3.8). Downloads stream through the controller rather
     // than sitting under public/ — these are contracts and passport scans.
     Route::middleware('permission:manage-employees')->group(function () {

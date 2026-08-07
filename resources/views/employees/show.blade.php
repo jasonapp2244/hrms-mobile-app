@@ -9,6 +9,7 @@
       <li class="breadcrumb-item active">Employee Details</li>
     </ol></nav></div>
   <div class="d-flex align-items-center flex-wrap">
+    <a href="{{ route('checklists.employee', $employee) }}" class="btn btn-outline-secondary me-2"><i class="ti ti-checklist me-1"></i>Checklist</a>
     <a href="{{ route('employees.documents.index', $employee) }}" class="btn btn-outline-secondary me-2"><i class="ti ti-folder me-1"></i>Documents</a>
     <a href="{{ route('employees.edit', $employee) }}" class="btn btn-primary"><i class="ti ti-edit me-1"></i>Edit</a>
   </div>

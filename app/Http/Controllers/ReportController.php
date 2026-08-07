@@ -51,6 +51,11 @@ class ReportController extends Controller
         return $this->handle($request, 'leave');
     }
 
+    public function weekly(Request $request)
+    {
+        return $this->handle($request, 'weekly');
+    }
+
     /** The report builder (A7.13) — whatever columns and filters were picked. */
     public function custom(Request $request)
     {

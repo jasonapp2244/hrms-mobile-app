@@ -42,6 +42,7 @@ class ReportSubscription extends Model
         'overtime'   => 'Overtime',
         'payroll'    => 'Payroll Hours',
         'leave'      => 'Leave',
+        'weekly'     => 'Weekly Rollup',
         'department' => 'Department Attendance',
     ];
 

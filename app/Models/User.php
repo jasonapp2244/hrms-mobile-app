@@ -114,6 +114,11 @@ class User extends Authenticatable
             'two_factor_secret' => 'encrypted',
             'two_factor_recovery_codes' => 'encrypted:array',
             'two_factor_confirmed_at' => 'datetime',
+
+            // Which dashboard panels this person keeps (A8.5). Null means never
+            // chosen and falls back to the role default; [] means they turned
+            // everything off, which is a different thing.
+            'dashboard_widgets' => 'array',
         ];
     }
 

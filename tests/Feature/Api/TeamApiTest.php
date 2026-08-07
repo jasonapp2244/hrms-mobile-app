@@ -262,4 +262,149 @@ class TeamApiTest extends TestCase
         $this->assertSame('2026-08-03', $response->json('date'));
         $this->assertSame('present', $response->json('team.0.status'));
     }
+
+    // ================= the team roster (B7.3) =================
+
+    /** A published or draft roster day for somebody. */
+    protected function roster(Employee $employee, string $date, ?Shift $shift, bool $published = true, bool $dayOff = false): void
+    {
+        \App\Models\ShiftAssignment::create([
+            'company_id'   => $this->company->id,
+            'employee_id'  => $employee->id,
+            'shift_id'     => $shift?->id,
+            'date'         => $date,
+            'is_day_off'   => $dayOff,
+            'published_at' => $published ? now() : null,
+        ]);
+    }
+
+    protected function shift(): Shift
+    {
+        return Shift::create([
+            'company_id' => $this->company->id, 'name' => 'Morning',
+            'start_time' => '09:00:00', 'end_time' => '17:00:00',
+            'break_minutes' => 30, 'late_grace_minutes' => 15, 'is_active' => true,
+        ]);
+    }
+
+    public function test_an_ordinary_employee_cannot_see_the_team_roster(): void
+    {
+        [, $user] = $this->staff('Ann', 'E1');
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/team/roster')->assertForbidden();
+    }
+
+    public function test_the_roster_covers_a_week_from_today_by_default(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->asManager();
+
+        $response = $this->getJson('/api/v1/team/roster')->assertOk();
+
+        $this->assertSame('2026-08-03', $response->json('from'));
+        $this->assertSame('2026-08-09', $response->json('to'));
+        $this->assertCount(7, $response->json('team.0.schedule'));
+    }
+
+    public function test_a_published_shift_is_returned(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->roster($ann, '2026-08-03', $this->shift());
+
+        $this->asManager();
+        $response = $this->getJson('/api/v1/team/roster?from=2026-08-03&days=1')->assertOk();
+
+        $this->assertSame('working', $response->json('team.0.schedule.0.status'));
+        $this->assertSame('Morning', $response->json('team.0.schedule.0.shift.name'));
+        $this->assertTrue($response->json('team.0.schedule.0.is_rostered'));
+    }
+
+    public function test_a_draft_shift_is_not_returned(): void
+    {
+        // A manager seeing a draft their team cannot see would tell somebody to
+        // come in on a day still being planned.
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->roster($ann, '2026-08-03', $this->shift(), published: false);
+
+        $this->asManager();
+        $response = $this->getJson('/api/v1/team/roster?from=2026-08-03&days=1')->assertOk();
+
+        $this->assertFalse($response->json('team.0.schedule.0.is_rostered'));
+    }
+
+    public function test_a_rostered_day_off_reads_as_a_day_off(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->roster($ann, '2026-08-03', null, dayOff: true);
+
+        $this->asManager();
+        $response = $this->getJson('/api/v1/team/roster?from=2026-08-03&days=1')->assertOk();
+
+        $this->assertSame('day_off', $response->json('team.0.schedule.0.status'));
+    }
+
+    public function test_leave_outranks_a_rostered_shift(): void
+    {
+        // Showing the shift would have a manager expecting somebody who booked
+        // the day off after the roster was drawn.
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->roster($ann, '2026-08-04', $this->shift());
+
+        $type = LeaveType::create([
+            'company_id' => $this->company->id, 'name' => 'Annual', 'code' => 'AL',
+            'days_per_year' => 20, 'is_paid' => true, 'is_active' => true,
+        ]);
+
+        LeaveRequest::create([
+            'company_id' => $this->company->id, 'employee_id' => $ann->id,
+            'leave_type_id' => $type->id, 'start_date' => '2026-08-04',
+            'end_date' => '2026-08-04', 'days' => 1, 'status' => 'approved',
+        ]);
+
+        $this->asManager();
+        $response = $this->getJson('/api/v1/team/roster?from=2026-08-04&days=1')->assertOk();
+
+        $this->assertSame('leave', $response->json('team.0.schedule.0.status'));
+        $this->assertNull($response->json('team.0.schedule.0.shift'));
+    }
+
+    public function test_the_weekend_is_reported_as_such(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->asManager();
+
+        // 8 August 2026 is a Saturday.
+        $response = $this->getJson('/api/v1/team/roster?from=2026-08-08&days=1')->assertOk();
+
+        $this->assertSame('weekend', $response->json('team.0.schedule.0.status'));
+    }
+
+    public function test_somebody_elses_report_is_not_in_my_roster(): void
+    {
+        [$otherBoss] = $this->staff('Otto', 'M2', 'manager');
+        $this->staff('Theirs', 'E9', 'employee', $otherBoss);
+        [$mine] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+
+        $this->asManager();
+        $response = $this->getJson('/api/v1/team/roster')->assertOk();
+
+        $codes = collect($response->json('team'))->pluck('employee_code')->all();
+
+        $this->assertSame(['E1'], $codes);
+    }
+
+    public function test_a_manager_with_no_reports_gets_an_empty_roster(): void
+    {
+        $this->asManager();
+
+        $this->getJson('/api/v1/team/roster')->assertOk()->assertJsonPath('team', []);
+    }
+
+    public function test_the_window_is_capped(): void
+    {
+        $this->asManager();
+
+        $this->getJson('/api/v1/team/roster?days=90')->assertStatus(422);
+    }
 }

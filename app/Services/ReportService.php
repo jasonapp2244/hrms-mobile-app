@@ -126,6 +126,113 @@ class ReportService
     }
 
     /**
+     * Weekly rollup (A4.11) — one row per week, not per employee.
+     *
+     * The only report here that aggregates over time rather than over people,
+     * and it exists because the per-employee reports cannot answer the question
+     * a manager actually asks at a monthly review: is this getting better or
+     * worse. Twenty rows of individual on-time percentages do not show a trend;
+     * six rows of weeks do.
+     *
+     * Weeks run Monday to Sunday and are clipped to the requested window, so a
+     * range starting mid-week gives a short first week rather than silently
+     * borrowing days from before it. The row says how many working days it
+     * covers for exactly that reason.
+     */
+    public function weekly(int $companyId, string $from, string $to, ?int $officeId = null): array
+    {
+        $company = Company::find($companyId);
+
+        $employees = Employee::where('company_id', $companyId)->active()
+            ->when($officeId, fn ($q) => $q->where('office_id', $officeId))
+            ->get();
+
+        $headcount = $employees->count();
+
+        $ins = AttendanceLog::whereIn('employee_id', $employees->pluck('id'))
+            ->forDates($from, $to)
+            ->where('type', 'in')
+            ->get(['employee_id', 'work_date', 'status']);
+
+        // Bucketed once by the Monday that starts each week, rather than
+        // re-filtering the whole set per week.
+        $byWeek = $ins->groupBy(fn ($log) => $log->work_date->copy()->startOfWeek()->toDateString());
+
+        $leaveDates = $this->leave->leaveDatesByEmployee($companyId, $from, $to);
+        $leaveByWeek = [];
+
+        foreach ($leaveDates as $dates) {
+            foreach ($dates as $date) {
+                $week = Carbon::parse($date)->startOfWeek()->toDateString();
+                $leaveByWeek[$week] = ($leaveByWeek[$week] ?? 0) + 1;
+            }
+        }
+
+        $rows = [];
+        $windowStart = Carbon::parse($from);
+        $windowEnd   = Carbon::parse($to);
+
+        for ($week = $windowStart->copy()->startOfWeek(); $week->lte($windowEnd); $week->addWeek()) {
+            $weekKey = $week->toDateString();
+
+            // Clipped: a range that starts on a Wednesday has a three-day first
+            // week, and reporting it as a full one would understate every rate
+            // in the row.
+            $start = $week->lt($windowStart) ? $windowStart->copy() : $week->copy();
+            $end   = $week->copy()->endOfWeek()->gt($windowEnd) ? $windowEnd->copy() : $week->copy()->endOfWeek();
+
+            $workingDays = count($this->leave->workingDatesBetween(
+                $company, $start->toDateString(), $end->toDateString(),
+            ));
+
+            $logs = $byWeek->get($weekKey, collect());
+
+            $presentDays = $logs->map(fn ($log) => $log->employee_id . '|' . $log->work_date->toDateString())
+                ->unique()->count();
+
+            $late   = $logs->where('status', 'late')->count();
+            $ontime = $logs->where('status', 'ontime')->count();
+            $total  = $logs->count();
+
+            $leaveDays = $leaveByWeek[$weekKey] ?? 0;
+            $expected  = $headcount * $workingDays;
+
+            $rows[] = [
+                'Week'         => $start->format('M j') . ' – ' . $end->format('M j'),
+                'Working Days' => $workingDays,
+                'Present'      => $presentDays,
+                'Leave'        => $leaveDays,
+                'Absent'       => max(0, $expected - $presentDays - $leaveDays),
+                'Late'         => $late,
+                // Null would break the Excel column; a dash reads correctly and
+                // says "nobody clocked in" rather than "nobody was on time".
+                'On-time %'    => $total > 0 ? round($ontime / $total * 100, 1) . '%' : '—',
+                'Attendance %' => $expected > 0 ? round($presentDays / $expected * 100, 1) . '%' : '—',
+            ];
+        }
+
+        $totalPresent = array_sum(array_column($rows, 'Present'));
+        $totalLate    = array_sum(array_column($rows, 'Late'));
+
+        return [
+            'title'    => 'Weekly Rollup',
+            'subtitle' => sprintf(
+                'One row per week over %d active employee(s). Weeks run Monday to Sunday and '
+                . 'are clipped to the reporting window, so a short first or last week is reported as short.',
+                $headcount,
+            ),
+            'tiles' => [
+                ['label' => 'Weeks', 'value' => count($rows)],
+                ['label' => 'Employee-Days Present', 'value' => $totalPresent],
+                ['label' => 'Late Arrivals', 'value' => $totalLate],
+                ['label' => 'Avg Present / Week', 'value' => count($rows) > 0 ? round($totalPresent / count($rows)) : 0],
+            ],
+            'headings' => ['Week', 'Working Days', 'Present', 'Leave', 'Absent', 'Late', 'On-time %', 'Attendance %'],
+            'rows'     => $rows,
+        ];
+    }
+
+    /**
      * Leave report (A7.10) — days taken per employee, broken down by type.
      *
      * The type columns are built from the company's own leave types rather than

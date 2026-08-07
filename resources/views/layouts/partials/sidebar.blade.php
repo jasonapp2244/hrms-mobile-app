@@ -63,6 +63,7 @@
 								<li><a class="{{ request()->routeIs('reports.overtime') ? 'active' : '' }}" href="{{ route('reports.overtime') }}">Overtime</a></li>
 								<li><a class="{{ request()->routeIs('reports.payroll') ? 'active' : '' }}" href="{{ route('reports.payroll') }}">Payroll Hours</a></li>
 								<li><a class="{{ request()->routeIs('reports.leave') ? 'active' : '' }}" href="{{ route('reports.leave') }}">Leave Report</a></li>
+								<li><a class="{{ request()->routeIs('reports.weekly') ? 'active' : '' }}" href="{{ route('reports.weekly') }}">Weekly Rollup</a></li>
 								@can('export-reports')
 								<li><a class="{{ request()->routeIs('report-subscriptions.*') ? 'active' : '' }}" href="{{ route('report-subscriptions.index') }}">Scheduled Reports</a></li>
 								@endcan
@@ -86,6 +87,7 @@
 							<ul style="{{ request()->routeIs('employees.*') ? 'display:block;' : '' }}">
 								<li><a class="{{ request()->routeIs('employees.index') ? 'active' : '' }}" href="{{ route('employees.index') }}">All Employees</a></li>
 								<li><a class="{{ request()->routeIs('employees.org-chart') ? 'active' : '' }}" href="{{ route('employees.org-chart') }}">Org Chart</a></li>
+								<li><a class="{{ request()->routeIs('checklists.templates') ? 'active' : '' }}" href="{{ route('checklists.templates') }}">Checklists</a></li>
 								<li><a class="{{ request()->routeIs('employees.create') ? 'active' : '' }}" href="{{ route('employees.create') }}">Add Employee</a></li>
 								@can('import-employees')
 								<li><a class="{{ request()->routeIs('employees.import') ? 'active' : '' }}" href="{{ route('employees.import') }}">Bulk Import</a></li>

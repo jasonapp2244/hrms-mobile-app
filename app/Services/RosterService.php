@@ -155,10 +155,62 @@ class RosterService
      */
     public function publish(int $companyId, string $from, string $to): int
     {
-        return ShiftAssignment::where('company_id', $companyId)
+        $unpublished = ShiftAssignment::with('employee.user')
+            ->where('company_id', $companyId)
+            ->between($from, $to)
+            ->whereNull('published_at')
+            ->get();
+
+        if ($unpublished->isEmpty()) {
+            return 0;
+        }
+
+        $count = ShiftAssignment::where('company_id', $companyId)
             ->between($from, $to)
             ->whereNull('published_at')
             ->update(['published_at' => now()]);
+
+        $this->announce($unpublished, $from, $to);
+
+        return $count;
+    }
+
+    /**
+     * Tell each affected employee their roster is up (A9.5).
+     *
+     * One notification per person covering the whole range, not one per day —
+     * publishing a week would otherwise send seven, which is the pattern that
+     * gets an app muted and an email address filtered.
+     *
+     * Sent after the update rather than before, so a person who opens the link
+     * immediately sees a published roster rather than an empty screen.
+     *
+     * Anybody without a user account is skipped in silence. Plenty of staff on
+     * a roster have never signed in, and that is not an error worth surfacing
+     * to whoever pressed Publish.
+     *
+     * @param  \Illuminate\Support\Collection<int, ShiftAssignment>  $assignments
+     */
+    protected function announce($assignments, string $from, string $to): void
+    {
+        foreach ($assignments->groupBy('employee_id') as $forEmployee) {
+            $user = $forEmployee->first()->employee?->user;
+
+            if (! $user) {
+                continue;
+            }
+
+            // Always the "ready" wording. Nothing records whether a row was
+            // published before and pulled back, so "changed" would be a guess —
+            // and telling somebody their shift moved when it did not is worse
+            // than the milder message. The notification still carries the
+            // isChange flag for a caller that genuinely knows.
+            $user->notify(new \App\Notifications\ScheduleUpdated(
+                from: $from,
+                to: $to,
+                days: $forEmployee->count(),
+            ));
+        }
     }
 
     /** Take a week back off the board. */
