@@ -264,6 +264,36 @@ class Preflight extends Command
             'not writable by the web user: ' . implode(', ', $bad),
             'all writable',
         );
+
+        $this->checkStorageLink();
+    }
+
+    /**
+     * public/storage has to exist, or every employee photo silently 404s.
+     *
+     * Worth its own line because the failure is invisible: nothing errors, no
+     * log entry is written, the pages all render — the pictures are simply
+     * missing, and the first report of it comes from a user weeks later.
+     *
+     * A WARN rather than a FAIL: the deploy script runs `storage:link` anyway,
+     * so a fresh checkout that has not run it yet is not a reason to refuse a
+     * deployment. Document-vault files are unaffected either way — those are on
+     * the private disk and are streamed through the app, never linked.
+     */
+    protected function checkStorageLink(): void
+    {
+        $link = public_path('storage');
+
+        // file_exists rather than is_link or is_dir. Those two disagree with
+        // each other across platforms — a Windows junction is not a link, and a
+        // symlink PHP cannot resolve is not a dir — and the question here is
+        // only whether the web server will find something at that path.
+        $this->assert(
+            'Public storage link',
+            file_exists($link) ? self::PASS : self::WARN,
+            'public/storage is missing — employee photos will 404. Run: php artisan storage:link',
+            'present',
+        );
     }
 
     protected function checkCaches(): void

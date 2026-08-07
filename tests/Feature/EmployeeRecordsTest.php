@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\EmployeeController;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Designation;
@@ -248,16 +249,41 @@ class EmployeeRecordsTest extends TestCase
         $this->actingAs($this->staff)->get(route('employees.org-chart'))->assertForbidden();
     }
 
-    public function test_the_export_and_the_import_agree_on_their_columns(): void
+    public function test_the_export_leads_with_the_import_columns(): void
     {
-        // The point of the export is that it can be edited and fed back in. If
-        // the two column lists drift, that stops being true silently.
-        $designation = Designation::create(['company_id' => $this->company->id, 'name' => 'Analyst']);
-        $this->employee(['designation_id' => $designation->id]);
+        // The point of the export is that it can be edited and fed back in. The
+        // export is built from IMPORT_COLUMNS for exactly this reason, and this
+        // is what stops the two drifting apart again.
+        $template = $this->actingAs($this->hr)->get(route('employees.import.template'))->assertOk();
 
-        $template = $this->actingAs($this->hr)->get(route('employees.import.template'));
-        $template->assertOk();
+        $header = str_getcsv(strtok($template->getContent(), "\n"), ',', '"', '\\');
+
+        $this->assertSame(EmployeeController::IMPORT_COLUMNS, $header);
+    }
+
+    public function test_the_export_names_the_manager_by_code_not_by_name(): void
+    {
+        // The import resolves the reporting line from manager_code. An export
+        // carrying "Max Reid" round-trips into a roster where every reporting
+        // line is silently blank.
+        $this->assertContains('manager_code', EmployeeController::IMPORT_COLUMNS);
+        $this->assertNotContains('manager', EmployeeController::IMPORT_COLUMNS);
+    }
+
+    public function test_a_round_trip_through_the_export_keeps_the_reporting_line(): void
+    {
+        $designation = Designation::create(['company_id' => $this->company->id, 'name' => 'Analyst']);
+        $boss = $this->employee(['first_name' => 'Max', 'last_name' => 'Reid']);
+        $this->employee([
+            'first_name' => 'Ann', 'last_name' => 'Lee',
+            'manager_id' => $boss->id, 'designation_id' => $designation->id,
+        ]);
 
         $this->actingAs($this->hr)->get(route('employees.export'))->assertOk();
+
+        // The row the export builds carries the manager's code, which is the
+        // value the import will look the manager up by.
+        $ann = Employee::where('first_name', 'Ann')->firstOrFail();
+        $this->assertSame($boss->employee_code, $ann->manager->employee_code);
     }
 }

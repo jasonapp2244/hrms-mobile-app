@@ -76,12 +76,20 @@ class EmployeeController extends Controller
             ->orderBy('employee_code')
             ->get();
 
-        $headings = [
-            'employee_code', 'first_name', 'last_name', 'email', 'phone',
-            'office', 'department', 'designation', 'manager',
-            'hire_date', 'status', 'work_mode',
+        // Derived from IMPORT_COLUMNS rather than written out again, so the two
+        // cannot drift apart. The extras go after, and the import ignores any
+        // header it does not know — it matches by name, not position.
+        //
+        // manager_code, not a manager's name: the import resolves the reporting
+        // line by employee code. An export carrying "Max Reid" round-trips into
+        // a roster with every reporting line silently blank.
+        $extra = [
+            'status', 'work_mode',
             'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
+            'personal_email', 'city', 'country',
         ];
+
+        $headings = array_merge(self::IMPORT_COLUMNS, $extra);
 
         $rows = $employees->map(fn (Employee $e) => [
             'employee_code' => $e->employee_code,
@@ -89,18 +97,23 @@ class EmployeeController extends Controller
             'last_name'     => $e->last_name,
             'email'         => $e->email,
             'phone'         => $e->phone,
-            // Names, not ids — the import matches on names, and an id means
-            // nothing to whoever opens this in Excel.
+            'gender'        => $e->gender,
+            'hire_date'     => $e->hire_date?->toDateString() ?? '',
+            // Names, not ids — the import matches offices, departments and
+            // designations by name, and an id means nothing in Excel.
             'office'        => $e->office->name ?? '',
             'department'    => $e->department->name ?? '',
             'designation'   => $e->designation->name ?? '',
-            'manager'       => $e->manager->full_name ?? '',
-            'hire_date'     => $e->hire_date?->toDateString() ?? '',
+            'manager_code'  => $e->manager->employee_code ?? '',
+
             'status'        => $e->status,
             'work_mode'     => $e->work_mode,
             'emergency_contact_name'     => $e->emergency_contact_name,
             'emergency_contact_phone'    => $e->emergency_contact_phone,
             'emergency_contact_relation' => $e->emergency_contact_relation,
+            'personal_email' => $e->personal_email,
+            'city'           => $e->city,
+            'country'        => $e->country,
         ])->all();
 
         return Excel::download(
