@@ -17,7 +17,7 @@
 @if(session('error'))<div class="alert alert-danger">{{ session('error') }}</div>@endif
 @if($errors->any())<div class="alert alert-danger"><ul class="mb-0">@foreach($errors->all() as $e)<li>{{ $e }}</li>@endforeach</ul></div>@endif
 
-<form action="{{ route('employees.update', $employee) }}" method="POST">
+<form action="{{ route('employees.update', $employee) }}" method="POST" enctype="multipart/form-data">
   @csrf
   @method('PUT')
   <div class="card">
@@ -128,6 +128,11 @@
         </div>
       </div>
     </div>
+  </div>
+
+  @include('employees.partials.personal-details')
+
+  <div class="card">
     <div class="card-footer text-end">
       <a href="{{ route('employees.index') }}" class="btn btn-light me-2">Cancel</a>
       <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Update Employee</button>

@@ -9,10 +9,21 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class LeaveType extends Model
 {
     protected $fillable = [
-        'company_id', 'name', 'code', 'days_per_year', 'is_paid',
+        'company_id', 'name', 'code', 'days_per_year', 'accrual_mode', 'is_paid',
         'requires_approval', 'allow_half_day', 'carry_forward_max',
         'color', 'is_active',
     ];
+
+    /** How entitlement arrives over the year (A6.4). */
+    public const ACCRUAL_MODES = [
+        'upfront' => 'All at once, at the start of the year',
+        'monthly' => 'A twelfth each month, pro-rated from the hire date',
+    ];
+
+    public function accruesMonthly(): bool
+    {
+        return $this->accrual_mode === 'monthly';
+    }
 
     protected $casts = [
         'days_per_year'     => 'decimal:1',

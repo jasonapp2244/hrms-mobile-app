@@ -8,8 +8,13 @@
       <li class="breadcrumb-item active">Employees</li>
     </ol></nav></div>
   <div class="d-flex align-items-center flex-wrap">
-    <a href="{{ route('employees.create') }}" class="btn btn-primary me-2"><i class="ti ti-plus me-1"></i>Add Employee</a>
-    <a href="{{ route('employees.import') }}" class="btn btn-outline-secondary"><i class="ti ti-upload me-1"></i>Bulk Import</a>
+    <a href="{{ route('employees.create') }}" class="btn btn-primary me-2 mb-1"><i class="ti ti-plus me-1"></i>Add Employee</a>
+    <a href="{{ route('employees.import') }}" class="btn btn-outline-secondary me-2 mb-1"><i class="ti ti-upload me-1"></i>Bulk Import</a>
+    {{-- Carries the current filters, so the button next to a filtered list
+         exports what is actually on screen. --}}
+    <a href="{{ route('employees.export', request()->only('q','department_id','status')) }}"
+       class="btn btn-outline-success me-2 mb-1"><i class="ti ti-download me-1"></i>Export</a>
+    <a href="{{ route('employees.org-chart') }}" class="btn btn-outline-secondary mb-1"><i class="ti ti-hierarchy-2 me-1"></i>Org Chart</a>
   </div>
 </div>
 

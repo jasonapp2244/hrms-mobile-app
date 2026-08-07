@@ -73,6 +73,7 @@ class LeaveTypeController extends Controller
             ],
             'code'              => 'nullable|string|max:30',
             'days_per_year'     => 'required|numeric|min:0|max:365',
+            'accrual_mode'      => 'nullable|in:upfront,monthly',
             'carry_forward_max' => 'nullable|numeric|min:0|max:365',
             'color'             => 'nullable|string|max:20',
         ], [

@@ -10,6 +10,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\DesignationController;
 use App\Http\Controllers\EmployeeController;
+use App\Http\Controllers\EmployeeDocumentController;
 use App\Http\Controllers\EmployeePortalController;
 use App\Http\Controllers\HolidayController;
 use App\Http\Controllers\LeaveApprovalController;
@@ -175,6 +176,9 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::prefix('attendance')->name('attendance.')->group(function () {
         Route::get('/', [AttendanceController::class, 'index'])->middleware('permission:view-attendance')->name('index');
         Route::get('logs', [AttendanceController::class, 'logs'])->middleware('permission:view-attendance')->name('logs');
+        // The live board (A4.19). Same permission as the log — it shows the same
+        // facts, one moment's worth rather than a history.
+        Route::get('board', [AttendanceController::class, 'board'])->middleware('permission:view-attendance')->name('board');
         Route::get('report', [AttendanceController::class, 'report'])->middleware('permission:view-reports')->name('report');
         Route::get('report/pdf', [AttendanceController::class, 'exportPdf'])->middleware('permission:export-reports')->name('report.pdf');
         Route::get('report/excel', [AttendanceController::class, 'exportExcel'])->middleware('permission:export-reports')->name('report.excel');
@@ -221,6 +225,23 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::get('employees/import', [EmployeeController::class, 'importForm'])->middleware('permission:import-employees')->name('employees.import');
     Route::get('employees/import/template', [EmployeeController::class, 'importTemplate'])->middleware('permission:import-employees')->name('employees.import.template');
     Route::post('employees/import', [EmployeeController::class, 'import'])->middleware('permission:import-employees')->name('employees.import.store');
+
+    // Roster export (A3.11) and the reporting hierarchy (A3.10). Both declared
+    // before the resource so 'export' and 'org-chart' are not swallowed by
+    // employees/{employee}.
+    Route::get('employees/export', [EmployeeController::class, 'export'])
+        ->middleware('permission:manage-employees')->name('employees.export');
+    Route::get('employees/org-chart', [EmployeeController::class, 'orgChart'])
+        ->middleware('permission:manage-employees')->name('employees.org-chart');
+
+    // The document vault (A3.8). Downloads stream through the controller rather
+    // than sitting under public/ — these are contracts and passport scans.
+    Route::middleware('permission:manage-employees')->group(function () {
+        Route::get('employees/{employee}/documents', [EmployeeDocumentController::class, 'index'])->name('employees.documents.index');
+        Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
+        Route::get('employees/{employee}/documents/{document}', [EmployeeDocumentController::class, 'download'])->name('employees.documents.download');
+        Route::delete('employees/{employee}/documents/{document}', [EmployeeDocumentController::class, 'destroy'])->name('employees.documents.destroy');
+    });
     Route::resource('employees', EmployeeController::class)->middleware('permission:manage-employees');
 
     // Departments / Designations
@@ -230,6 +251,10 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     // Leave — company-wide register and the final approval step.
     Route::get('leave', [LeaveController::class, 'index'])
         ->middleware('permission:manage-leave')->name('leave.index');
+    // The month view (A6.7). Open to anybody who can approve as well as to HR:
+    // deciding on cover is exactly what it is for.
+    Route::get('leave/calendar', [LeaveController::class, 'calendar'])
+        ->middleware('permission:manage-leave|approve-leave')->name('leave.calendar');
     Route::middleware('permission:approve-leave')->group(function () {
         Route::post('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
         Route::post('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->name('leave.reject');

@@ -645,6 +645,95 @@ class AttendanceService
     }
 
     /**
+     * Who is on the clock at this moment (A4.19).
+     *
+     * Three buckets, because "who is in" has three honest answers and a board
+     * that shows only the first is the one people stop trusting:
+     *
+     *  - `in`      — clocked in, not yet out. Includes people on a break, with
+     *                the break flagged, because they are still at work.
+     *  - `left`    — clocked in and back out again. They were here today.
+     *  - `not_in`  — no punch at all, and no approved leave. This is the bucket
+     *                somebody is actually looking for.
+     *
+     * Approved leave is reported separately and never as "not in": the board is
+     * read to find out who is unaccounted for, and somebody on booked holiday is
+     * accounted for.
+     *
+     * Yesterday's date is considered as well as today's, because a night shift
+     * that began yesterday is still yesterday's work date at two in the morning
+     * and the person is very much at work.
+     *
+     * @return array{in: array, left: array, not_in: array, on_leave: array, as_of: \Carbon\Carbon}
+     */
+    public function whoIsIn(int $companyId, ?int $officeId = null): array
+    {
+        $company = \App\Models\Company::find($companyId);
+        $now = Carbon::now($company?->tz() ?? config('app.timezone'));
+
+        $employees = Employee::with(['department', 'office'])
+            ->where('company_id', $companyId)->active()
+            ->when($officeId, fn ($q) => $q->where('office_id', $officeId))
+            ->orderBy('first_name')
+            ->get();
+
+        // forDates rather than whereIn on the two dates: work_date carries a
+        // time component on any engine without a real DATE type, so a string
+        // match against "2026-08-05" finds nothing.
+        $punches = AttendanceLog::whereIn('employee_id', $employees->pluck('id'))
+            ->forDates($now->copy()->subDay()->toDateString(), $now->toDateString())
+            ->orderBy('scanned_at')
+            ->get()
+            ->groupBy('employee_id');
+
+        $onLeave = $this->leave->onLeaveOn($companyId, $now->toDateString());
+
+        $buckets = ['in' => [], 'left' => [], 'not_in' => [], 'on_leave' => []];
+
+        foreach ($employees as $employee) {
+            $logs = $punches->get($employee->id, collect());
+            $last = $logs->last();
+
+            if ($last && in_array($last->type, ['in', 'break_start', 'break_end'], true)) {
+                $buckets['in'][] = [
+                    'employee'  => $employee,
+                    'since'     => $logs->firstWhere('type', 'in')?->scanned_at,
+                    'on_break'  => $last->type === 'break_start',
+                    'last'      => $last,
+                ];
+
+                continue;
+            }
+
+            if ($last && $last->type === 'out') {
+                $buckets['left'][] = [
+                    'employee' => $employee,
+                    'since'    => $logs->firstWhere('type', 'in')?->scanned_at,
+                    'until'    => $last->scanned_at,
+                ];
+
+                continue;
+            }
+
+            // No punch at all. Booked leave explains it; nothing else does.
+            if ($onLeave->has($employee->id)) {
+                $buckets['on_leave'][] = [
+                    'employee' => $employee,
+                    'leave'    => $onLeave->get($employee->id),
+                ];
+
+                continue;
+            }
+
+            $buckets['not_in'][] = ['employee' => $employee];
+        }
+
+        $buckets['as_of'] = $now;
+
+        return $buckets;
+    }
+
+    /**
      * Aggregate summary tiles for a date (company-wide or per office).
      *
      * Approved leave is not absence. Somebody who booked the day off and did not

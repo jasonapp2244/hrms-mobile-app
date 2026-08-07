@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Company;
 use App\Models\Department;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\Office;
 use App\Services\LeaveService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 /**
@@ -76,6 +79,63 @@ class LeaveController extends Controller
         $departments = Department::where('company_id', $companyId)->orderBy('name')->get();
 
         return view('leave.index', compact('requests', 'stats', 'types', 'departments'));
+    }
+
+    /**
+     * The month, and who is away in it (A6.7).
+     *
+     * A calendar rather than a list because the question it answers is spatial:
+     * "can I approve this Thursday" is about who else is already off that day,
+     * and a list sorted by employee cannot be read that way at all.
+     *
+     * Approved and pending are both drawn, in different weights. A manager
+     * deciding on cover needs to see the request they are about to approve
+     * alongside the ones already granted — showing only approved leave means
+     * approving three people onto the same day one at a time.
+     */
+    public function calendar(Request $request)
+    {
+        $companyId = auth()->user()->company_id ?? Office::value('company_id');
+
+        $month = Carbon::parse($request->input('month', now()->format('Y-m')) . '-01')->startOfMonth();
+        $start = $month->copy()->startOfMonth();
+        $end   = $month->copy()->endOfMonth();
+
+        $requests = LeaveRequest::with(['employee.department', 'leaveType'])
+            ->where('company_id', $companyId)
+            ->whereIn('status', ['approved', 'pending'])
+            ->overlapping($start->toDateString(), $end->toDateString())
+            ->when($request->filled('department_id'), fn ($q) => $q->whereHas(
+                'employee',
+                fn ($e) => $e->where('department_id', $request->department_id),
+            ))
+            ->get();
+
+        // Expanded to one entry per date up front, so the grid below is a lookup
+        // rather than a scan of every request for every one of thirty-one days.
+        $byDate = [];
+
+        foreach ($requests as $leave) {
+            $from = Carbon::parse(max($leave->start_date->toDateString(), $start->toDateString()));
+            $to   = Carbon::parse(min($leave->end_date->toDateString(), $end->toDateString()));
+
+            for ($day = $from->copy(); $day->lte($to); $day->addDay()) {
+                $byDate[$day->toDateString()][] = $leave;
+            }
+        }
+
+        $company  = Company::find($companyId);
+        $weekend  = $this->leave->weekendDays($company);
+        $holidays = Holiday::datesBetween($companyId, $start->toDateString(), $end->toDateString());
+
+        return view('leave.calendar', [
+            'month'       => $month,
+            'byDate'      => $byDate,
+            'weekend'     => $weekend,
+            'holidays'    => $holidays,
+            'departments' => Department::where('company_id', $companyId)->orderBy('name')->get(),
+            'total'       => $requests->count(),
+        ]);
     }
 
     /**

@@ -189,14 +189,182 @@ class LeaveService
      */
     public function balanceFor(Employee $employee, LeaveType $type, ?int $year = null): LeaveBalance
     {
+        $year ??= (int) date('Y');
+
         return LeaveBalance::firstOrCreate(
             [
                 'employee_id'   => $employee->id,
                 'leave_type_id' => $type->id,
-                'year'          => $year ?? (int) date('Y'),
+                'year'          => $year,
             ],
-            ['entitled_days' => $type->days_per_year]
+            ['entitled_days' => $this->entitlementFor($employee, $type, $year)]
         );
+    }
+
+    /**
+     * What this employee is entitled to for the year, at this moment (A6.4).
+     *
+     * On an `upfront` type this is simply the type's allowance, which is what
+     * every type did before accrual existed.
+     *
+     * On a `monthly` type it is a twelfth per completed month, counted from
+     * January or from the hire date, whichever is later. Somebody who joined in
+     * November has two months of a twelve-month allowance and cannot book the
+     * whole year in their first fortnight.
+     *
+     * Never counts months that have not happened yet, and never exceeds the
+     * annual allowance — both of which a naive months-since-hire calculation
+     * gets wrong for anybody who has been here more than a year.
+     */
+    public function entitlementFor(Employee $employee, LeaveType $type, ?int $year = null): float
+    {
+        $allowance = (float) $type->days_per_year;
+
+        if (! $type->accruesMonthly() || $allowance <= 0) {
+            return $allowance;
+        }
+
+        $year ??= (int) date('Y');
+
+        $yearStart = Carbon::create($year, 1, 1)->startOfDay();
+        $yearEnd   = Carbon::create($year, 12, 31)->endOfDay();
+
+        // Nothing accrues before somebody joins, and a hire date inside the year
+        // is what makes the first year a part year.
+        $from = $employee->hire_date && $employee->hire_date->greaterThan($yearStart)
+            ? $employee->hire_date->copy()->startOfDay()
+            : $yearStart;
+
+        if ($from->greaterThan($yearEnd)) {
+            return 0.0;
+        }
+
+        // A past year has finished accruing; the current one has only reached
+        // today. Counting to the year end either way would grant December's
+        // twelfth in January.
+        $upTo = now()->between($yearStart, $yearEnd) ? now() : $yearEnd;
+
+        if ($upTo->lessThan($from)) {
+            return 0.0;
+        }
+
+        // Completed months, plus the one in progress — somebody in their first
+        // week of employment has earned something, and zero for a month reads
+        // as a broken feature rather than as a policy.
+        //
+        // Cast to int because diffInMonths returns a float: half a month through
+        // June would otherwise accrue half a twelfth extra and give everybody a
+        // fractional day that moves every night.
+        $months = min(12, (int) $from->diffInMonths($upTo) + 1);
+
+        return round($allowance * $months / 12, 1);
+    }
+
+    /**
+     * Bring monthly-accrual balances up to date (A6.4).
+     *
+     * Only ever raises. Entitlement that has already been granted is not taken
+     * back because the calendar says a smaller number — HR adjusts a balance
+     * downwards deliberately, and an automatic job undoing that adjustment
+     * every month would be maddening.
+     *
+     * @return int how many balances moved
+     */
+    public function accrue(int $companyId, ?int $year = null): int
+    {
+        $year ??= (int) date('Y');
+
+        $types = LeaveType::where('company_id', $companyId)->active()
+            ->where('accrual_mode', 'monthly')->get();
+
+        if ($types->isEmpty()) {
+            return 0;
+        }
+
+        $employees = Employee::where('company_id', $companyId)->active()->get();
+        $moved = 0;
+
+        foreach ($employees as $employee) {
+            foreach ($types as $type) {
+                $balance = $this->balanceFor($employee, $type, $year);
+                $earned  = $this->entitlementFor($employee, $type, $year);
+
+                if ($earned > (float) $balance->entitled_days) {
+                    $balance->update(['entitled_days' => $earned]);
+                    $moved++;
+                }
+            }
+        }
+
+        return $moved;
+    }
+
+    /**
+     * Roll balances into the following year (A6.9).
+     *
+     * Carry-forward is capped by the type: null means uncapped, 0 stops it
+     * entirely. What carries is what was left — entitlement plus anything
+     * already carried, less what was spent — and never a negative, because an
+     * employee who overdrew last year starts the new one at zero rather than
+     * in debt.
+     *
+     * Idempotent. A year-end job that ran twice would otherwise double
+     * everybody's carried days, and this is exactly the kind of job that gets
+     * re-run by hand when somebody is not sure it worked.
+     *
+     * @return int how many balances were created
+     */
+    public function carryForward(int $companyId, int $fromYear): int
+    {
+        $toYear = $fromYear + 1;
+
+        $types = LeaveType::where('company_id', $companyId)->active()->get()->keyBy('id');
+
+        if ($types->isEmpty()) {
+            return 0;
+        }
+
+        $employees = Employee::where('company_id', $companyId)->active()->get();
+        $created = 0;
+
+        foreach ($employees as $employee) {
+            foreach ($types as $type) {
+                $previous = LeaveBalance::where('employee_id', $employee->id)
+                    ->where('leave_type_id', $type->id)
+                    ->where('year', $fromYear)
+                    ->first();
+
+                $carried = 0.0;
+
+                if ($previous) {
+                    $left = max(0.0, $previous->available);
+
+                    $carried = $type->carry_forward_max === null
+                        ? $left
+                        : min($left, (float) $type->carry_forward_max);
+                }
+
+                // firstOrCreate, so a second run finds the row and leaves it be
+                // rather than adding another year's carry on top.
+                $balance = LeaveBalance::firstOrCreate(
+                    [
+                        'employee_id'   => $employee->id,
+                        'leave_type_id' => $type->id,
+                        'year'          => $toYear,
+                    ],
+                    [
+                        'entitled_days'   => $this->entitlementFor($employee, $type, $toYear),
+                        'carried_forward' => round($carried, 1),
+                    ],
+                );
+
+                if ($balance->wasRecentlyCreated) {
+                    $created++;
+                }
+            }
+        }
+
+        return $created;
     }
 
     /**

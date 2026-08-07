@@ -12,7 +12,22 @@ class Employee extends Model
         'company_id', 'office_id', 'department_id', 'designation_id', 'manager_id',
         'shift_id', 'user_id', 'employee_code', 'first_name', 'last_name', 'email',
         'phone', 'avatar', 'date_of_birth', 'gender', 'hire_date', 'status', 'work_mode',
+        // A3.9 — personal details and the emergency contact.
+        'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
+        'personal_email', 'address', 'city', 'country', 'national_id', 'blood_group',
     ];
+
+    /**
+     * A usable photo URL, or null.
+     *
+     * Null rather than a placeholder image path: the views already fall back to
+     * initials, which read better than a grey silhouette repeated down a list,
+     * and deciding that here would take the choice away from them.
+     */
+    public function getPhotoUrlAttribute(): ?string
+    {
+        return $this->avatar ? \Illuminate\Support\Facades\Storage::url($this->avatar) : null;
+    }
 
     /** Human labels for the work_mode enum. */
     public const WORK_MODES = [
@@ -185,6 +200,27 @@ class Employee extends Model
     public function leaveRequests(): HasMany
     {
         return $this->hasMany(LeaveRequest::class);
+    }
+
+    /** Filed contracts, ID scans and certificates (A3.8). */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(EmployeeDocument::class);
+    }
+
+    /**
+     * Take the filed documents — and their files — with the record.
+     *
+     * The database cascade already removes the rows, but a cascade is invisible
+     * to Eloquent, so EmployeeDocument's own deleting hook never runs and the
+     * files stay on disk for ever. Deleting them through the model here is what
+     * makes "the employee is gone" mean their passport scan is gone too.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (self $employee) {
+            $employee->documents->each->delete();
+        });
     }
 
     public function leaveBalances(): HasMany

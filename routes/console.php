@@ -51,6 +51,31 @@ Schedule::command('reports:send')
     ->onOneServer()
     ->runInBackground();
 
+// Late enough that the morning shift has arrived and the grace period has
+// passed, early enough to still be the morning. One digest per company per day
+// rather than an alert per person, which is a stream nobody reads.
+Schedule::command('attendance:report-late')
+    ->dailyAt('10:30')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Once a day is plenty — an expiry date moves once. Early enough that the mail
+// is waiting when HR arrives, and the command only writes to somebody who has
+// not already been told about that document.
+Schedule::command('documents:check-expiry')
+    ->dailyAt('06:45')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Daily, not monthly. Both halves are idempotent, so a daily run means a server
+// that was down on the 1st of the month — or over New Year, which is when the
+// year-end roll happens and when nobody is watching — catches up the next day
+// rather than leaving everybody without a balance.
+Schedule::command('leave:process')
+    ->dailyAt('01:30')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 // Nightly, and verified rather than assumed. Runs at 02:10 — after the last
 // hourly close has settled and well before anyone clocks in, so the dump is of
 // a quiet database and the verification restore is not competing with traffic.

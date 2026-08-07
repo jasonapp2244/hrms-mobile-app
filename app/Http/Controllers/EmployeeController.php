@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\TableExport;
 use App\Models\Department;
 use App\Models\Designation;
 use App\Models\Employee;
@@ -10,7 +11,9 @@ use App\Models\Shift;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EmployeeController extends Controller
 {
@@ -43,6 +46,99 @@ class EmployeeController extends Controller
         return view('employees.index', compact('employees', 'departments'));
     }
 
+    /**
+     * Export the roster (A3.11).
+     *
+     * Deliberately the same columns the bulk import accepts, in the same order,
+     * so an export can be edited and fed straight back in. An export that
+     * cannot round-trip is a report; this is meant to be a working file.
+     *
+     * Honours whatever filters are on screen, because "export what I am looking
+     * at" is what the button next to a filtered list is understood to mean.
+     */
+    public function export(Request $request)
+    {
+        $companyId = $this->companyId();
+
+        // No 'shift' here — it is an accessor over the override and the
+        // department's shift, not a relation, and eager-loading it throws.
+        $employees = Employee::with(['office', 'department', 'designation', 'manager'])
+            ->where('company_id', $companyId)
+            ->when($request->filled('q'), function ($q) use ($request) {
+                $term = '%' . $request->q . '%';
+                $q->where(fn ($w) => $w->where('first_name', 'like', $term)
+                    ->orWhere('last_name', 'like', $term)
+                    ->orWhere('employee_code', 'like', $term)
+                    ->orWhere('email', 'like', $term));
+            })
+            ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->orderBy('employee_code')
+            ->get();
+
+        $headings = [
+            'employee_code', 'first_name', 'last_name', 'email', 'phone',
+            'office', 'department', 'designation', 'manager',
+            'hire_date', 'status', 'work_mode',
+            'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relation',
+        ];
+
+        $rows = $employees->map(fn (Employee $e) => [
+            'employee_code' => $e->employee_code,
+            'first_name'    => $e->first_name,
+            'last_name'     => $e->last_name,
+            'email'         => $e->email,
+            'phone'         => $e->phone,
+            // Names, not ids — the import matches on names, and an id means
+            // nothing to whoever opens this in Excel.
+            'office'        => $e->office->name ?? '',
+            'department'    => $e->department->name ?? '',
+            'designation'   => $e->designation->name ?? '',
+            'manager'       => $e->manager->full_name ?? '',
+            'hire_date'     => $e->hire_date?->toDateString() ?? '',
+            'status'        => $e->status,
+            'work_mode'     => $e->work_mode,
+            'emergency_contact_name'     => $e->emergency_contact_name,
+            'emergency_contact_phone'    => $e->emergency_contact_phone,
+            'emergency_contact_relation' => $e->emergency_contact_relation,
+        ])->all();
+
+        return Excel::download(
+            new TableExport($headings, $rows),
+            'employees_' . now()->toDateString() . '.xlsx',
+        );
+    }
+
+    /**
+     * The reporting hierarchy (A3.10).
+     *
+     * Built in memory from one query rather than walking the tree with a query
+     * per node: a five-level hierarchy over three hundred staff is three
+     * hundred queries done the obvious way, and the whole roster is a few
+     * hundred rows.
+     *
+     * Anybody whose manager is missing, inactive, or outside the company is
+     * treated as a root. They have to appear somewhere, and dropping them
+     * silently is how an org chart comes to be quietly missing four people.
+     */
+    public function orgChart()
+    {
+        $employees = Employee::with(['designation', 'department'])
+            ->where('company_id', $this->companyId())
+            ->where('status', 'active')
+            ->orderBy('first_name')
+            ->get();
+
+        $byManager = $employees->groupBy('manager_id');
+        $ids = $employees->pluck('id')->all();
+
+        $roots = $employees->filter(
+            fn (Employee $e) => ! $e->manager_id || ! in_array($e->manager_id, $ids, true),
+        )->values();
+
+        return view('employees.org-chart', compact('roots', 'byManager', 'employees'));
+    }
+
     public function create()
     {
         return view('employees.create', $this->formData());
@@ -53,7 +149,10 @@ class EmployeeController extends Controller
         $companyId = $this->companyId();
         $data = $this->validateEmployee($request);
         $data['company_id'] = $companyId;
-        $data['employee_code'] = $data['employee_code'] ?: $this->nextCode($companyId);
+        // ?? as well as ?: — the field is nullable, so a caller that omits it
+        // entirely (the API, an import, a form without the input) left the key
+        // missing and produced a 500 rather than an auto-generated code.
+        $data['employee_code'] = ($data['employee_code'] ?? null) ?: $this->nextCode($companyId);
 
         Employee::create($data);
 
@@ -393,7 +492,36 @@ class EmployeeController extends Controller
             'hire_date'      => 'nullable|date',
             'status'         => 'required|in:active,inactive,terminated',
             'work_mode'      => 'required|in:office,wfh,hybrid',
+
+            // A3.9 — personal details and the emergency contact.
+            'emergency_contact_name'     => 'nullable|string|max:150',
+            'emergency_contact_phone'    => 'nullable|string|max:30',
+            'emergency_contact_relation' => 'nullable|string|max:60',
+            'personal_email' => 'nullable|email|max:150',
+            'address'        => 'nullable|string|max:500',
+            'city'           => 'nullable|string|max:100',
+            'country'        => 'nullable|string|max:100',
+            'national_id'    => 'nullable|string|max:60',
+            'blood_group'    => 'nullable|string|max:10',
+
+            // A3.7 — the profile photo. Capped at 2MB and to real image types:
+            // this is displayed in a list of a hundred people, and a 12-megapixel
+            // phone photo per row makes the page unusable.
+            'photo'          => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         ]);
+
+        // Handled apart from the rest because it is a file, not a field: the
+        // uploaded photo becomes a stored path, and "no file this time" has to
+        // mean "keep the existing one" rather than "clear it".
+        if ($request->hasFile('photo')) {
+            if ($employee?->avatar) {
+                Storage::disk('public')->delete($employee->avatar);
+            }
+
+            $data['avatar'] = $request->file('photo')->store('avatars', 'public');
+        }
+
+        unset($data['photo']);
 
         // A new employee cannot close a loop, so the guard only has real work to
         // do on update — but running it either way keeps the rule in one place.

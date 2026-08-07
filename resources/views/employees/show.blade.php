@@ -9,6 +9,7 @@
       <li class="breadcrumb-item active">Employee Details</li>
     </ol></nav></div>
   <div class="d-flex align-items-center flex-wrap">
+    <a href="{{ route('employees.documents.index', $employee) }}" class="btn btn-outline-secondary me-2"><i class="ti ti-folder me-1"></i>Documents</a>
     <a href="{{ route('employees.edit', $employee) }}" class="btn btn-primary"><i class="ti ti-edit me-1"></i>Edit</a>
   </div>
 </div>
@@ -24,7 +25,12 @@
   <div class="col-lg-4">
     <div class="card">
       <div class="card-body text-center">
-        <span class="avatar avatar-xl bg-primary text-white rounded-circle mb-3 mx-auto d-flex align-items-center justify-content-center" style="width:72px;height:72px;font-size:1.75rem;">{{ strtoupper(substr($employee->first_name, 0, 1)) }}</span>
+        @if($employee->photo_url)
+          <img src="{{ $employee->photo_url }}" class="rounded-circle mb-3" width="72" height="72"
+               style="object-fit:cover" alt="{{ $employee->full_name }}">
+        @else
+          <span class="avatar avatar-xl bg-primary text-white rounded-circle mb-3 mx-auto d-flex align-items-center justify-content-center" style="width:72px;height:72px;font-size:1.75rem;">{{ strtoupper(substr($employee->first_name, 0, 1)) }}</span>
+        @endif
         <h4 class="mb-1">{{ $employee->full_name }}</h4>
         <p class="text-muted mb-2">{{ $employee->employee_code }}</p>
         <span class="badge bg-{{ $statusBadge }}">{{ ucfirst($employee->status) }}</span>
@@ -67,6 +73,32 @@
         <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Hire Date</span><span>{{ $employee->hire_date?->format('m/d/Y') ?? '—' }}</span></li>
       </ul>
     </div>
+
+    {{-- Only rendered when there is something to show. An empty "Emergency
+         Contact" card reads as if the system lost it, rather than as if nobody
+         has filled it in. --}}
+    @if($employee->emergency_contact_name || $employee->emergency_contact_phone)
+    <div class="card mt-3 border-warning">
+      <div class="card-header"><h6 class="mb-0"><i class="ti ti-urgent me-1"></i>Emergency Contact</h6></div>
+      <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Name</span><span>{{ $employee->emergency_contact_name ?? '—' }}</span></li>
+        <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Phone</span><span>{{ $employee->emergency_contact_phone ?? '—' }}</span></li>
+        <li class="list-group-item d-flex justify-content-between"><span class="text-muted">Relationship</span><span>{{ $employee->emergency_contact_relation ?? '—' }}</span></li>
+      </ul>
+    </div>
+    @endif
+
+    @if($employee->personal_email || $employee->address || $employee->national_id || $employee->blood_group)
+    <div class="card mt-3">
+      <div class="card-header"><h6 class="mb-0">Personal Details</h6></div>
+      <ul class="list-group list-group-flush">
+        @if($employee->personal_email)<li class="list-group-item d-flex justify-content-between"><span class="text-muted">Personal Email</span><span>{{ $employee->personal_email }}</span></li>@endif
+        @if($employee->address)<li class="list-group-item"><span class="text-muted d-block mb-1">Address</span>{{ $employee->address }}{{ $employee->city ? ', ' . $employee->city : '' }}{{ $employee->country ? ', ' . $employee->country : '' }}</li>@endif
+        @if($employee->national_id)<li class="list-group-item d-flex justify-content-between"><span class="text-muted">National ID</span><span>{{ $employee->national_id }}</span></li>@endif
+        @if($employee->blood_group)<li class="list-group-item d-flex justify-content-between"><span class="text-muted">Blood Group</span><span>{{ $employee->blood_group }}</span></li>@endif
+      </ul>
+    </div>
+    @endif
   </div>
 
   <div class="col-lg-8">

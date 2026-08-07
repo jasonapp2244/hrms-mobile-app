@@ -42,6 +42,25 @@ class AttendanceController extends Controller
     }
 
     /** Full, filterable attendance log table. */
+    /**
+     * The live "who is in right now" board (A4.19).
+     *
+     * Refreshes itself on a timer rather than over a socket. The figure changes
+     * a handful of times a minute in a company of any size, and a polling page
+     * costs one cheap query where a websocket costs a process to run and keep
+     * alive for the rest of the product's life.
+     */
+    public function board(Request $request)
+    {
+        $companyId = $this->companyId();
+        $officeId = $request->filled('office_id') ? (int) $request->office_id : null;
+
+        return view('attendance.board', [
+            'board'   => $this->attendance->whoIsIn($companyId, $officeId),
+            'offices' => Office::where('company_id', $companyId)->orderBy('name')->get(),
+        ]);
+    }
+
     public function logs(Request $request)
     {
         $companyId = $this->companyId();

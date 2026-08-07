@@ -127,6 +127,17 @@
                         <input type="number" step="0.5" min="0" max="365" name="carry_forward_max" class="form-control" value="{{ old('carry_forward_max', $t->carry_forward_max) }}" placeholder="Empty = unlimited">
                       </div>
                     </div>
+                    <div class="row g-3 mt-0">
+                      <div class="col-md-12">
+                        <label class="form-label">Entitlement arrives</label>
+                        <select name="accrual_mode" class="form-select">
+                          @foreach(\App\Models\LeaveType::ACCRUAL_MODES as $mode => $label)
+                            <option value="{{ $mode }}" @selected(old('accrual_mode', $t->accrual_mode) === $mode)>{{ $label }}</option>
+                          @endforeach
+                        </select>
+                        <div class="form-text">Monthly stops a November starter booking the whole year in December.</div>
+                      </div>
+                    </div>
                     <div class="mt-3">
                       {{-- Hidden partner sends 0 when the box is unchecked, so
                            clearing a flag actually persists. --}}
@@ -203,6 +214,17 @@
             <div class="col-md-6">
               <label class="form-label">Carry Forward Max</label>
               <input type="number" step="0.5" min="0" max="365" name="carry_forward_max" class="form-control" value="{{ old('carry_forward_max') }}" placeholder="Empty = unlimited">
+            </div>
+          </div>
+          <div class="row g-3 mt-0">
+            <div class="col-md-12">
+              <label class="form-label">Entitlement arrives</label>
+              <select name="accrual_mode" class="form-select">
+                @foreach(\App\Models\LeaveType::ACCRUAL_MODES as $mode => $label)
+                  <option value="{{ $mode }}" @selected(old('accrual_mode') === $mode)>{{ $label }}</option>
+                @endforeach
+              </select>
+              <div class="form-text">Monthly stops a November starter booking the whole year in December.</div>
             </div>
           </div>
           <div class="mt-3">

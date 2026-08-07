@@ -36,6 +36,7 @@
 							<ul style="{{ request()->routeIs('attendance.*') ? 'display:block;' : '' }}">
 								@can('view-attendance')
 								<li><a class="{{ request()->routeIs('attendance.index') ? 'active' : '' }}" href="{{ route('attendance.index') }}">Overview</a></li>
+								<li><a class="{{ request()->routeIs('attendance.board') ? 'active' : '' }}" href="{{ route('attendance.board') }}">Who Is In</a></li>
 								<li><a class="{{ request()->routeIs('attendance.logs') ? 'active' : '' }}" href="{{ route('attendance.logs') }}">Attendance Logs</a></li>
 								@can('manage-attendance')
 								<li><a class="{{ request()->routeIs('attendance.regularisations*') ? 'active' : '' }}" href="{{ route('attendance.regularisations') }}">Corrections</a></li>
@@ -84,6 +85,7 @@
 							</a>
 							<ul style="{{ request()->routeIs('employees.*') ? 'display:block;' : '' }}">
 								<li><a class="{{ request()->routeIs('employees.index') ? 'active' : '' }}" href="{{ route('employees.index') }}">All Employees</a></li>
+								<li><a class="{{ request()->routeIs('employees.org-chart') ? 'active' : '' }}" href="{{ route('employees.org-chart') }}">Org Chart</a></li>
 								<li><a class="{{ request()->routeIs('employees.create') ? 'active' : '' }}" href="{{ route('employees.create') }}">Add Employee</a></li>
 								@can('import-employees')
 								<li><a class="{{ request()->routeIs('employees.import') ? 'active' : '' }}" href="{{ route('employees.import') }}">Bulk Import</a></li>
@@ -120,6 +122,7 @@
 								</a>
 								<ul style="{{ request()->routeIs('leave.*') || request()->routeIs('leave-types.*') || request()->routeIs('leave-balances.*') || request()->routeIs('holidays.*') ? 'display:block;' : '' }}">
 									<li><a class="{{ request()->routeIs('leave.index') ? 'active' : '' }}" href="{{ route('leave.index') }}">Leave Requests</a></li>
+									<li><a class="{{ request()->routeIs('leave.calendar') ? 'active' : '' }}" href="{{ route('leave.calendar') }}">Leave Calendar</a></li>
 									<li><a class="{{ request()->routeIs('leave-balances.*') ? 'active' : '' }}" href="{{ route('leave-balances.index') }}">Leave Balances</a></li>
 									<li><a class="{{ request()->routeIs('leave-types.*') ? 'active' : '' }}" href="{{ route('leave-types.index') }}">Leave Types</a></li>
 									<li><a class="{{ request()->routeIs('holidays.*') ? 'active' : '' }}" href="{{ route('holidays.index') }}">Holiday Calendar</a></li>

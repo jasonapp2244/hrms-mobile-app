@@ -83,16 +83,16 @@ return [
         [
             'no'      => 9,
             'title'   => 'Employee records & leave depth',
-            'detail'  => 'Photos, a document vault with expiry alerts, emergency contacts, the org chart, leave accrual and carry-forward',
-            'covers'  => 'A3.7–A3.12, A6.4–A6.9',
-            'status'  => 'active',
+            'detail'  => 'Photos, a document vault with expiry alerts, emergency contacts, the org chart, the roster export, leave accrual and carry-forward, the leave calendar, the live board and the late-arrival digest',
+            'covers'  => 'A3.7–A3.11, A6.4/A6.7/A6.9, A4.19, A9.3',
+            'status'  => 'delivered',
         ],
         [
             'no'      => 10,
-            'title'   => 'Dashboards & alerts',
-            'detail'  => 'Role-specific dashboards, week-on-week trends, the live "who is in right now" board and late-arrival alerts',
-            'covers'  => 'A4.19, A8.4–A8.6, A9.3–A9.5',
-            'status'  => 'planned',
+            'title'   => 'Dashboards & checklists',
+            'detail'  => 'Role-specific dashboards, week-on-week trends, weekly rollups, schedule-change alerts and on/offboarding checklists',
+            'covers'  => 'A3.12, A4.11, A8.4–A8.6, A9.5',
+            'status'  => 'active',
         ],
         [
             'no'      => 11,
