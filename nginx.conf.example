@@ -1,10 +1,11 @@
 # Employment Management Portal — nginx server block
 #
 # Install to /etc/nginx/sites-available/emp and symlink into sites-enabled.
-# Replace hr.example.com and /var/www/emp throughout.
+# The server_name is emp.klutchcleaning.com, which is the subdomain in use.
+# Replace /var/www/emp throughout if the checkout lives elsewhere.
 #
 # The TLS lines are written the way certbot rewrites them, so running
-#   certbot --nginx -d hr.example.com
+#   certbot --nginx -d emp.klutchcleaning.com
 # against this file produces exactly these directives and nothing surprising.
 
 # Plain http exists only to be redirected, and to answer the ACME challenge that
@@ -12,7 +13,7 @@
 server {
     listen 80;
     listen [::]:80;
-    server_name hr.example.com;
+    server_name emp.klutchcleaning.com;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -27,7 +28,7 @@ server {
     listen 443 ssl;
     listen [::]:443 ssl;
     http2 on;
-    server_name hr.example.com;
+    server_name emp.klutchcleaning.com;
 
     # The web root is public/, never the project directory. Pointing at the
     # project root would serve .env, storage/ and vendor/ to anyone who guessed
@@ -35,8 +36,8 @@ server {
     root /var/www/emp/public;
     index index.php;
 
-    ssl_certificate     /etc/letsencrypt/live/hr.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/hr.example.com/privkey.pem;
+    ssl_certificate     /etc/letsencrypt/live/emp.klutchcleaning.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/emp.klutchcleaning.com/privkey.pem;
     include             /etc/letsencrypt/options-ssl-nginx.conf;
     ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
