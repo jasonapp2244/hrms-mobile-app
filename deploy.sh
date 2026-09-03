@@ -26,9 +26,13 @@ BRANCH="${BRANCH:-main}"
 #
 # The repository root and the Laravel application are not always the same
 # directory. On the documented layout they are; on a panel host the site lives
-# at <domain>/ and the application at <domain>/emp, because the web root has
-# to point at emp/public. Detected rather than configured, so the same command
-# works on both.
+# at <domain>/ and the application in a subdirectory, because the web root has
+# to point at that subdirectory's public/.
+#
+# That subdirectory has been called both hrms/ and emp/, so all three layouts
+# are tried in order. Detected rather than configured: the same command works
+# everywhere, and renaming the directory again does not silently break the
+# deploy on whichever host happens to run it next.
 # ---------------------------------------------------------------------------
 SITE="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [ -z "$SITE" ]; then
@@ -36,10 +40,13 @@ if [ -z "$SITE" ]; then
     exit 1
 fi
 
-if   [ -f "$SITE/artisan" ];      then APP="$SITE"
-elif [ -f "$SITE/emp/artisan" ]; then APP="$SITE/emp"
-else
-    echo "Cannot find artisan under $SITE — is this the right repository?" >&2
+APP=""
+for CANDIDATE in "$SITE" "$SITE/hrms" "$SITE/emp"; do
+    if [ -f "$CANDIDATE/artisan" ]; then APP="$CANDIDATE"; break; fi
+done
+if [ -z "$APP" ]; then
+    echo "Cannot find artisan under $SITE (tried ./, ./hrms and ./emp)" >&2
+    echo "— is this the right repository?" >&2
     exit 1
 fi
 
