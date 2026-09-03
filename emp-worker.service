@@ -1,9 +1,9 @@
-# HR & Attendance — queue worker
+# Employment Management Portal — queue worker
 #
 # Install:
-#   sudo cp deploy/hrms-worker.service /etc/systemd/system/
+#   sudo cp deploy/emp-worker.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable --now hrms-worker
+#   sudo systemctl enable --now emp-worker
 #
 # Without this running, email and push are queued and never sent. The in-app
 # notification bell writes directly and keeps working, which is exactly what
@@ -11,13 +11,13 @@
 # employee is being told anything.
 
 [Unit]
-Description=HR & Attendance queue worker
+Description=Employment Management Portal queue worker
 After=network.target mysql.service
 
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/var/www/hrms
+WorkingDirectory=/var/www/emp
 
 # --max-time=3600 retires the worker every hour and lets systemd start a fresh
 # one. A long-lived PHP process holds the code it booted with, so without this a
@@ -26,7 +26,7 @@ WorkingDirectory=/var/www/hrms
 #
 # --tries=3 with --backoff spaces out retries rather than burning all three
 # attempts in the same second a provider happens to be down.
-ExecStart=/usr/bin/php /var/www/hrms/artisan queue:work \
+ExecStart=/usr/bin/php /var/www/emp/artisan queue:work \
     --queue=default \
     --sleep=3 \
     --tries=3 \
@@ -44,8 +44,8 @@ RestartSec=5
 KillSignal=SIGTERM
 TimeoutStopSec=90
 
-StandardOutput=append:/var/log/hrms-worker.log
-StandardError=append:/var/log/hrms-worker.log
+StandardOutput=append:/var/log/emp-worker.log
+StandardError=append:/var/log/emp-worker.log
 
 [Install]
 WantedBy=multi-user.target

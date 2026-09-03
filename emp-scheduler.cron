@@ -1,8 +1,8 @@
-# HR & Attendance — the scheduler
+# Employment Management Portal — the scheduler
 #
 # Install:
-#   sudo cp deploy/hrms-scheduler.cron /etc/cron.d/hrms
-#   sudo chmod 644 /etc/cron.d/hrms
+#   sudo cp deploy/emp-scheduler.cron /etc/cron.d/emp
+#   sudo chmod 644 /etc/cron.d/emp
 #
 # One line, running every minute. Laravel decides internally what is actually
 # due — routes/console.php holds the real schedule, so nothing here changes when
@@ -28,4 +28,4 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # would otherwise leave no trace anywhere. Set it to a real inbox.
 MAILTO=ops@example.com
 
-* * * * * www-data cd /var/www/hrms && /usr/bin/php artisan schedule:run >> /var/log/hrms-scheduler.log 2>&1
+* * * * * www-data cd /var/www/emp && /usr/bin/php artisan schedule:run >> /var/log/emp-scheduler.log 2>&1

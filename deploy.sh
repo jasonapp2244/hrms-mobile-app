@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #
-# HR & Attendance — deploy a new revision.
+# Employment Management Portal — deploy a new revision.
 #
-#   sudo bash deploy/deploy.sh
+#   sudo bash deploy/deploy.sh      (a server you own)
+#   bash deploy/deploy.sh           (managed webspace — there is no sudo)
 #
 # Safe to re-run, and safe to interrupt: the site comes back up whatever
 # happens, and nothing touches the database until the new code is on disk and
@@ -25,8 +26,8 @@ BRANCH="${BRANCH:-main}"
 #
 # The repository root and the Laravel application are not always the same
 # directory. On the documented layout they are; on a panel host the site lives
-# at <domain>/ and the application at <domain>/hrms, because the web root has
-# to point at hrms/public. Detected rather than configured, so the same command
+# at <domain>/ and the application at <domain>/emp, because the web root has
+# to point at emp/public. Detected rather than configured, so the same command
 # works on both.
 # ---------------------------------------------------------------------------
 SITE="$(git rev-parse --show-toplevel 2>/dev/null || true)"
@@ -36,7 +37,7 @@ if [ -z "$SITE" ]; then
 fi
 
 if   [ -f "$SITE/artisan" ];      then APP="$SITE"
-elif [ -f "$SITE/hrms/artisan" ]; then APP="$SITE/hrms"
+elif [ -f "$SITE/emp/artisan" ]; then APP="$SITE/emp"
 else
     echo "Cannot find artisan under $SITE — is this the right repository?" >&2
     exit 1
@@ -46,6 +47,17 @@ fi
 # cannot write, which surfaces as a 500 with nothing useful in the log. The
 # files are handed back at the end; this is who to hand them to.
 OWNER="${OWNER:-$(stat -c '%U' "$SITE")}"
+
+# On managed webspace there is no root, no sudo and no systemd: the account
+# already owns every file, so handing them back is both impossible and
+# unnecessary. Detected rather than configured, so one script covers both hosts.
+if [ "$(id -u)" = "0" ]; then
+    IS_ROOT=1
+    AS_OWNER="sudo -u $OWNER"
+else
+    IS_ROOT=0
+    AS_OWNER=""
+fi
 
 cd "$APP"
 
@@ -58,7 +70,7 @@ Refusing to deploy: APP_ENV is '${APP_ENV_VALUE:-unset}', not 'production'.
 Guessing wrong here means running migrations against the wrong database. If
 this really is a staging or demo box, say so explicitly:
 
-    sudo ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh
+    ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh   # prefix with sudo where you have root
 MSG
     exit 1
 fi
@@ -158,12 +170,14 @@ echo "==> Restarting the queue worker"
 # The running worker holds the code it booted with. Without this it keeps
 # executing the previous revision until it retires on its own.
 $PHP artisan queue:restart || true
-if systemctl list-unit-files 2>/dev/null | grep -q '^hrms-worker'; then
-    systemctl restart hrms-worker || echo "    (could not restart hrms-worker — do it by hand)"
+if systemctl list-unit-files 2>/dev/null | grep -q '^emp-worker'; then
+    systemctl restart emp-worker || echo "    (could not restart emp-worker — do it by hand)"
 fi
 
-echo "==> Ownership"
-chown -R "$OWNER:$OWNER" "$SITE"
+if [ "$IS_ROOT" = "1" ]; then
+    echo "==> Ownership"
+    chown -R "$OWNER:$OWNER" "$SITE"
+fi
 
 # ---------------------------------------------------------------------------
 echo "==> Preflight"
@@ -171,10 +185,10 @@ echo "==> Preflight"
 # staging box it is advisory: MAIL_MAILER=log and a demo panel are the point
 # there, and failing on them would only teach people to skip the script.
 if [ "${ALLOW_NON_PRODUCTION:-0}" = "1" ]; then
-    sudo -u "$OWNER" $PHP artisan hrms:preflight || \
+    $AS_OWNER $PHP artisan emp:preflight || \
         echo "    (advisory only on a non-production install)"
 else
-    sudo -u "$OWNER" $PHP artisan hrms:preflight
+    $AS_OWNER $PHP artisan emp:preflight
 fi
 
 echo "==> Done"

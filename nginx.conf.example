@@ -1,7 +1,7 @@
-# HR & Attendance — nginx server block
+# Employment Management Portal — nginx server block
 #
-# Install to /etc/nginx/sites-available/hrms and symlink into sites-enabled.
-# Replace hr.example.com and /var/www/hrms throughout.
+# Install to /etc/nginx/sites-available/emp and symlink into sites-enabled.
+# Replace hr.example.com and /var/www/emp throughout.
 #
 # The TLS lines are written the way certbot rewrites them, so running
 #   certbot --nginx -d hr.example.com
@@ -32,7 +32,7 @@ server {
     # The web root is public/, never the project directory. Pointing at the
     # project root would serve .env, storage/ and vendor/ to anyone who guessed
     # the path — the entire database password and every backup.
-    root /var/www/hrms/public;
+    root /var/www/emp/public;
     index index.php;
 
     ssl_certificate     /etc/letsencrypt/live/hr.example.com/fullchain.pem;
