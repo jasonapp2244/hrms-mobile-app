@@ -490,18 +490,33 @@ class Preflight extends Command
             );
         }
 
-        // db:backup shells out to these. On Windows under XAMPP they are not on
-        // PATH, which is why they are configurable at all.
-        foreach (['mysqldump' => config('backup.mysqldump'), 'mysql' => config('backup.mysql')] as $label => $binary) {
-            $found = $this->binaryExists((string) $binary);
+        // db:backup prefers these. On Windows under XAMPP they are not on PATH,
+        // which is why they are configurable at all; on managed webspace they
+        // are frequently absent altogether.
+        //
+        // Neither absence fails a deploy any more, and the difference between
+        // them matters. Without mysqldump the dump is still taken, in PHP.
+        // Without the mysql client it cannot be restored to prove it reads
+        // back — the same standing warning as a host that will not let the
+        // user create a scratch database. Failing here instead used to block a
+        // deploy over a backup that would have been written perfectly well.
+        $dumpFound = $this->binaryExists((string) config('backup.mysqldump'));
 
-            $this->assert(
-                "Backup: {$label}",
-                $found ? self::PASS : self::FAIL,
-                "'{$binary}' was not found — nightly backups will fail",
-                (string) $binary,
-            );
-        }
+        $this->assert(
+            'Backup: mysqldump',
+            $dumpFound ? self::PASS : self::WARN,
+            "'" . config('backup.mysqldump') . "' was not found — dumps will be written through PHP instead",
+            $dumpFound ? (string) config('backup.mysqldump') : 'PHP fallback',
+        );
+
+        $clientFound = $this->binaryExists((string) config('backup.mysql'));
+
+        $this->assert(
+            'Backup: mysql',
+            $clientFound ? self::PASS : self::WARN,
+            "'" . config('backup.mysql') . "' was not found — dumps cannot be verified automatically; restore one by hand",
+            $clientFound ? (string) config('backup.mysql') : 'unverified',
+        );
     }
 
     protected function checkPush(): void

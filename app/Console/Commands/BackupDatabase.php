@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use App\Support\SqlDumper;
 use Symfony\Component\Process\Process;
 
 /**
@@ -130,8 +131,19 @@ class BackupDatabase extends Command
 
     protected function dump(string $credentials, array $db, string $target, bool $gzip): bool
     {
+        $binary = self::locateBinary((string) config('backup.mysqldump'));
+
+        // Managed webspace ships the client library but not the command-line
+        // tools. Failing here would mean no backup at all on such a host, so
+        // the dump is written through PHP instead — see App\Support\SqlDumper.
+        if ($binary === null) {
+            $this->warn('No mysqldump on this host — writing the dump through PHP instead.');
+
+            return $this->dumpWithPhp($db, $target, $gzip);
+        }
+
         $command = [
-            config('backup.mysqldump'),
+            $binary,
             "--defaults-extra-file={$credentials}",
             // Consistent snapshot without locking the whole database — staff can
             // keep clocking in while the backup runs.
@@ -193,6 +205,98 @@ class BackupDatabase extends Command
     }
 
     /**
+     * Write the dump over the application's own connection.
+     *
+     * The result restores with any MySQL client — phpMyAdmin included, which
+     * on a host with no binaries is how a restore will actually be performed.
+     */
+    protected function dumpWithPhp(array $db, string $target, bool $gzip): bool
+    {
+        $handle = $gzip ? gzopen($target, 'wb9') : fopen($target, 'wb');
+
+        if (! $handle) {
+            $this->error("Could not open {$target} for writing.");
+
+            return false;
+        }
+
+        $pdo = DB::connection()->getPdo();
+
+        // Unbuffered, so attendance_logs streams rather than arriving in
+        // memory in one piece. Restored afterwards because the connection is
+        // the application's, not ours to leave altered.
+        $buffered = null;
+
+        try {
+            $buffered = $pdo->getAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY);
+            $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+        } catch (\Throwable) {
+            // Not a MySQL driver, or the attribute is unavailable. The dump
+            // still works; it simply holds each table in memory.
+        }
+
+        try {
+            (new SqlDumper($pdo, $db['database']))->dump(
+                fn (string $sql) => $gzip ? gzwrite($handle, $sql) : fwrite($handle, $sql)
+            );
+        } catch (\Throwable $e) {
+            $this->error('The PHP dump failed: ' . $e->getMessage());
+            $gzip ? gzclose($handle) : fclose($handle);
+            // Leave nothing half-written to be mistaken for a real backup.
+            @unlink($target);
+
+            return false;
+        } finally {
+            if ($buffered !== null) {
+                try {
+                    $pdo->setAttribute(\PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, $buffered);
+                } catch (\Throwable) {
+                    // Nothing to restore it to; the process is about to end.
+                }
+            }
+        }
+
+        $gzip ? gzclose($handle) : fclose($handle);
+
+        return true;
+    }
+
+    /**
+     * The usable path to a binary, or null when this host does not have it.
+     *
+     * A configured value carrying a separator is taken at its word. A bare
+     * name is searched across PATH directly rather than by shelling out to
+     * `which`, which is itself absent on some stripped-down managed hosts —
+     * and a missing `which` would otherwise read as a missing mysqldump.
+     */
+    public static function locateBinary(string $configured, ?string $path = null): ?string
+    {
+        if (trim($configured) === '') {
+            return null;
+        }
+
+        if (str_contains($configured, '/') || str_contains($configured, '\\')) {
+            return is_executable($configured) ? $configured : null;
+        }
+
+        $path ??= (string) getenv('PATH');
+
+        foreach (explode(PATH_SEPARATOR, $path) as $dir) {
+            if (trim($dir) === '') {
+                continue;
+            }
+
+            $candidate = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $configured;
+
+            if (is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Load the dump into a scratch database and count what came back.
      *
      * The scratch name carries the timestamp so two runs cannot collide, and it
@@ -203,6 +307,19 @@ class BackupDatabase extends Command
      */
     protected function verify(string $credentials, array $db, string $target, bool $gzip): ?bool
     {
+        // No client binary means there is nothing to restore *with*, which is
+        // the same situation as being unable to create the scratch database:
+        // the dump may be perfect and cannot be proven so. Saying that here
+        // keeps it out of the error path, where it would fail a deploy over a
+        // backup that was written correctly.
+        if (self::locateBinary((string) config('backup.mysql')) === null) {
+            $this->warn('Cannot verify on this host: there is no mysql client to restore with.');
+            $this->warn('The dump was written but has NOT been restored to prove it reads back.');
+            $this->line('  Verify it yourself: load the dump into a scratch database with phpMyAdmin.');
+
+            return null;
+        }
+
         $scratch = substr('vrfy_' . $db['database'] . '_' . now()->format('His'), 0, 60);
         $expected = count(DB::select('SHOW TABLES'));
 
