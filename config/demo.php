@@ -14,7 +14,7 @@ return [
     | text on a page that requires no account to reach. On a demo box that is
     | the whole point; on a live install it is a total compromise. So it is off
     | unless switched on, and the `&&` below forces it off in production no
-    | matter what the environment file says. `hrms:preflight` fails a deploy
+    | matter what the environment file says. `emp:preflight` fails a deploy
     | that somehow still has it on.
     |
     | Accounts are listed as `email:password`, comma separated. Nothing here is

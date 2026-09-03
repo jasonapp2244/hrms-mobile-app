@@ -48,17 +48,17 @@ class InstallAndPurgeTest extends TestCase
     {
         $this->get(route('login'))
             ->assertOk()
-            ->assertDontSee('admin@hrms.test')
+            ->assertDontSee('admin@emp.test')
             ->assertDontSee('Demo credentials');
     }
 
     // -------------------------------------------------------------------------
-    // hrms:install
+    // emp:install
     // -------------------------------------------------------------------------
 
     public function test_install_creates_a_company_and_a_working_administrator(): void
     {
-        $this->artisan('hrms:install', [
+        $this->artisan('emp:install', [
             '--company'  => 'Real Company Ltd',
             '--timezone' => 'Asia/Karachi',
             '--currency' => 'PKR',
@@ -88,7 +88,7 @@ class InstallAndPurgeTest extends TestCase
     {
         Company::create(['name' => 'Already Here', 'timezone' => 'UTC', 'currency' => 'USD']);
 
-        $this->artisan('hrms:install', [
+        $this->artisan('emp:install', [
             '--company'      => 'Second One',
             '--timezone'     => 'UTC',
             '--name'         => 'Someone',
@@ -110,7 +110,7 @@ class InstallAndPurgeTest extends TestCase
             'name' => 'Real Company Ltd', 'timezone' => 'Asia/Karachi', 'currency' => 'PKR',
         ]);
 
-        $this->artisan('hrms:install', [
+        $this->artisan('emp:install', [
             '--company-id' => $company->id,
             '--name'       => 'Tauseef Aslam',
             '--email'      => 'boss@realcompany.com',
@@ -136,7 +136,7 @@ class InstallAndPurgeTest extends TestCase
     {
         Company::create(['name' => 'Already Here', 'timezone' => 'UTC', 'currency' => 'USD']);
 
-        $this->artisan('hrms:install', [
+        $this->artisan('emp:install', [
             '--company-id' => 999,
             '--name'       => 'Someone',
             '--email'      => 'someone@example.com',
@@ -150,7 +150,7 @@ class InstallAndPurgeTest extends TestCase
     {
         Company::create(['name' => 'Already Here', 'timezone' => 'UTC', 'currency' => 'USD']);
 
-        $this->artisan('hrms:install', [
+        $this->artisan('emp:install', [
             '--force'    => true,
             '--company'  => 'Second One',
             '--timezone' => 'Europe/London',
@@ -166,7 +166,7 @@ class InstallAndPurgeTest extends TestCase
 
     public function test_install_declined_at_the_prompt_creates_nothing(): void
     {
-        $this->artisan('hrms:install', [
+        $this->artisan('emp:install', [
             '--company'  => 'Real Company Ltd',
             '--timezone' => 'UTC',
             '--name'     => 'Tauseef Aslam',
@@ -184,7 +184,7 @@ class InstallAndPurgeTest extends TestCase
     {
         // A typo here does not error — it falls back to UTC and then marks the
         // whole workforce late every morning, which is why it is validated.
-        $this->artisan('hrms:install', [
+        $this->artisan('emp:install', [
             '--company'  => 'Real Company Ltd',
             '--timezone' => 'Asia/Karachee',
             '--name'     => 'Tauseef Aslam',
@@ -200,16 +200,16 @@ class InstallAndPurgeTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // hrms:purge-demo
+    // emp:purge-demo
     // -------------------------------------------------------------------------
 
     public function test_a_dry_run_changes_nothing(): void
     {
         $this->seedDemoData();
 
-        $this->artisan('hrms:purge-demo', ['--dry-run' => true])->assertSuccessful();
+        $this->artisan('emp:purge-demo', ['--dry-run' => true])->assertSuccessful();
 
-        $this->assertDatabaseHas('users', ['email' => 'admin@hrms.test']);
+        $this->assertDatabaseHas('users', ['email' => 'admin@emp.test']);
         $this->assertDatabaseHas('employees', ['employee_code' => 'EMP-0001']);
         $this->assertSame(1, AttendanceLog::where('source', 'kiosk')->count());
     }
@@ -218,11 +218,11 @@ class InstallAndPurgeTest extends TestCase
     {
         [$company, $real] = $this->seedDemoData();
 
-        $this->artisan('hrms:purge-demo')
+        $this->artisan('emp:purge-demo')
             ->expectsConfirmation('Delete everything listed above? There is no undo.', 'yes')
             ->assertSuccessful();
 
-        $this->assertDatabaseMissing('users', ['email' => 'admin@hrms.test']);
+        $this->assertDatabaseMissing('users', ['email' => 'admin@emp.test']);
         $this->assertDatabaseMissing('employees', ['employee_code' => 'EMP-0001']);
         $this->assertSame(0, AttendanceLog::where('source', 'kiosk')->count());
 
@@ -249,7 +249,7 @@ class InstallAndPurgeTest extends TestCase
             'source'      => 'mobile',
         ]);
 
-        $this->artisan('hrms:purge-demo', ['--dry-run' => true])
+        $this->artisan('emp:purge-demo', ['--dry-run' => true])
             ->expectsOutputToContain('Real attendance that would go with them')
             ->assertSuccessful();
     }
@@ -268,7 +268,7 @@ class InstallAndPurgeTest extends TestCase
             'source'      => 'mobile',
         ]);
 
-        $this->artisan('hrms:purge-demo', ['--keep-employees' => ['EMP-0001']])
+        $this->artisan('emp:purge-demo', ['--keep-employees' => ['EMP-0001']])
             ->expectsConfirmation('Delete everything listed above? There is no undo.', 'yes')
             ->assertSuccessful();
 
@@ -285,7 +285,7 @@ class InstallAndPurgeTest extends TestCase
 
     public function test_purge_says_so_when_there_is_nothing_to_remove(): void
     {
-        $this->artisan('hrms:purge-demo', ['--dry-run' => true])
+        $this->artisan('emp:purge-demo', ['--dry-run' => true])
             ->expectsOutputToContain('no seeded demo data')
             ->assertSuccessful();
     }

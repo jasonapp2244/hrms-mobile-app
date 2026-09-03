@@ -57,10 +57,10 @@
 	{{--
 		One-click sign-in for demos and role testing.
 
-		The box that used to sit here was hard-coded to admin@hrms.test /
+		The box that used to sit here was hard-coded to admin@emp.test /
 		password — it named accounts only the demo seeder creates, so on a real
 		install it advertised logins that did not work, and it published the
-		exact pair `hrms:preflight` fails a deploy over.
+		exact pair `emp:preflight` fails a deploy over.
 
 		This one is empty unless DEMO_QUICK_LOGIN is on, is forced empty in
 		production, and every row has been checked against the database before

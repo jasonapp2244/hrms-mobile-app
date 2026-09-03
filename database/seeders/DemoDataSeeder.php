@@ -34,7 +34,7 @@ class DemoDataSeeder extends Seeder
 
         // Admin user (Phase 1 = admin-only login)
         $admin = User::firstOrCreate(
-            ['email' => 'admin@hrms.test'],
+            ['email' => 'admin@emp.test'],
             [
                 'name' => 'System Administrator',
                 'password' => Hash::make('password'),
@@ -46,7 +46,7 @@ class DemoDataSeeder extends Seeder
 
         // HR user (structured now; login gate blocks HR in Phase 1)
         $hr = User::firstOrCreate(
-            ['email' => 'hr@hrms.test'],
+            ['email' => 'hr@emp.test'],
             [
                 'name' => 'HR Manager',
                 'password' => Hash::make('password'),

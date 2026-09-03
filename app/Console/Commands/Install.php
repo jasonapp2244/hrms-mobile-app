@@ -15,7 +15,7 @@ use Throwable;
  * Set up a real install: one company, one administrator, no invented people.
  *
  * This replaces the demo seeder as the way a new install is started. The old
- * route was `db:seed`, which produced a fictional company and `admin@hrms.test`
+ * route was `db:seed`, which produced a fictional company and `admin@emp.test`
  * with the password `password` — fine for a sandbox, wrong everywhere else, and
  * the deployment guide's answer was a page of PHP to paste into `tinker`. That
  * is a bad instruction to give somebody on a live server: it runs unvalidated,
@@ -31,7 +31,7 @@ use Throwable;
  */
 class Install extends Command
 {
-    protected $signature = 'hrms:install
+    protected $signature = 'emp:install
                             {--company= : Company name}
                             {--company-id= : Attach the administrator to this existing company instead of creating one}
                             {--timezone= : IANA timezone, e.g. America/New_York}
@@ -46,7 +46,7 @@ class Install extends Command
     public function handle(): int
     {
         $this->line('');
-        $this->line('  <options=bold>HR & Attendance — install</>');
+        $this->line('  <options=bold>Employment Management Portal — install</>');
         $this->line('');
 
         $existing = $this->resolveExistingCompany();
@@ -143,7 +143,7 @@ class Install extends Command
         $this->info("  Done. Sign in as {$user->email}");
         $this->line('');
         $this->line('  <fg=gray>Next: add offices, departments and shifts, then employees.</>');
-        $this->line('  <fg=gray>Check the install with: php artisan hrms:preflight</>');
+        $this->line('  <fg=gray>Check the install with: php artisan emp:preflight</>');
         $this->line('');
 
         return self::SUCCESS;
@@ -305,7 +305,7 @@ class Install extends Command
                 continue;
             }
 
-            // The exact string hrms:preflight fails a production deploy for,
+            // The exact string emp:preflight fails a production deploy for,
             // so it is better refused now than discovered at go-live.
             if ($password === 'password') {
                 $this->error('  Not that one. It is the seeded default and the first thing anybody tries.');

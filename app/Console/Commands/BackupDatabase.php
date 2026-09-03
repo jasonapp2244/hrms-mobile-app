@@ -113,7 +113,7 @@ class BackupDatabase extends Command
      */
     protected function writeCredentialsFile(array $db): string
     {
-        $path = tempnam(sys_get_temp_dir(), 'hrms-backup-');
+        $path = tempnam(sys_get_temp_dir(), 'emp-backup-');
 
         file_put_contents($path, sprintf(
             "[client]\nuser=%s\npassword=%s\nhost=%s\nport=%s\n",

@@ -14,7 +14,7 @@ use Throwable;
  * Remove the rows DemoDataSeeder and AttendanceSeeder invented.
  *
  * Anything seeded is identified by the exact values those two seeders write —
- * the five `EMP-000n` codes, the seven `@hrms.test` / `@acme.test` addresses,
+ * the five `EMP-000n` codes, the seven `@emp.test` / `@acme.test` addresses,
  * and `source = 'kiosk'` on attendance. Deliberately not by pattern matching:
  * a rule like "delete test-looking emails" would eventually eat somebody real.
  * `kiosk` is safe as a marker because nothing in the application writes it —
@@ -32,7 +32,7 @@ use Throwable;
  */
 class PurgeDemoData extends Command
 {
-    protected $signature = 'hrms:purge-demo
+    protected $signature = 'emp:purge-demo
                             {--dry-run : Show what would be deleted and change nothing}
                             {--keep-employees=* : Employee codes to spare, e.g. --keep-employees=EMP-0001}
                             {--force : Allow this to run with APP_ENV=production}';
@@ -41,8 +41,8 @@ class PurgeDemoData extends Command
 
     /** Exactly the accounts DemoDataSeeder creates. */
     private const DEMO_EMAILS = [
-        'admin@hrms.test',
-        'hr@hrms.test',
+        'admin@emp.test',
+        'hr@emp.test',
         'james.smith@acme.test',
         'emily.johnson@acme.test',
         'michael.brown@acme.test',
@@ -173,7 +173,7 @@ class PurgeDemoData extends Command
 
         $this->line('');
         $this->info('  Demo data removed.');
-        $this->line('  <fg=gray>If no administrator is left, create one: php artisan hrms:install --force</>');
+        $this->line('  <fg=gray>If no administrator is left, create one: php artisan emp:install --force</>');
         $this->line('');
 
         return self::SUCCESS;

@@ -25,7 +25,7 @@ use Illuminate\Database\Seeder;
  *   php artisan db:seed --class=Database\\Seeders\\DemoDataSeeder
  *   php artisan db:seed --class=Database\\Seeders\\AttendanceSeeder
  *
- * To set up a real install, use `php artisan hrms:install` instead. It creates
+ * To set up a real install, use `php artisan emp:install` instead. It creates
  * the company and the first administrator by asking, and seeds these same roles.
  */
 class DatabaseSeeder extends Seeder

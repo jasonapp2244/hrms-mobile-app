@@ -1,4 +1,4 @@
-# HR & Attendance Management — Admin Web Dashboard (Phase 1)
+# Employment Management Portal — Admin Web Dashboard (Phase 1)
 
 Laravel 12 + MySQL admin dashboard focused on the **Attendance module** (QR-based clock in/out).
 Built on the SmartHR (Bootstrap 5) template. Admin-only login in Phase 1; HR/Employee roles are
@@ -12,24 +12,24 @@ structured (Spatie RBAC) and can be enabled later without schema changes.
 ## Setup (already done during build)
 ```bash
 composer install
-# .env is already configured for MySQL db "hrms"
+# .env is already configured for MySQL db "emp"
 php artisan key:generate
 php artisan migrate --seed
 ```
 
 ## Run the app
 1. Start **MySQL** (XAMPP Control Panel → MySQL → Start).
-2. From the `hrms/` folder:
+2. From the `emp/` folder:
    ```bash
    php artisan serve
    ```
 3. Open **http://127.0.0.1:8000**
 
 ### Demo login (Phase 1 = admin only)
-- **Email:** admin@hrms.test
+- **Email:** admin@emp.test
 - **Password:** password
 
-*(An `hr@hrms.test` user exists with the HR role but cannot log in yet — Phase 1 gate.)*
+*(An `hr@emp.test` user exists with the HR role but cannot log in yet — Phase 1 gate.)*
 
 ## Attendance / QR flow
 - **QR Kiosk** (`Attendance → QR Kiosk`): a screen for each office that displays a **dynamic

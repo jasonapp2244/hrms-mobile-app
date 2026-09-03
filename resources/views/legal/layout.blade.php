@@ -56,7 +56,7 @@
 </head>
 <body>
 	<div class="wrap">
-		<div class="mark">HR</div>
+		<div class="mark">EMP</div>
 		@yield('content')
 
 		<footer>

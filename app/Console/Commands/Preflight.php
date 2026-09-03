@@ -30,7 +30,7 @@ use Throwable;
  */
 class Preflight extends Command
 {
-    protected $signature = 'hrms:preflight
+    protected $signature = 'emp:preflight
                             {--strict : Treat warnings as failures too}';
 
     protected $description = 'Verify this install is correctly configured for production';
@@ -52,7 +52,7 @@ class Preflight extends Command
     public function handle(): int
     {
         $this->line('');
-        $this->line('  <options=bold>HR & Attendance — production preflight</>');
+        $this->line('  <options=bold>Employment Management Portal — production preflight</>');
         $this->line('');
 
         $this->checkEnvironment();
@@ -372,9 +372,9 @@ class Preflight extends Command
 
             $this->assert(
                 'Queue worker',
-                $waited > 300 ? self::FAIL : self::PASS,
+                $waited > $this->queueTolerance() ? self::FAIL : self::PASS,
                 'a job has been waiting ' . $this->humanise($waited)
-                    . ' — no worker appears to be running (systemctl status hrms-worker)',
+                    . ' — nothing appears to be draining the queue (' . $this->queueHint() . ')',
                 'draining',
             );
         }
@@ -391,6 +391,52 @@ class Preflight extends Command
         }
     }
 
+    /**
+     * Whether this install is shared webspace rather than a server we own.
+     *
+     * The distinction matters only to the two checks below. Everything else
+     * preflight asserts is true of both.
+     */
+    protected function managed(): bool
+    {
+        return config('hosting.mode') === 'managed';
+    }
+
+    /**
+     * How long the oldest ready job may have been waiting before the queue
+     * counts as stalled.
+     *
+     * On a daemon the gap between drains is seconds. On managed hosting it is
+     * the cron interval, so the tolerance has to clear that with room for a
+     * missed run — otherwise a healthy install fails its own deploy.
+     */
+    protected function queueTolerance(): int
+    {
+        $configured = config('hosting.queue_max_wait');
+
+        if ($configured !== null && $configured !== '') {
+            return (int) $configured;
+        }
+
+        return $this->managed()
+            ? (int) config('hosting.managed_cron_minutes', 5) * 60 * 3
+            : 300;
+    }
+
+    /** Where to go and look, which is a different place in each mode. */
+    protected function queueHint(): string
+    {
+        return $this->managed()
+            ? 'check the queue:work cron entry — see deploy/emp-webspace.cron'
+            : 'systemctl status emp-worker';
+    }
+
+    /** @see queueHint() */
+    protected function schedulerCronFile(): string
+    {
+        return $this->managed() ? 'deploy/emp-webspace.cron' : 'deploy/emp-scheduler.cron';
+    }
+
     protected function checkScheduler(): void
     {
         // There is no reliable "when did schedule:run last fire" record, so this
@@ -405,7 +451,7 @@ class Preflight extends Command
                 'Scheduler',
                 self::FAIL,
                 'no backup has ever been produced — the cron entry is probably missing '
-                    . '(see deploy/hrms-scheduler.cron)',
+                    . '(see ' . $this->schedulerCronFile() . ')',
             );
 
             return;

@@ -16,7 +16,7 @@ Artisan::command('inspire', function () {
 | Nothing below runs unless a scheduler is running. In production that is one
 | cron entry:
 |
-|     * * * * * cd /path/to/hrms && php artisan schedule:run >> /dev/null 2>&1
+|     * * * * * cd /path/to/emp && php artisan schedule:run >> /dev/null 2>&1
 |
 | Locally, `php artisan schedule:work` does the same in the foreground. Queued
 | email additionally needs `php artisan queue:work` — the notification bell

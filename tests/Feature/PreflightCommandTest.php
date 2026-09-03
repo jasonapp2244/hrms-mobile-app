@@ -66,7 +66,7 @@ class PreflightCommandTest extends TestCase
     /** Drop a dump in the backup directory with an mtime this many hours old. */
     protected function writeBackupAgedHours(int $hours): void
     {
-        $file = $this->backupDir . '/hrms_test.sql.gz';
+        $file = $this->backupDir . '/emp_test.sql.gz';
         File::put($file, 'not a real dump');
         touch($file, time() - ($hours * 3600));
     }
@@ -94,7 +94,7 @@ class PreflightCommandTest extends TestCase
         // Worth its own test rather than folding into a general "bad config"
         // case: this one hands the database password and APP_KEY to anyone who
         // can provoke an exception, which is a different order of problem.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('APP_DEBUG')
             ->assertExitCode(1);
     }
@@ -106,7 +106,7 @@ class PreflightCommandTest extends TestCase
 
         // The single most-missed setting in this deploy. Leave approvals are
         // queued and "sent" successfully; the employee is simply never told.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('MAIL_MAILER')
             ->assertExitCode(1);
     }
@@ -118,7 +118,7 @@ class PreflightCommandTest extends TestCase
 
         // A handset cannot reach localhost, and the app stores will not accept a
         // privacy-policy URL that resolves to one.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('APP_URL')
             ->assertExitCode(1);
     }
@@ -128,7 +128,7 @@ class PreflightCommandTest extends TestCase
         $this->passingConfig();
         Config::set('app.url', 'http://hr.example.com');
 
-        $this->artisan('hrms:preflight')->assertExitCode(1);
+        $this->artisan('emp:preflight')->assertExitCode(1);
     }
 
     public function test_it_fails_when_the_queue_would_run_inside_the_web_request(): void
@@ -138,7 +138,7 @@ class PreflightCommandTest extends TestCase
 
         // Not merely slow: a punch would block on the SMTP round-trip and the
         // push to every one of the employee's handsets before it returned.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('Queue')
             ->assertExitCode(1);
     }
@@ -153,7 +153,7 @@ class PreflightCommandTest extends TestCase
         // The missing cron line is invisible from the dashboard: shifts never
         // close, nobody is reminded, and no backup is ever taken — all without a
         // single error anywhere.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('Scheduler')
             ->assertExitCode(1);
     }
@@ -164,7 +164,7 @@ class PreflightCommandTest extends TestCase
         File::cleanDirectory($this->backupDir);
         $this->writeBackupAgedHours(72);
 
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('Scheduler')
             ->assertExitCode(1);
     }
@@ -177,15 +177,15 @@ class PreflightCommandTest extends TestCase
 
         $user = User::create([
             'name'     => 'Demo Admin',
-            'email'    => 'admin@hrms.test',
+            'email'    => 'admin@emp.test',
             'password' => Hash::make('password'),
         ]);
         $user->assignRole('admin');
 
-        // The seeded admin is admin@hrms.test / password. Reaching production
+        // The seeded admin is admin@emp.test / password. Reaching production
         // with it intact is a full administrative account open to anyone who has
         // read the README.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('Demo credentials')
             ->assertExitCode(1);
     }
@@ -195,7 +195,7 @@ class PreflightCommandTest extends TestCase
         $this->passingConfig();
         $this->safeAdmin();
 
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->doesntExpectOutputToContain('still use the seeded password')
             ->assertExitCode(0);
     }
@@ -215,7 +215,7 @@ class PreflightCommandTest extends TestCase
         // Employees cannot reach the dashboard at all, and their credentials are
         // issued per person rather than seeded. Flagging them would make this
         // check noisy on every install and get it ignored.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->doesntExpectOutputToContain('still use the seeded password')
             ->assertExitCode(0);
     }
@@ -230,7 +230,7 @@ class PreflightCommandTest extends TestCase
 
         // Falls back to UTC, so nothing errors — the whole company is just
         // marked late every morning by however far they are from UTC.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('Company timezones')
             ->assertExitCode(1);
     }
@@ -241,7 +241,7 @@ class PreflightCommandTest extends TestCase
 
         Company::create(['name' => 'Acme', 'timezone' => 'America/New_York', 'currency' => 'USD']);
 
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->doesntExpectOutputToContain('judged late against the wrong clock')
             ->assertExitCode(0);
     }
@@ -255,14 +255,14 @@ class PreflightCommandTest extends TestCase
         // TRUSTED_PROXIES unset and FCM off are both warnings: real things to
         // look at, but not reasons to refuse to ship. A check that fails on
         // everything gets ignored, which is worse than not having it.
-        $this->artisan('hrms:preflight')->assertExitCode(0);
+        $this->artisan('emp:preflight')->assertExitCode(0);
     }
 
     public function test_strict_mode_promotes_warnings_to_failures(): void
     {
         $this->passingConfig();
 
-        $this->artisan('hrms:preflight --strict')->assertExitCode(1);
+        $this->artisan('emp:preflight --strict')->assertExitCode(1);
     }
 
     // ================= push =================
@@ -276,7 +276,7 @@ class PreflightCommandTest extends TestCase
 
         // Half-configured is worse than off: every notification fails into
         // failed_jobs instead of quietly not being sent.
-        $this->artisan('hrms:preflight')
+        $this->artisan('emp:preflight')
             ->expectsOutputToContain('Push (FCM)')
             ->assertExitCode(1);
     }
@@ -301,7 +301,7 @@ class PreflightCommandTest extends TestCase
             // A box with a dead database is exactly when someone runs this, so it
             // has to produce the diagnosis instead of a stack trace — and must
             // not then repeat that same error for every later check that queries.
-            $this->artisan('hrms:preflight')
+            $this->artisan('emp:preflight')
                 ->expectsOutputToContain('Database')
                 ->assertExitCode(1);
         } finally {
@@ -309,5 +309,84 @@ class PreflightCommandTest extends TestCase
             // tries to roll back the broken connection instead of the real one.
             Config::set('database.default', 'sqlite');
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Managed hosting
+    //
+    // On shared webspace the queue is drained by a cron entry, not a daemon,
+    // so a job waiting a few minutes is normal rather than broken. Judging it
+    // by the daemon's tolerance fails the deploy of a healthy install — and
+    // the obvious "fix" for that is to stop running preflight, which loses
+    // every other check with it.
+    // ------------------------------------------------------------------
+
+    /** Put a job in the queue that has been ready for this many seconds. */
+    protected function queueJobWaiting(int $seconds): void
+    {
+        \Illuminate\Support\Facades\DB::table('jobs')->insert([
+            'queue'        => 'default',
+            'payload'      => '{}',
+            'attempts'     => 0,
+            'available_at' => now()->getTimestamp() - $seconds,
+            'created_at'   => now()->getTimestamp() - $seconds,
+        ]);
+    }
+
+    public function test_a_cron_drained_queue_is_not_called_stalled_on_managed_hosting(): void
+    {
+        $this->passingConfig();
+        Config::set('hosting.mode', 'managed');
+
+        // Eight minutes: past the daemon's five-minute tolerance, well inside
+        // the fifteen a five-minute cron is allowed.
+        $this->queueJobWaiting(480);
+
+        $this->artisan('emp:preflight')->assertExitCode(0);
+    }
+
+    public function test_the_same_wait_does_fail_on_a_server_running_a_daemon(): void
+    {
+        $this->passingConfig();
+        Config::set('hosting.mode', 'vps');
+
+        $this->queueJobWaiting(480);
+
+        $this->artisan('emp:preflight')->assertExitCode(1);
+    }
+
+    public function test_managed_hosting_still_fails_a_genuinely_stalled_queue(): void
+    {
+        $this->passingConfig();
+        Config::set('hosting.mode', 'managed');
+
+        // An hour. No cron interval explains this; the entry is missing.
+        $this->queueJobWaiting(3600);
+
+        $this->artisan('emp:preflight')->assertExitCode(1);
+    }
+
+    public function test_it_names_the_webspace_cron_file_rather_than_systemd_on_managed_hosting(): void
+    {
+        $this->passingConfig();
+        Config::set('hosting.mode', 'managed');
+        $this->queueJobWaiting(3600);
+
+        // Being told to run systemctl on a host that has no systemd is the
+        // difference between a five-minute fix and an afternoon.
+        $this->artisan('emp:preflight')
+            ->expectsOutputToContain('emp-webspace.cron')
+            ->assertExitCode(1);
+    }
+
+    public function test_an_explicit_tolerance_overrides_the_mode_default(): void
+    {
+        $this->passingConfig();
+        Config::set('hosting.mode', 'managed');
+        Config::set('hosting.queue_max_wait', 60);
+
+        $this->queueJobWaiting(480);
+
+        $this->artisan('emp:preflight')->assertExitCode(1);
     }
 }

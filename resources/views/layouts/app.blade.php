@@ -3,7 +3,7 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
-	<meta name="description" content="HR & Attendance Management">
+	<meta name="description" content="Employment Management Portal">
 	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<title>@yield('title', 'Dashboard') | {{ config('app.name') }}</title>
 
@@ -42,7 +42,6 @@
 
 			<div class="footer d-sm-flex align-items-center justify-content-between border-top bg-white p-3">
 				<p class="mb-0">2026 &copy; {{ config('app.name') }}.</p>
-				<p>HR &amp; Attendance Management System</p>
 			</div>
 		</div>
 		<!-- /Page Wrapper -->

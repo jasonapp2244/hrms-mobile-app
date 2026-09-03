@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Hash;
  * A hard-coded demo box used to sit on that page and was removed, for two
  * reasons worth not repeating. It named accounts that only the demo seeder
  * creates, so on a real install it advertised logins that did not work. And it
- * printed a fixed password that `hrms:preflight` fails a deploy over, on a page
+ * printed a fixed password that `emp:preflight` fails a deploy over, on a page
  * anyone can reach.
  *
  * So nothing here is taken on trust. The environment file supplies candidates;

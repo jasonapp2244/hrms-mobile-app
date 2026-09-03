@@ -55,7 +55,7 @@ class BackupCommandTest extends TestCase
     {
         [$dir, $files] = $this->makeDumps(['2026-01-01_000000', '2026-02-01_000000', '2026-03-01_000000']);
 
-        $this->rotate($dir, 'hrms', 2);
+        $this->rotate($dir, 'emp', 2);
 
         $this->assertFileDoesNotExist($files['2026-01-01_000000'], 'the oldest should go');
         $this->assertFileExists($files['2026-02-01_000000']);
@@ -66,7 +66,7 @@ class BackupCommandTest extends TestCase
     {
         [$dir, $files] = $this->makeDumps(['2026-01-01_000000', '2026-02-01_000000']);
 
-        $this->rotate($dir, 'hrms', 14);
+        $this->rotate($dir, 'emp', 14);
 
         foreach ($files as $file) {
             $this->assertFileExists($file);
@@ -80,7 +80,7 @@ class BackupCommandTest extends TestCase
         $foreign = $dir . DIRECTORY_SEPARATOR . 'otherapp_2020-01-01_000000.sql.gz';
         file_put_contents($foreign, 'x');
 
-        $this->rotate($dir, 'hrms', 1);
+        $this->rotate($dir, 'emp', 1);
 
         $this->assertFileExists($foreign, 'a dump belonging to another database is not ours to delete');
         $this->assertFileExists($files['2026-03-01_000000']);
@@ -91,7 +91,7 @@ class BackupCommandTest extends TestCase
         // Guards against a mistyped BACKUP_KEEP=0 wiping every backup on the box.
         [$dir, $files] = $this->makeDumps(['2026-01-01_000000', '2026-02-01_000000']);
 
-        $this->rotate($dir, 'hrms', 0);
+        $this->rotate($dir, 'emp', 0);
 
         foreach ($files as $file) {
             $this->assertFileExists($file);
@@ -101,12 +101,12 @@ class BackupCommandTest extends TestCase
     /** @return array{0: string, 1: array<string, string>} */
     protected function makeDumps(array $stamps): array
     {
-        $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'hrms-backup-test-' . uniqid();
+        $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'emp-backup-test-' . uniqid();
         mkdir($dir, 0777, true);
 
         $files = [];
         foreach ($stamps as $stamp) {
-            $path = $dir . DIRECTORY_SEPARATOR . "hrms_{$stamp}.sql.gz";
+            $path = $dir . DIRECTORY_SEPARATOR . "emp_{$stamp}.sql.gz";
             file_put_contents($path, 'dump');
             $files[$stamp] = $path;
         }
