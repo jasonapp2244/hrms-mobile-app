@@ -3,13 +3,13 @@
 	<!-- Logo -->
 	<div class="sidebar-logo">
 		<a href="{{ route('dashboard') }}" class="logo logo-normal">
-			<img src="{{ asset('assets/img/logo.svg') }}" alt="Logo">
+			<img src="{{ asset('assets/img/logo.png') }}" width="130" height="29" alt="Klutch Cleaning">
 		</a>
 		<a href="{{ route('dashboard') }}" class="logo-small">
-			<img src="{{ asset('assets/img/logo-small.svg') }}" alt="Logo">
+			<img src="{{ asset('assets/img/logo-small.png') }}" width="30" height="30" alt="Klutch Cleaning">
 		</a>
 		<a href="{{ route('dashboard') }}" class="dark-logo">
-			<img src="{{ asset('assets/img/logo-white.svg') }}" alt="Logo">
+			<img src="{{ asset('assets/img/logo-white.png') }}" width="130" height="29" alt="Klutch Cleaning">
 		</a>
 	</div>
 	<!-- /Logo -->

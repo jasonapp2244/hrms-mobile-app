@@ -5,7 +5,8 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
 	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<title>@yield('title', 'My Attendance') | {{ config('app.name') }}</title>
-	<link rel="icon" type="image/svg+xml" href="{{ asset('assets/img/favicon.svg') }}">
+	<link rel="icon" type="image/png" href="{{ asset('assets/img/favicon.png') }}">
+	<link rel="apple-touch-icon" href="{{ asset('assets/img/favicon.png') }}">
 	<link rel="stylesheet" href="{{ asset('assets/css/bootstrap.min.css') }}">
 	<link rel="stylesheet" href="{{ asset('assets/plugins/icons/feather/feather.css') }}">
 	<link rel="stylesheet" href="{{ asset('assets/plugins/tabler-icons/tabler-icons.min.css') }}">
@@ -22,7 +23,7 @@
 <body>
 	<div class="emp-topbar">
 		<div class="emp-wrap d-flex align-items-center justify-content-between py-2" style="padding-bottom:8px!important;padding-top:8px!important">
-			<img src="{{ asset('assets/img/logo.svg') }}" class="logo" alt="{{ config('app.name') }}">
+			<img src="{{ asset('assets/img/logo.png') }}" class="logo" alt="{{ config('app.name') }}">
 			<div class="d-flex align-items-center gap-2">
 				<span class="d-none d-sm-inline text-muted small">{{ auth()->user()->name }}</span>
 				@include('layouts.partials.notification-bell')

@@ -3,11 +3,12 @@
 <head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
-	<meta name="description" content="Employment Management Portal">
+	<meta name="description" content="{{ config('app.name') }}">
 	<meta name="csrf-token" content="{{ csrf_token() }}">
 	<title>@yield('title', 'Dashboard') | {{ config('app.name') }}</title>
 
-	<link rel="icon" type="image/svg+xml" href="{{ asset('assets/img/favicon.svg') }}">
+	<link rel="icon" type="image/png" href="{{ asset('assets/img/favicon.png') }}">
+	<link rel="apple-touch-icon" href="{{ asset('assets/img/favicon.png') }}">
 	<script src="{{ asset('assets/js/theme-script.js') }}"></script>
 
 	<link rel="stylesheet" href="{{ asset('assets/css/bootstrap.min.css') }}">

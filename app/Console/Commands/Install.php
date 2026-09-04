@@ -46,7 +46,7 @@ class Install extends Command
     public function handle(): int
     {
         $this->line('');
-        $this->line('  <options=bold>Employment Management Portal — install</>');
+        $this->line('  <options=bold>' . config('app.name') . ' — install</>');
         $this->line('');
 
         $existing = $this->resolveExistingCompany();

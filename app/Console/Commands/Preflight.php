@@ -52,7 +52,7 @@ class Preflight extends Command
     public function handle(): int
     {
         $this->line('');
-        $this->line('  <options=bold>Employment Management Portal — production preflight</>');
+        $this->line('  <options=bold>' . config('app.name') . ' — production preflight</>');
         $this->line('');
 
         $this->checkEnvironment();

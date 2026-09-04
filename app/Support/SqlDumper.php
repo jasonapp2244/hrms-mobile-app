@@ -165,9 +165,16 @@ final class SqlDumper
         return '`' . str_replace('`', '``', $name) . '`';
     }
 
+    /**
+     * The product name is spelled out rather than read from config(app.name).
+     * This class is deliberately container-free — SqlDumperTest is a plain
+     * PHPUnit TestCase with no application booted, so a config() call here
+     * fails with "Target class [config] does not exist". Backups must not
+     * depend on a booted framework either. Update the name by hand.
+     */
     public static function header(string $database): string
     {
-        return "-- Employment Management Portal — database dump\n"
+        return "-- Klutch Cleaning - Employment Management Portal (EMP) — database dump\n"
             . "-- Written by App\\Support\\SqlDumper, not mysqldump: this host has no\n"
             . "-- mysqldump binary. Restores with any MySQL client, phpMyAdmin included.\n"
             . '-- Database: ' . $database . "\n"

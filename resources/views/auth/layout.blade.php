@@ -19,7 +19,8 @@
 	<meta name="robots" content="noindex, nofollow">
 	<title>@yield('title') | {{ config('app.name') }}</title>
 
-	<link rel="icon" type="image/svg+xml" href="{{ asset('assets/img/favicon.svg') }}">
+	<link rel="icon" type="image/png" href="{{ asset('assets/img/favicon.png') }}">
+	<link rel="apple-touch-icon" href="{{ asset('assets/img/favicon.png') }}">
 	<link rel="stylesheet" href="{{ asset('assets/css/bootstrap.min.css') }}">
 	<link rel="stylesheet" href="{{ asset('assets/plugins/icons/feather/feather.css') }}">
 	<link rel="stylesheet" href="{{ asset('assets/plugins/tabler-icons/tabler-icons.min.css') }}">
@@ -67,7 +68,7 @@
 									<div class="vh-100 d-flex flex-column justify-content-between p-4 pb-0">
 
 										<div class="mx-auto mb-4 text-center">
-											<img src="{{ asset('assets/img/logo.svg') }}" class="img-fluid" alt="{{ config('app.name') }}" style="max-height:42px">
+											<img src="{{ asset('assets/img/logo.png') }}" class="img-fluid" alt="{{ config('app.name') }}" style="max-height:42px">
 										</div>
 
 										<div class="">
