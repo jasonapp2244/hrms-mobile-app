@@ -19,7 +19,7 @@ php artisan migrate --seed
 
 ## Run the app
 1. Start **MySQL** (XAMPP Control Panel → MySQL → Start).
-2. From the `emp/` folder:
+2. From the `hrms/` folder:
    ```bash
    php artisan serve
    ```
