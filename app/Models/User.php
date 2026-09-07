@@ -54,15 +54,28 @@ class User extends Authenticatable
     /**
      * Route name of the home page this user should land on, based on role.
      *
-     * Only admin and HR reach the staff dashboard. Everyone else — employees and
-     * managers alike — lands on the self-service portal. Managers are staff who
-     * approve for their own team, not dashboard users, and sending them to
-     * 'dashboard' would bounce them straight off its role:admin|hr gate.
+     * Three destinations, one per area, and each one is the only area that role
+     * can actually reach: admin and HR to the staff dashboard behind
+     * `role:admin|hr`, managers to their own dashboard behind `role:manager`,
+     * everybody else to the self-service portal.
+     *
+     * Order matters. An admin who also manages a team is an admin here — the
+     * staff dashboard is the larger screen and their manager area stays one
+     * click away, whereas the reverse would take an administrator to a page
+     * showing four cleaners and no way back to the company.
+     *
+     * Checked before it is used, everywhere: sending somebody to a route their
+     * middleware refuses is a redirect loop, which is how this went wrong the
+     * first time — managers used to land on 'dashboard' and bounce.
      */
     public function homeRoute(): string
     {
-        return $this->hasAnyRole(['admin', 'hr'])
-            ? 'dashboard'
+        if ($this->hasAnyRole(['admin', 'hr'])) {
+            return 'dashboard';
+        }
+
+        return $this->hasRole('manager')
+            ? 'manager.dashboard'
             : 'employee.dashboard';
     }
 

@@ -75,7 +75,16 @@ class LeaveApprovalController extends Controller
                 ->get()
             : collect();
 
-        return view('employee.approvals', compact('manager', 'pending', 'clashes', 'decided', 'swaps'));
+        // Which shell to draw it in. A manager reaching this from their own
+        // dashboard should stay in that dashboard; the same screen opened from
+        // the portal tab keeps the portal's chrome. The controller, the queries
+        // and the scope check are identical either way — only the frame differs,
+        // which is why this is a view variable and not a second controller.
+        $layout = request()->routeIs('manager.*')
+            ? 'layouts.app'
+            : 'layouts.employee';
+
+        return view('employee.approvals', compact('manager', 'pending', 'clashes', 'decided', 'swaps', 'layout'));
     }
 
     public function approve(Request $request, LeaveRequest $leaveRequest)

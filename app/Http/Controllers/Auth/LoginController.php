@@ -235,14 +235,26 @@ class LoginController extends Controller
     }
 
     /**
-     * Employees always land on their own portal; staff use intended() so deep
-     * links still work after a session timeout.
+     * Staff use intended() so a deep link still works after a session timeout;
+     * everybody else goes straight to their own home.
+     *
+     * The test is on the roles rather than on homeRoute()'s answer. It used to
+     * compare that answer against 'employee.dashboard' and send anything else
+     * to route('dashboard') — which was correct only while those were the sole
+     * two outcomes. The moment managers gained a home of their own, that
+     * comparison sent them to the admin dashboard, where `role:admin|hr`
+     * refuses them: a sign-in that ends in a 403.
+     *
+     * intended() is deliberately staff-only. A manager or an employee following
+     * a stale deep link into the admin app would be redirected there after
+     * signing in and refused on arrival, which reads as a broken login rather
+     * than as the permission boundary it is.
      */
     protected function landing(User $user)
     {
-        return $user->homeRoute() === 'employee.dashboard'
-            ? redirect()->route('employee.dashboard')
-            : redirect()->intended(route('dashboard'));
+        return $user->hasAnyRole(['admin', 'hr'])
+            ? redirect()->intended(route('dashboard'))
+            : redirect()->route($user->homeRoute());
     }
 
     public function logout(Request $request)

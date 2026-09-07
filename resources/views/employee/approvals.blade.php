@@ -1,4 +1,14 @@
-@extends('layouts.employee')
+{{-- One inbox, two shells.
+
+	 A manager reaches this from their own dashboard and, being a member of
+	 staff themselves, also from the portal where they clock in. Rendering it
+	 through whichever layout the route asked for keeps that one screen and one
+	 controller instead of a second copy that would drift.
+
+	 The approve and reject forms below still post to the portal's endpoints,
+	 which is deliberate: one write path, already scoped to the manager's own
+	 reports, rather than two places for that check to be forgotten. --}}
+@extends($layout ?? 'layouts.employee', ['sidebarPartial' => 'layouts.partials.manager-sidebar'])
 @section('title', 'Team Approvals')
 
 @section('content')

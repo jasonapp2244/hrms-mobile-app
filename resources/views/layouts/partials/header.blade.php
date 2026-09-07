@@ -2,11 +2,14 @@
 <div class="header">
 	<div class="main-header">
 
+		{{-- The logo goes home, and home depends on who is looking. Hard-coded
+			 to route('dashboard') it was the one page a manager is refused, which
+			 made the most obvious control on the screen a 403. --}}
 		<div class="header-left">
-			<a href="{{ route('dashboard') }}" class="logo">
+			<a href="{{ route(auth()->user()->homeRoute()) }}" class="logo">
 				<img src="{{ asset('assets/img/logo.png') }}" width="130" height="29" alt="Klutch Cleaning">
 			</a>
-			<a href="{{ route('dashboard') }}" class="dark-logo">
+			<a href="{{ route(auth()->user()->homeRoute()) }}" class="dark-logo">
 				<img src="{{ asset('assets/img/logo-white.png') }}" width="130" height="29" alt="Klutch Cleaning">
 			</a>
 		</div>

@@ -33,7 +33,10 @@
 	<div class="main-wrapper">
 
 		@include('layouts.partials.header')
-		@include('layouts.partials.sidebar')
+		{{-- The shell is shared; the menu is not. Admin and HR get the sidebar of
+			 their own app, the manager area passes its own, and neither can render
+			 a link the other's middleware would refuse. --}}
+		@include($sidebarPartial ?? 'layouts.partials.sidebar')
 
 		<!-- Page Wrapper -->
 		<div class="page-wrapper">

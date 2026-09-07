@@ -31,7 +31,7 @@ class ReportService
      * is all the lateness reports need, whereas overtime has to pair each in
      * with its out to know how long anybody was actually here.
      */
-    public function overtime(int $companyId, string $from, string $to, ?int $officeId = null): array
+    public function overtime(int $companyId, string $from, string $to, ?int $officeId = null, ?array $employeeIds = null): array
     {
         // `shift` is an accessor over shiftOverride ?? department.shift, so both
         // sides of it are loaded here along with the roster — otherwise every
@@ -39,6 +39,8 @@ class ReportService
         $employees = Employee::with(['department.shift', 'office', 'shiftOverride', 'shiftAssignments.shift'])
             ->where('company_id', $companyId)->active()
             ->when($officeId, fn ($q) => $q->where('office_id', $officeId))
+            // See employeeStats: null is everybody, [] is nobody.
+            ->when($employeeIds !== null, fn ($q) => $q->whereIn('id', $employeeIds))
             ->get();
 
         // Ordered here so workedMinutes can walk each day once — it pairs in
@@ -139,12 +141,14 @@ class ReportService
      * borrowing days from before it. The row says how many working days it
      * covers for exactly that reason.
      */
-    public function weekly(int $companyId, string $from, string $to, ?int $officeId = null): array
+    public function weekly(int $companyId, string $from, string $to, ?int $officeId = null, ?array $employeeIds = null): array
     {
         $company = Company::find($companyId);
 
         $employees = Employee::where('company_id', $companyId)->active()
             ->when($officeId, fn ($q) => $q->where('office_id', $officeId))
+            // See employeeStats: null is everybody, [] is nobody.
+            ->when($employeeIds !== null, fn ($q) => $q->whereIn('id', $employeeIds))
             ->get();
 
         $headcount = $employees->count();
@@ -158,7 +162,16 @@ class ReportService
         // re-filtering the whole set per week.
         $byWeek = $ins->groupBy(fn ($log) => $log->work_date->copy()->startOfWeek()->toDateString());
 
-        $leaveDates = $this->leave->leaveDatesByEmployee($companyId, $from, $to);
+        // Narrowed to the people this report is actually about. The lookup
+        // answers for the whole company, so counting it unfiltered credited a
+        // team's — or an office's — rollup with leave taken by everybody else,
+        // which showed up as an absence rate that would not add up.
+        $inScope = $employees->pluck('id')->flip();
+        $leaveDates = array_filter(
+            $this->leave->leaveDatesByEmployee($companyId, $from, $to),
+            fn ($employeeId) => $inScope->has($employeeId),
+            ARRAY_FILTER_USE_KEY,
+        );
         $leaveByWeek = [];
 
         foreach ($leaveDates as $dates) {
@@ -752,11 +765,16 @@ class ReportService
      * Per-employee attendance stats for the period, keyed by employee id.
      * @return Collection<int,array>
      */
-    protected function employeeStats(int $companyId, string $from, string $to, ?int $officeId = null): Collection
+    protected function employeeStats(int $companyId, string $from, string $to, ?int $officeId = null, ?array $employeeIds = null): Collection
     {
         $employees = Employee::with(['department', 'office'])
             ->where('company_id', $companyId)->active()
             ->when($officeId, fn ($q) => $q->where('office_id', $officeId))
+            // Null is "everybody", an array is exactly those — including the
+            // empty array, which must mean nobody rather than everybody. A
+            // manager with no reports asking for a report gets an empty one,
+            // and `!== null` is what keeps that from becoming the whole company.
+            ->when($employeeIds !== null, fn ($q) => $q->whereIn('id', $employeeIds))
             ->get();
 
         $insByEmp = AttendanceLog::whereIn('employee_id', $employees->pluck('id'))
@@ -797,9 +815,9 @@ class ReportService
     }
 
     /** Late Arrivals report — employees ranked by number of late clock-ins. */
-    public function late(int $companyId, string $from, string $to, ?int $officeId = null): array
+    public function late(int $companyId, string $from, string $to, ?int $officeId = null, ?array $employeeIds = null): array
     {
-        $stats = $this->employeeStats($companyId, $from, $to, $officeId)
+        $stats = $this->employeeStats($companyId, $from, $to, $officeId, $employeeIds)
             ->filter(fn ($s) => $s['late'] > 0)
             ->sortByDesc('late');
 

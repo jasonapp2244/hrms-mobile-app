@@ -67,6 +67,16 @@
 					href="{{ route('employee.approvals.index') }}"><i class="ti ti-checklist me-1"></i>Team Approvals</a>
 			</li>
 			@endcan
+			@role('manager')
+			{{-- The way back out. A manager clocks in here like everybody else, and
+				 without this the portal is a one-way door — their own dashboard is
+				 reachable only by editing the address bar. Gated on the role rather
+				 than a permission because that is exactly what the /manager group
+				 is gated on, so the link can never point somewhere refused. --}}
+			<li class="nav-item ms-auto">
+				<a class="nav-link bg-white" href="{{ route('manager.dashboard') }}"><i class="ti ti-layout-dashboard me-1"></i>Team Dashboard</a>
+			</li>
+			@endrole
 		</ul>
 
 		@yield('content')

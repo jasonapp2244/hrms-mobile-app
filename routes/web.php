@@ -20,6 +20,11 @@ use App\Http\Controllers\LeaveBalanceController;
 use App\Http\Controllers\LeaveController;
 use App\Http\Controllers\LeaveRequestController;
 use App\Http\Controllers\LeaveTypeController;
+use App\Http\Controllers\Manager\AttendanceController as ManagerAttendanceController;
+use App\Http\Controllers\Manager\DashboardController as ManagerDashboardController;
+use App\Http\Controllers\Manager\ReportController as ManagerReportController;
+use App\Http\Controllers\Manager\ScheduleController as ManagerScheduleController;
+use App\Http\Controllers\Manager\TeamController as ManagerTeamController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\PolicyController;
@@ -165,6 +170,49 @@ Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('
         Route::post('{leaveRequest}/reject', [LeaveApprovalController::class, 'reject'])->name('reject');
     });
 });
+
+// ---- Manager area (team leads) ----
+// A first-class area of its own rather than more tabs on the employee portal.
+// A manager is still an employee — they clock in and book leave through the
+// portal above, and both role groups apply to them — but supervising a team is
+// a different job from doing one, and it needs a dashboard rather than a pill.
+//
+// Deliberately NOT folded into the admin group below. That group is wrapped in
+// `role:admin|hr`, which runs before any `permission:` middleware inside it, so
+// a manager holding a matching permission would still be refused at the door.
+// A parallel group is the only way the role can be reached at all.
+//
+// Gated twice: `role:manager` decides who is in the area, `permission:view-team`
+// decides what the area is for — and the roles editor can withdraw the second
+// without anybody having to remember which routes to unhook. Neither says
+// *whose* team; that is ManagerScope, applied inside every controller, and it
+// is what stops one manager reading another's staff.
+Route::middleware(['auth', 'role:manager', 'permission:view-team'])
+    ->prefix('manager')->name('manager.')->group(function () {
+        Route::get('dashboard', [ManagerDashboardController::class, 'index'])->name('dashboard');
+
+        Route::get('team', [ManagerTeamController::class, 'index'])->name('team.index');
+        Route::get('team/{employee}', [ManagerTeamController::class, 'show'])->name('team.show');
+
+        // 'logs' before nothing in particular, but kept above any future
+        // attendance/{...} so it is never swallowed by a wildcard.
+        Route::get('attendance/logs', [ManagerAttendanceController::class, 'logs'])->name('attendance.logs');
+        Route::get('attendance', [ManagerAttendanceController::class, 'index'])->name('attendance.index');
+
+        Route::get('schedule', [ManagerScheduleController::class, 'index'])->name('schedule.index');
+
+        Route::get('reports/{type}', [ManagerReportController::class, 'show'])->name('reports.show');
+
+        // The approvals inbox, in the manager shell.
+        //
+        // Read only. It is the *same* controller the portal route uses, and the
+        // approve and reject writes stay on their existing portal endpoints —
+        // one write path, already scoped to the manager's own reports and
+        // already covered by LeaveApprovalTest. A second pair of POST routes
+        // would be a second place for that scope check to be forgotten.
+        Route::get('approvals', [LeaveApprovalController::class, 'index'])
+            ->middleware('permission:approve-leave')->name('approvals.index');
+    });
 
 // ---- Staff dashboard (admin + HR only) ----
 // Locked to staff roles so an employee-role account can never reach the admin
