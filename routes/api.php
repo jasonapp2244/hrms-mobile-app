@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\RegularisationController;
 use App\Http\Controllers\Api\ScheduleController;
 use App\Http\Controllers\Api\TeamController;
 use Illuminate\Support\Facades\Route;
@@ -76,6 +77,17 @@ Route::middleware('auth:sanctum')->group(function () {
         ->name('api.attendance.break');
     Route::get('attendance/today', [AttendanceController::class, 'today'])->name('api.attendance.today');
     Route::get('attendance/history', [AttendanceController::class, 'history'])->name('api.attendance.history');
+
+    // Regularisation (A4.13) — raising only. Deciding one voids a punch and
+    // writes a replacement, which is manage-attendance and stays on the web.
+    // A manager has no step in this chain: leave is manager-then-HR, a
+    // correction is HR's alone.
+    Route::get('attendance/regularisations', [RegularisationController::class, 'index'])
+        ->name('api.regularisations.index');
+    Route::post('attendance/regularisations', [RegularisationController::class, 'store'])
+        ->middleware('throttle:write')->name('api.regularisations.store');
+    Route::post('attendance/regularisations/{regularisation}/cancel', [RegularisationController::class, 'cancel'])
+        ->middleware('throttle:write')->name('api.regularisations.cancel');
 
     // Leave — the employee's own.
     Route::get('leave/balances', [LeaveController::class, 'balances'])->name('api.leave.balances');

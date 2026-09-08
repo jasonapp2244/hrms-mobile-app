@@ -5,7 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceLog;
 use App\Models\AttendanceRegularisation;
 use App\Models\Employee;
-use Carbon\Carbon;
+use App\Services\RegularisationService;
 use Illuminate\Http\Request;
 
 /**
@@ -18,6 +18,10 @@ use Illuminate\Http\Request;
  */
 class RegularisationRequestController extends Controller
 {
+    public function __construct(
+        protected RegularisationService $regularisation,
+    ) {}
+
     protected function currentEmployee(): Employee
     {
         $employee = auth()->user()->employee;
@@ -57,60 +61,12 @@ class RegularisationRequestController extends Controller
             'reason'            => ['required', 'string', 'min:5', 'max:500'],
         ]);
 
-        $timezone = $employee->company?->tz() ?? config('app.timezone');
-        $at = Carbon::parse($data['requested_at'], $timezone);
-
-        if ($at->isFuture()) {
-            return back()->withInput()->withErrors([
-                'requested_at' => 'You cannot ask for a correction to a time that has not happened yet.',
-            ]);
-        }
-
-        // A challenged punch must be one of this employee's own. Checked rather
-        // than trusted: the id arrives from a form field anyone can retype.
-        $challenged = null;
-
-        if (! empty($data['attendance_log_id'])) {
-            $challenged = AttendanceLog::where('employee_id', $employee->id)
-                ->find($data['attendance_log_id']);
-
-            if (! $challenged) {
-                return back()->withInput()->withErrors([
-                    'attendance_log_id' => 'That punch is not on your record.',
-                ]);
-            }
-        }
-
-        // One open request per punch, or per date-and-type where there is no
-        // punch. Without this a double submit produces two approvals and two
-        // corrections for the same problem.
-        $duplicate = AttendanceRegularisation::where('employee_id', $employee->id)
-            ->pending()
-            ->when(
-                $challenged,
-                fn ($q) => $q->where('attendance_log_id', $challenged->id),
-                fn ($q) => $q->whereNull('attendance_log_id')
-                    ->whereDate('work_date', $at->toDateString())
-                    ->where('type', $data['type']),
-            )
-            ->exists();
-
-        if ($duplicate) {
-            return back()->withInput()->withErrors([
-                'reason' => 'You already have a request waiting on this. Wait for it to be decided first.',
-            ]);
-        }
-
-        AttendanceRegularisation::create([
-            'company_id'        => $employee->company_id,
-            'employee_id'       => $employee->id,
-            'attendance_log_id' => $challenged?->id,
-            'office_id'         => $challenged?->office_id ?? $employee->office_id,
-            'work_date'         => $at->toDateString(),
-            'type'              => $data['type'],
-            'requested_at'      => $at,
-            'reason'            => $data['reason'],
-        ]);
+        // The rules that are not shape — future times, whose punch it is, one
+        // open request per problem — live in the service, because the app posts
+        // here too and a rule enforced in a form is a rule the app would not
+        // have. The ValidationException it throws redirects back with the same
+        // field keys this view already renders.
+        $this->regularisation->submit($employee, $data);
 
         return back()->with('success', 'Request submitted. HR will review it.');
     }
@@ -122,11 +78,7 @@ class RegularisationRequestController extends Controller
 
         abort_unless($regularisation->employee_id === $employee->id, 404);
 
-        if (! $regularisation->isPending()) {
-            return back()->withErrors(['status' => 'That request has already been decided.']);
-        }
-
-        $regularisation->update(['status' => 'cancelled']);
+        $this->regularisation->cancel($regularisation);
 
         return back()->with('success', 'Request withdrawn.');
     }
