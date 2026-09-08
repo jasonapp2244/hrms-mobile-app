@@ -85,6 +85,12 @@ return [
             'detail' => 'Dashboards per role and per person, week-on-week trends, weekly rollups, schedule-change alerts and on/offboarding checklists',
             'status' => 'delivered',
         ],
+        [
+            'no'     => 10,
+            'title'  => 'Manager workspace',
+            'detail' => 'The team lead promoted from a tab on the employee portal to a role with its own area — team dashboard, attendance, published roster, scoped reports and the approvals inbox, every query limited to their own direct reports',
+            'status' => 'delivered',
+        ],
     ],
 
     /* Badge label and colour per status. Kept beside the data so a new status

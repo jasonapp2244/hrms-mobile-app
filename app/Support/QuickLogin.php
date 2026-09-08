@@ -118,9 +118,39 @@ final class QuickLogin
             'email'    => $user->email,
             'password' => $pair['password'],
             'name'     => $user->name,
-            'roles'    => $roles->map(fn (string $role) => self::label($role))->join(' + '),
+            'roles'    => self::label(self::primaryRole($roles)),
             'is_admin' => $roles->contains('admin'),
         ];
+    }
+
+    /**
+     * The one role this button is worth naming.
+     *
+     * Every role used to be joined with ' + ', which turned the manager account
+     * into "Employee + Manager" — accurate about the row and wrong about the
+     * button, because the panel is answering "what do I get if I click this",
+     * and what you get is the manager area. Managers hold the employee role as
+     * well by design, so the joined label would have said that about every one
+     * of them.
+     *
+     * The order is deliberately the same as User::homeRoute()'s, because it is
+     * answering the same question — which of somebody's roles decides where
+     * they land. If that precedence ever changes, this has to change with it,
+     * or the panel will promise one area and open another.
+     *
+     * @param  Collection<int, string>  $roles
+     */
+    private static function primaryRole(Collection $roles): string
+    {
+        foreach (['admin', 'hr', 'manager', 'employee'] as $role) {
+            if ($roles->contains($role)) {
+                return $role;
+            }
+        }
+
+        // Unreachable while row() keeps refusing anything outside those four,
+        // but a guess is better than an empty button if that ever loosens.
+        return (string) $roles->first();
     }
 
     private static function label(string $role): string
