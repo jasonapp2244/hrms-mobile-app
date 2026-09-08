@@ -67,6 +67,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('attendance/check', [AttendanceController::class, 'check'])
         ->middleware('throttle:punch')
         ->name('api.attendance.check');
+    // Breaks share the punch limiter rather than the write one: they write an
+    // attendance row like a punch does, and a loop on this endpoint costs the
+    // same as a loop on that one.
+    Route::post('attendance/break', [AttendanceController::class, 'break'])
+        ->middleware('throttle:punch')
+        ->name('api.attendance.break');
     Route::get('attendance/today', [AttendanceController::class, 'today'])->name('api.attendance.today');
     Route::get('attendance/history', [AttendanceController::class, 'history'])->name('api.attendance.history');
 

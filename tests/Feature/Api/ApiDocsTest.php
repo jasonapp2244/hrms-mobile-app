@@ -89,10 +89,55 @@ class ApiDocsTest extends TestCase
             'too_many_requests', 'server_error',
             'invalid_credentials', 'account_disabled', 'duplicate_scan',
             'no_office', 'wrong_password', 'invalid_range', 'range_too_large',
+            'outside_geofence', 'break_not_available',
         ];
 
         foreach ($codes as $code) {
             $this->assertStringContainsString($code, $doc, "Error code '{$code}' is not documented.");
         }
+    }
+
+    /**
+     * The list above is hand-written, which is the same failure mode the route
+     * walk exists to prevent — `outside_geofence` shipped with A4.16 and sat
+     * undocumented because nobody remembered to add it to a literal array.
+     * This reads the codes out of the controllers instead, so a new `fail()`
+     * documents itself or fails the build.
+     */
+    public function test_every_error_code_raised_in_a_controller_is_documented(): void
+    {
+        $doc   = file_get_contents(self::DOC);
+        $found = [];
+
+        foreach (glob(app_path('Http/Controllers/Api/*.php')) as $file) {
+            // The first argument of $this->fail() is the code the client
+            // branches on. Only literals are matched — a computed code could
+            // not be documented by name anyway.
+            preg_match_all(
+                '/\$this->fail\(\s*[\'"]([a-z_]+)[\'"]/',
+                file_get_contents($file),
+                $matches,
+            );
+
+            foreach ($matches[1] as $code) {
+                $found[$code] = basename($file);
+            }
+        }
+
+        $this->assertNotEmpty($found, 'No error codes were found — has fail() been renamed?');
+
+        $missing = [];
+
+        foreach ($found as $code => $file) {
+            if (! str_contains($doc, $code)) {
+                $missing[] = "{$code} (raised in {$file})";
+            }
+        }
+
+        $this->assertSame([], $missing, sprintf(
+            "These error codes are raised but not in API-Reference_v1.md:\n  %s\n"
+            . "A client cannot branch on a code it has never been told about.",
+            implode("\n  ", $missing),
+        ));
     }
 }

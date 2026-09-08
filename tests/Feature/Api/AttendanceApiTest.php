@@ -253,7 +253,190 @@ class AttendanceApiTest extends TestCase
             ->assertStatus(401);
     }
 
+    // ================= break =================
+
+    public function test_a_break_starts_when_on_the_clock(): void
+    {
+        // travelTo before the punch, not after: the duplicate cooldown measures
+        // created_at, which is stamped from the clock as it stands when the row
+        // is written. Punch first and the row is stamped today, which is not
+        // within a minute of a moment in August — and the endpoint refuses.
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/break')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('punch.type', 'break_start')
+            ->assertJsonPath('on_break', true)
+            ->assertJsonPath('next_break_action', 'end');
+    }
+
+    public function test_the_server_decides_start_or_end_not_the_app(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+        $this->punch('break_start', '2026-08-03 13:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:30:00'));
+
+        // The app sends nothing but coordinates, exactly as it does for a
+        // punch, so a screen that has not refreshed cannot open a second break.
+        $this->postJson('/api/v1/attendance/break')
+            ->assertOk()
+            ->assertJsonPath('punch.type', 'break_end')
+            ->assertJsonPath('on_break', false)
+            ->assertJsonPath('next_break_action', 'start');
+    }
+
+    public function test_a_break_is_refused_when_not_clocked_in(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/break')
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('error', 'break_not_available');
+
+        $this->assertDatabaseCount('attendance_logs', 0);
+    }
+
+    public function test_a_break_after_clocking_out_is_refused(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 17:00:00'));
+        $this->punch('out', '2026-08-03 17:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 17:30:00'));
+
+        $this->postJson('/api/v1/attendance/break')
+            ->assertStatus(422)
+            ->assertJsonPath('error', 'break_not_available');
+    }
+
+    public function test_a_break_punch_is_never_late(): void
+    {
+        // There is nothing to judge a break against. Reusing the punch statuses
+        // would hang a "late" badge on somebody's lunch.
+        $this->travelTo(Carbon::parse('2026-08-03 11:00:00'));
+        $this->punch('in', '2026-08-03 11:00:00', ['status' => 'late']);
+        $this->travelTo(Carbon::parse('2026-08-03 14:00:00'));
+
+        $this->postJson('/api/v1/attendance/break')
+            ->assertOk()
+            ->assertJsonPath('punch.status', 'ontime');
+    }
+
+    public function test_a_break_is_marked_as_coming_from_the_app(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/break')
+            ->assertOk()
+            ->assertJsonPath('punch.source', 'mobile');
+    }
+
+    public function test_gps_travels_with_a_break(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/break', [
+            'latitude' => 40.7128, 'longitude' => -74.0060,
+        ])->assertOk();
+
+        $log = AttendanceLog::where('type', 'break_start')->first();
+
+        $this->assertEquals(40.7128, (float) $log->latitude);
+        $this->assertEquals(-74.0060, (float) $log->longitude);
+    }
+
+    public function test_a_double_tap_on_break_is_refused(): void
+    {
+        $this->punch('in', '2026-08-03 09:00:00');
+
+        // Inside the cooldown of the punch just made, rather than travelling on.
+        $this->postJson('/api/v1/attendance/break')
+            ->assertStatus(429)
+            ->assertJsonPath('error', 'duplicate_scan');
+    }
+
+    public function test_a_break_needs_a_token(): void
+    {
+        app('auth')->forgetGuards();
+
+        $this->postJson('/api/v1/attendance/break')->assertStatus(401);
+    }
+
+    public function test_a_finished_break_does_not_end_the_working_day(): void
+    {
+        // The regression this endpoint would otherwise have caused: break_end is
+        // neither 'in' nor 'out', so anything reading the last punch treats a
+        // returning employee as one who went home, and the next tap opens a
+        // second attendance stretch.
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+        $this->punch('break_start', '2026-08-03 13:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:30:00'));
+        $this->punch('break_end', '2026-08-03 13:30:00');
+        $this->travelTo(Carbon::parse('2026-08-03 15:00:00'));
+
+        $this->getJson('/api/v1/attendance/today')
+            ->assertJsonPath('is_clocked_in', true)
+            ->assertJsonPath('next_action', 'out')
+            ->assertJsonPath('on_break', false);
+
+        $this->postJson('/api/v1/attendance/check')
+            ->assertOk()
+            ->assertJsonPath('punch.type', 'out');
+    }
+
     // ================= today =================
+
+    public function test_today_stays_clocked_in_through_a_break(): void
+    {
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->punch('break_start', '2026-08-03 13:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:20:00'));
+
+        $this->getJson('/api/v1/attendance/today')
+            ->assertJsonPath('is_clocked_in', true)
+            ->assertJsonPath('next_action', 'out')
+            ->assertJsonPath('on_break', true)
+            ->assertJsonPath('next_break_action', 'end')
+            ->assertJsonPath('break_started_at', '2026-08-03T13:00:00+00:00');
+    }
+
+    public function test_the_break_button_is_offered_only_on_the_clock(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 08:00:00'));
+
+        $this->getJson('/api/v1/attendance/today')
+            ->assertJsonPath('can_break', false)
+            ->assertJsonPath('on_break', false)
+            ->assertJsonPath('break_started_at', null);
+
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 10:00:00'));
+
+        $this->getJson('/api/v1/attendance/today')->assertJsonPath('can_break', true);
+    }
+
+    public function test_a_break_is_not_paid_time(): void
+    {
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->punch('break_start', '2026-08-03 12:00:00');
+        $this->punch('break_end', '2026-08-03 12:30:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        // Four hours on the clock, half an hour of it on a break.
+        $this->getJson('/api/v1/attendance/today')->assertJsonPath('worked_minutes', 210);
+    }
 
     public function test_today_reports_an_empty_day(): void
     {

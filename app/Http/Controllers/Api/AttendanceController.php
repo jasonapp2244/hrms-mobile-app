@@ -95,6 +95,78 @@ class AttendanceController extends ApiController
     }
 
     /**
+     * Start or end a break (B2.6).
+     *
+     * A4.15 built this months ago and the web portal's break button has called
+     * `recordBreak` ever since; the API simply never exposed it, so the app
+     * could not offer the button at all. This adds nothing to the rules — the
+     * service still decides start-vs-end from the day's punches, so a stale
+     * screen cannot post the wrong one, exactly as `check` cannot.
+     *
+     * Deliberately a separate endpoint rather than a `type` on `check`: the two
+     * refuse for different reasons and the app has to tell them apart. A break
+     * is refused when the day is not in a state for one; a punch never is.
+     */
+    public function break(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'latitude'  => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        $employee = $this->employee();
+
+        if ($this->attendance->recentlyScanned($employee)) {
+            return $this->fail(
+                'duplicate_scan',
+                'Already recorded moments ago. Please wait a minute.',
+                429,
+            );
+        }
+
+        $office = $employee->office
+            ?? Office::where('company_id', $employee->company_id)->orderBy('id')->first();
+
+        if (! $office) {
+            return $this->fail(
+                'no_office',
+                'No office is set up for your company yet. Please contact HR.',
+                422,
+            );
+        }
+
+        try {
+            $result = $this->attendance->recordBreak($employee, $office, [
+                'source'     => 'mobile',
+                'latitude'   => $data['latitude'] ?? null,
+                'longitude'  => $data['longitude'] ?? null,
+                'ip_address' => $request->ip(),
+            ]);
+        } catch (\RuntimeException $e) {
+            // Its own code, not the geofence's: this one means "you are not
+            // clocked in", which the app answers by refreshing the day rather
+            // than by telling somebody to move closer to the office.
+            return $this->fail('break_not_available', $e->getMessage(), 422);
+        }
+
+        $log     = $result['log'];
+        $started = $result['type'] === 'break_start';
+        $at      = $this->attendance->wallClock($log->scanned_at, $this->timezone($employee));
+
+        return $this->ok([
+            'punch'    => $this->punchPayload($log, $this->timezone($employee)),
+            'on_break' => $started,
+            // What the break button should say next. Named apart from
+            // `next_action`, which belongs to the in/out button — one screen
+            // carries both and they move independently.
+            'next_break_action' => $started ? 'end' : 'start',
+            'message' => $started
+                ? sprintf('Break started at %s. Your worked time pauses until you return.', $at->format('h:i A'))
+                : sprintf('Break ended at %s. Welcome back.', $at->format('h:i A')),
+        ]);
+    }
+
+    /**
      * Everything the home screen shows: where the day stands, and why the
      * employee may not be expected in at all.
      */
@@ -109,24 +181,44 @@ class AttendanceController extends ApiController
         $date = $this->attendance->workDateFor($employee, $now);
 
         $logs = $this->logsFor($employee, $date);
-        $last = $logs->last();
+
+        // Not `$logs->last()`. Reading the last punch treats a break as the end
+        // of the day: `break_end` is neither 'in' nor 'out', so the screen would
+        // offer "Check In" to somebody who never left and start a second
+        // attendance stretch when they took it. `breakState` is the one place
+        // that knows all four types mean, between them, one of two states — the
+        // same reading the live board uses. It costs a second query on this
+        // endpoint, which is worth more than two definitions of "clocked in".
+        $state    = $this->attendance->breakState($employee, $date);
+        $cooldown = $this->attendance->recentlyScanned($employee);
 
         return $this->ok([
             'date'        => $date,
             'server_time' => $now->toIso8601String(),
             'timezone'    => $timezone,
-            'next_action' => ($last && $last->type === 'in') ? 'out' : 'in',
+            'next_action' => $state['clocked_in'] ? 'out' : 'in',
             // False only while the cooldown is running, so the app can grey the
             // button out rather than let a tap fail.
-            'can_check'      => ! $this->attendance->recentlyScanned($employee),
+            'can_check'      => ! $cooldown,
+            // The break button's own three facts. It is offered only on the
+            // clock, because that is the only state `recordBreak` accepts —
+            // better greyed out than refused after the tap.
+            'on_break'          => $state['on_break'],
+            'break_started_at'  => $state['break_started_at']
+                ? $this->attendance->wallClock($state['break_started_at'], $timezone)->toIso8601String()
+                : null,
+            'can_break'         => $state['clocked_in'] && ! $cooldown,
+            'next_break_action' => $state['on_break'] ? 'end' : 'start',
             'punches' => $logs->map(fn ($log) => $this->punchPayload($log, $timezone))->values(),
             // The comparison point has to be stated in the same frame the
             // punches are stored in, or the tz offset is counted as hours worked.
             'worked_minutes' => $this->attendance->workedMinutes(
                 $logs, $this->attendance->wallClock($now),
             ),
-            // Open means the clock is still running on the number above.
-            'is_clocked_in' => (bool) ($last && $last->type === 'in'),
+            // Open means the clock is still running on the number above. True
+            // through a break as well: the person has not gone home, and
+            // workedMinutes has already subtracted the break itself.
+            'is_clocked_in' => $state['clocked_in'],
         ] + $this->dayContext($employee, $date));
     }
 
