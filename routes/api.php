@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\ProfileController;
@@ -105,6 +106,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('team/roster', [TeamController::class, 'roster'])
             ->name('api.team.roster');
     });
+
+    // The employee's own documents (B3.7). No employee id in either route —
+    // the vault is HR's, and the only thing the app can reach is the caller's
+    // own shelf of it.
+    Route::get('documents', [DocumentController::class, 'index'])->name('api.documents.index');
+    Route::get('documents/{document}', [DocumentController::class, 'download'])
+        ->name('api.documents.download');
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('api.schedule');
 

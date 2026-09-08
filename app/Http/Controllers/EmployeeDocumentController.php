@@ -15,8 +15,10 @@ use Illuminate\Validation\Rule;
  *
  * Everything is gated on manage-employees. These are contracts, passports and
  * medical notes; view-attendance is not the right key for them, and an employee
- * reaching their own is a self-service feature that does not exist yet rather
- * than something to leave a door open for.
+ * reaching their own goes through `Api\DocumentController` (B3.7) rather than
+ * through a door left open here. That one is read-only and scoped to the caller,
+ * and it does not send `notes` — this screen's notes field is where HR records
+ * why a visa is being chased, and the employee is its subject, not its reader.
  *
  * Downloads are streamed through this controller rather than served from
  * `public/`. A guessable URL that hands out a passport scan without a session
