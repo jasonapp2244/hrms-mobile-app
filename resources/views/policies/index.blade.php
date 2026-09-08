@@ -75,6 +75,21 @@
             neither is a punch that arrives without a location — a phone indoors often cannot get one.
           </div>
         </div>
+        <div class="col-md-4">
+          <label class="form-label">Staff directory</label>
+          <div class="form-check mt-2">
+            <input type="hidden" name="directory_show_contact_details" value="0">
+            <input class="form-check-input" type="checkbox" name="directory_show_contact_details" value="1" id="dirContact"
+                   @checked(old('directory_show_contact_details', $company->policy('directory_show_contact_details')))>
+            <label class="form-check-label" for="dirContact">Show colleagues' email and phone in the app</label>
+          </div>
+          <div class="form-text">
+            Off by default. The directory always lists who works here, their job title, department
+            and office; this decides whether staff can also see each other's contact details.
+            There is one phone column on an employee record, so if it holds personal mobiles this
+            publishes them to everybody — turn it on only if those numbers are work numbers.
+          </div>
+        </div>
       </div>
     </div>
   </div>

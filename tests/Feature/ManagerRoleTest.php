@@ -327,14 +327,30 @@ class ManagerRoleTest extends TestCase
 
     public function test_the_team_list_shows_only_direct_reports(): void
     {
-        $this->actingAs($this->managerUser)
+        $response = $this->actingAs($this->managerUser)
             ->get(route('manager.team.index'))
             ->assertOk()
             ->assertSee('Raj')
-            ->assertDontSee('Nina')
-            // Their own name is not on their own team — they do not report to
-            // themselves, and Employee::canReportTo makes that impossible.
-            ->assertDontSee('M1');
+            ->assertDontSee('Nina');
+
+        // Their own record is not on their own team — they do not report to
+        // themselves, and Employee::canReportTo makes that impossible.
+        //
+        // Asserted against the view data rather than as assertDontSee('M1').
+        // That was a two-character search of a whole rendered page, and the
+        // CSRF token is forty random alphanumerics: roughly one run in a
+        // hundred contained "M1" by chance and failed here for no reason. A
+        // flake in a suite this size is worse than a missing assertion, because
+        // it teaches everyone to re-run rather than read.
+        $listed = collect($response->viewData('rows'))
+            ->map(fn (array $row) => $row['employee']->id)
+            ->all();
+
+        $this->assertNotContains(
+            $this->manager->id,
+            $listed,
+            'A manager must not appear on their own team list.',
+        );
     }
 
     public function test_a_manager_cannot_open_somebody_elses_report(): void

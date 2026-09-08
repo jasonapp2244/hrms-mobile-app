@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceController;
+use App\Http\Controllers\Api\DirectoryController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveController;
@@ -125,6 +126,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('documents', [DocumentController::class, 'index'])->name('api.documents.index');
     Route::get('documents/{document}', [DocumentController::class, 'download'])
         ->name('api.documents.download');
+
+    // Who else works here (B3.8). The only endpoint that answers about other
+    // people, so it carries the least: no PII beyond a job title, and contact
+    // details only where the company has switched them on.
+    Route::get('directory', [DirectoryController::class, 'index'])->name('api.directory.index');
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('api.schedule');
 

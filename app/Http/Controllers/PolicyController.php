@@ -70,6 +70,7 @@ class PolicyController extends Controller
             'session_idle_timeout_minutes'  => 'required|integer|min:0|max:1440',
             'enforce_geofence'              => 'nullable|boolean',
             'require_two_factor_for_staff'  => 'nullable|boolean',
+            'directory_show_contact_details' => 'nullable|boolean',
         ], [
             'session_idle_timeout_minutes.max' => 'An idle timeout longer than a day is the same as no timeout.',
         ]);
@@ -97,6 +98,7 @@ class PolicyController extends Controller
             'session_idle_timeout_minutes'    => (int) $data['session_idle_timeout_minutes'],
             'enforce_geofence'                => $request->boolean('enforce_geofence'),
             'require_two_factor_for_staff'    => $request->boolean('require_two_factor_for_staff'),
+            'directory_show_contact_details'  => $request->boolean('directory_show_contact_details'),
         ])]);
 
         ActivityLog::record(

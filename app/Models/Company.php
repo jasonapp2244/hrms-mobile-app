@@ -64,6 +64,16 @@ class Company extends Model
         // coordinates are a record rather than a gate. A company that wants
         // office-only attendance turns this on knowing what it costs.
         'enforce_geofence' => false,
+
+        // Show colleagues' email and phone in the app's directory (B3.8). Off
+        // by default, and this one matters more than it looks: `employees.phone`
+        // is the only phone column on the record, and for a workforce with no
+        // desk lines it holds personal mobiles. Defaulting this on would publish
+        // every cleaner's mobile number to every other cleaner the moment the
+        // app updated — a disclosure nobody consented to and one that cannot be
+        // taken back. The directory still lists who works here and where; the
+        // switch only governs how to reach them.
+        'directory_show_contact_details' => false,
     ];
 
     /** A policy value for this company, falling back to the default. */
