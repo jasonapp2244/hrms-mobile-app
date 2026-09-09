@@ -148,6 +148,140 @@ class AttendanceService
     }
 
     /**
+     * How far back a punch made offline may reach (B2.4).
+     *
+     * Two days covers a night shift whose phone had no signal, a weekend away
+     * from coverage, and a handset that stayed in a bag. Past that the claim is
+     * old enough that somebody should look at it, and A4.13 exists for exactly
+     * that — a regularisation carries a reason and a decision, which a silently
+     * back-dated punch does not.
+     *
+     * It is also the bound on the one thing this feature gives up. An offline
+     * punch is stamped from the device, so a person who moves their clock can
+     * move the time; capping it means they can move it by at most this much,
+     * and the row says `mobile_offline` for anyone reading afterwards.
+     */
+    public const OFFLINE_MAX_AGE_HOURS = 48;
+
+    /**
+     * Record a punch that was made with no signal and delivered later (B2.4).
+     *
+     * **This is the one place the device clock is trusted, and only just.** The
+     * alternative is worse: stamping it at the moment it arrives would file a
+     * 09:00 check-in as 17:00 and hand payroll a number that is simply wrong.
+     * So the claimed time is taken, bounded, and labelled.
+     *
+     * Three things keep it honest:
+     *
+     *  - `source` is `mobile_offline`, so every report, export and history
+     *    screen can tell it from a punch the server timed itself.
+     *  - The delivery delay is written to `notes`, which is what a reader wants
+     *    to know first: how long this sat on a handset before anyone saw it.
+     *  - Anything in the future, or older than OFFLINE_MAX_AGE_HOURS, is
+     *    refused rather than clamped. A clamped time is a wrong time that looks
+     *    right.
+     *
+     * The type is still the server's decision, not the app's — but inferred
+     * from the punches *before this moment* rather than from the last of the
+     * day, because a queued punch is being slotted into a sequence rather than
+     * appended to it.
+     *
+     * Delivering the same punch twice returns the row already written instead
+     * of a second one. A queue retries whenever a connection is flaky, which is
+     * precisely when this feature is in use, and attendance is append-only —
+     * a duplicate could only ever be voided, never removed.
+     *
+     * @return array{log: AttendanceLog, type: string, duplicate: bool}
+     * @throws \RuntimeException when the claimed time is not acceptable
+     */
+    public function recordQueued(Employee $employee, Office $office, Carbon $at, array $meta = []): array
+    {
+        $timezone = $office->company?->tz() ?? config('app.timezone');
+        $now      = Carbon::now($timezone);
+        $at       = $at->copy()->setTimezone($timezone);
+
+        if ($at->greaterThan($now)) {
+            throw new \RuntimeException(
+                'That punch is dated in the future. Check the date and time on this device.',
+            );
+        }
+
+        if ($at->diffInHours($now) > self::OFFLINE_MAX_AGE_HOURS) {
+            throw new \RuntimeException(sprintf(
+                'That punch is more than %d hours old. Ask for a correction instead, so it '
+                . 'can be checked and recorded properly.',
+                self::OFFLINE_MAX_AGE_HOURS,
+            ));
+        }
+
+        $workDate = $this->workDateFor($employee, $at);
+
+        // Same person, same moment, same day — this punch has already landed.
+        // Matching on the exact timestamp is safe because it came from the
+        // device and is repeated verbatim on every retry.
+        $existing = AttendanceLog::where('employee_id', $employee->id)
+            ->whereDate('work_date', $workDate)
+            ->where('scanned_at', $at)
+            ->whereIn('type', ['in', 'out'])
+            ->first();
+
+        if ($existing) {
+            return ['log' => $existing, 'type' => $existing->type, 'duplicate' => true];
+        }
+
+        $this->assertInsideGeofence($employee, $office, $meta);
+
+        // What came *before* this moment decides the direction. record() reads
+        // the last punch of the day, which is right for a button pressed in
+        // sequence and wrong for one being slotted in behind later arrivals.
+        $preceding = AttendanceLog::where('employee_id', $employee->id)
+            ->whereDate('work_date', $workDate)
+            ->whereIn('type', ['in', 'out'])
+            ->where('scanned_at', '<', $at)
+            ->orderByDesc('scanned_at')
+            ->first();
+
+        $type = ($preceding && $preceding->type === 'in') ? 'out' : 'in';
+
+        $log = AttendanceLog::create([
+            'company_id'  => $employee->company_id,
+            'employee_id' => $employee->id,
+            'office_id'   => $office->id,
+            'type'        => $type,
+            'scanned_at'  => $at,
+            'work_date'   => $workDate,
+            'status'      => $this->determineStatus($type, $at, $employee, $workDate),
+            'source'      => 'mobile_offline',
+            'latitude'    => $meta['latitude'] ?? null,
+            'longitude'   => $meta['longitude'] ?? null,
+            'ip_address'  => $meta['ip_address'] ?? null,
+            'notes'       => sprintf(
+                'Recorded offline at %s, delivered %s (%s later).',
+                $at->format('H:i'),
+                $now->format('H:i'),
+                $this->humanGap($at, $now),
+            ),
+        ]);
+
+        return ['log' => $log, 'type' => $type, 'duplicate' => false];
+    }
+
+    /** "3h 20m", for the delivery delay on an offline punch's note. */
+    protected function humanGap(Carbon $from, Carbon $to): string
+    {
+        $minutes = (int) round($from->diffInMinutes($to));
+
+        if ($minutes < 60) {
+            return $minutes . 'm';
+        }
+
+        $hours = intdiv($minutes, 60);
+        $rest  = $minutes % 60;
+
+        return $rest === 0 ? $hours . 'h' : sprintf('%dh %dm', $hours, $rest);
+    }
+
+    /**
      * Start or end a break (A4.15).
      *
      * Refuses rather than guesses when the day is not in a state where a break

@@ -94,6 +94,94 @@ class AttendanceController extends ApiController
         ]);
     }
 
+    /** Most punches one sync call will take. A day of tapping, not a month. */
+    public const MAX_SYNC_PUNCHES = 50;
+
+    /**
+     * Deliver punches made with no signal (B2.4).
+     *
+     * A batch rather than one call per punch, because the moment this runs is
+     * the moment the connection is worst: a queue of four punches over a link
+     * that drops is four chances to fail rather than one.
+     *
+     * **Partial success is the normal case, so the response is per punch.**
+     * One refused punch must not throw away three good ones — the app has to
+     * know exactly which entries to drop from its queue and which to keep. A
+     * single ok/failed for the batch would leave it guessing, and guessing here
+     * means either losing somebody's hours or punching them in twice.
+     */
+    public function sync(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'punches'                => 'required|array|min:1|max:' . self::MAX_SYNC_PUNCHES,
+            'punches.*.occurred_at'  => 'required|date',
+            'punches.*.latitude'     => 'nullable|numeric|between:-90,90',
+            'punches.*.longitude'    => 'nullable|numeric|between:-180,180',
+        ], [
+            'punches.max' => 'Send at most ' . self::MAX_SYNC_PUNCHES . ' punches at a time.',
+        ]);
+
+        $employee = $this->employee();
+        $timezone = $this->timezone($employee);
+
+        $office = $employee->office
+            ?? Office::where('company_id', $employee->company_id)->orderBy('id')->first();
+
+        if (! $office) {
+            return $this->fail(
+                'no_office',
+                'No office is set up for your company yet. Please contact HR.',
+                422,
+            );
+        }
+
+        // Oldest first, whatever order the queue sent them in. Each punch's
+        // direction is inferred from what precedes it, so applying them out of
+        // order would have a later one decide before the earlier one existed.
+        $queued = collect($data['punches'])
+            ->map(fn (array $p) => $p + ['_at' => Carbon::parse($p['occurred_at'], $timezone)])
+            ->sortBy('_at')
+            ->values();
+
+        $results = [];
+
+        foreach ($queued as $punch) {
+            try {
+                $result = $this->attendance->recordQueued($employee, $office, $punch['_at'], [
+                    'latitude'   => $punch['latitude'] ?? null,
+                    'longitude'  => $punch['longitude'] ?? null,
+                    'ip_address' => $request->ip(),
+                ]);
+
+                $results[] = [
+                    'occurred_at' => $punch['occurred_at'],
+                    // accepted | duplicate — both mean "stop retrying this one".
+                    'result' => $result['duplicate'] ? 'duplicate' : 'accepted',
+                    'punch'  => $this->punchPayload($result['log'], $timezone),
+                ];
+            } catch (\RuntimeException $e) {
+                // Refused for a reason that will not change on a retry — too
+                // old, dated in the future, outside the fence. The app drops
+                // these from the queue and tells the person why; keeping them
+                // would retry for ever.
+                $results[] = [
+                    'occurred_at' => $punch['occurred_at'],
+                    'result'      => 'refused',
+                    'message'     => $e->getMessage(),
+                ];
+            }
+        }
+
+        $counts = collect($results)->countBy('result');
+
+        return $this->ok([
+            'results'  => $results,
+            'accepted' => $counts['accepted'] ?? 0,
+            'duplicate' => $counts['duplicate'] ?? 0,
+            'refused'  => $counts['refused'] ?? 0,
+        ]);
+    }
+
     /**
      * Start or end a break (B2.6).
      *

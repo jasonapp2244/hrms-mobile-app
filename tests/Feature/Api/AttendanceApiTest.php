@@ -253,6 +253,196 @@ class AttendanceApiTest extends TestCase
             ->assertStatus(401);
     }
 
+    // ================= offline sync =================
+
+    public function test_a_punch_made_offline_keeps_the_time_it_was_made(): void
+    {
+        // The whole point. Stamping it on arrival would file a 09:00 check-in
+        // as 13:00 and hand payroll a number that is simply wrong.
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [['occurred_at' => '2026-08-03 09:00:00']],
+        ])
+            ->assertOk()
+            ->assertJsonPath('accepted', 1)
+            ->assertJsonPath('results.0.result', 'accepted')
+            ->assertJsonPath('results.0.punch.type', 'in');
+
+        $log = AttendanceLog::firstOrFail();
+
+        $this->assertSame('2026-08-03 09:00:00', $log->scanned_at->format('Y-m-d H:i:s'));
+        $this->assertSame('mobile_offline', $log->source);
+    }
+
+    public function test_an_offline_punch_says_how_long_it_sat_on_the_handset(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 13:20:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [['occurred_at' => '2026-08-03 09:00:00']],
+        ])->assertOk();
+
+        // The first thing a reader wants to know about a back-dated row.
+        $this->assertStringContainsString('4h 20m later', AttendanceLog::firstOrFail()->notes);
+    }
+
+    public function test_an_offline_punch_is_judged_against_the_shift_at_that_moment(): void
+    {
+        // 09:40 against a 09:00 shift with 15 minutes' grace is late, however
+        // long afterwards it was delivered.
+        $this->travelTo(Carbon::parse('2026-08-03 18:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [['occurred_at' => '2026-08-03 09:40:00']],
+        ])
+            ->assertOk()
+            ->assertJsonPath('results.0.punch.status', 'late');
+    }
+
+    public function test_a_queue_is_applied_oldest_first_whatever_order_it_arrives(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 18:00:00'));
+
+        // Deliberately out of order: each punch's direction is decided by what
+        // precedes it, so applying them as sent would have the later one decide
+        // before the earlier one existed.
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [
+                ['occurred_at' => '2026-08-03 17:00:00'],
+                ['occurred_at' => '2026-08-03 09:00:00'],
+            ],
+        ])->assertOk()->assertJsonPath('accepted', 2);
+
+        $logs = AttendanceLog::orderBy('scanned_at')->get();
+
+        $this->assertSame('in', $logs[0]->type);
+        $this->assertSame('out', $logs[1]->type);
+    }
+
+    public function test_an_offline_punch_slots_in_behind_one_already_recorded(): void
+    {
+        // A live check-out at 17:00 reached the server first; the offline
+        // check-in at 09:00 arrives afterwards and must still read as an "in".
+        $this->travelTo(Carbon::parse('2026-08-03 17:00:00'));
+        $this->punch('out', '2026-08-03 17:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 18:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [['occurred_at' => '2026-08-03 09:00:00']],
+        ])
+            ->assertOk()
+            ->assertJsonPath('results.0.punch.type', 'in');
+    }
+
+    public function test_delivering_the_same_punch_twice_does_not_double_it(): void
+    {
+        // A queue retries whenever the connection is flaky, which is exactly
+        // when this feature is in use — and attendance is append-only, so a
+        // duplicate could only ever be voided, never removed.
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $payload = ['punches' => [['occurred_at' => '2026-08-03 09:00:00']]];
+
+        $this->postJson('/api/v1/attendance/sync', $payload)
+            ->assertOk()->assertJsonPath('results.0.result', 'accepted');
+
+        $this->postJson('/api/v1/attendance/sync', $payload)
+            ->assertOk()
+            ->assertJsonPath('results.0.result', 'duplicate')
+            ->assertJsonPath('duplicate', 1);
+
+        $this->assertSame(1, AttendanceLog::count());
+    }
+
+    public function test_a_punch_dated_in_the_future_is_refused(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [['occurred_at' => '2026-08-03 11:00:00']],
+        ])
+            ->assertOk()
+            ->assertJsonPath('results.0.result', 'refused')
+            ->assertJsonPath('refused', 1);
+
+        $this->assertSame(0, AttendanceLog::count());
+    }
+
+    public function test_a_punch_older_than_the_cap_is_refused_rather_than_clamped(): void
+    {
+        // Clamping would write a wrong time that looks right. Past the cap the
+        // claim is old enough that somebody should look at it — A4.13 exists
+        // for that, and carries a reason and a decision.
+        $this->travelTo(Carbon::parse('2026-08-06 09:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [['occurred_at' => '2026-08-03 09:00:00']],
+        ])
+            ->assertOk()
+            ->assertJsonPath('results.0.result', 'refused');
+
+        $this->assertSame(0, AttendanceLog::count());
+    }
+
+    public function test_one_refused_punch_does_not_throw_away_the_good_ones(): void
+    {
+        // Partial success is the normal case. A single verdict for the batch
+        // would leave the app guessing which entries to drop, and guessing
+        // means losing somebody's hours or punching them in twice.
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [
+                ['occurred_at' => '2026-08-03 09:00:00'],
+                ['occurred_at' => '2026-08-03 23:00:00'],
+            ],
+        ])
+            ->assertOk()
+            ->assertJsonPath('accepted', 1)
+            ->assertJsonPath('refused', 1);
+
+        $this->assertSame(1, AttendanceLog::count());
+    }
+
+    public function test_gps_travels_with_an_offline_punch(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [[
+                'occurred_at' => '2026-08-03 09:00:00',
+                'latitude' => 40.7128, 'longitude' => -74.0060,
+            ]],
+        ])->assertOk();
+
+        $log = AttendanceLog::firstOrFail();
+
+        $this->assertEquals(40.7128, (float) $log->latitude);
+        $this->assertEquals(-74.0060, (float) $log->longitude);
+    }
+
+    public function test_an_empty_or_oversized_queue_is_rejected(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', ['punches' => []])
+            ->assertStatus(422)->assertJsonValidationErrors('punches');
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => array_fill(0, 51, ['occurred_at' => '2026-08-03 09:00:00']),
+        ])->assertStatus(422)->assertJsonValidationErrors('punches');
+    }
+
+    public function test_syncing_needs_a_token(): void
+    {
+        app('auth')->forgetGuards();
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [['occurred_at' => '2026-08-03 09:00:00']],
+        ])->assertStatus(401);
+    }
+
     // ================= break =================
 
     public function test_a_break_starts_when_on_the_clock(): void

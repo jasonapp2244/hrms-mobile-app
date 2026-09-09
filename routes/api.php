@@ -76,6 +76,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('attendance/break', [AttendanceController::class, 'break'])
         ->middleware('throttle:punch')
         ->name('api.attendance.break');
+    // Delivering punches made with no signal (B2.4). A batch, and on the punch
+    // limiter: it writes attendance rows, and 50 of them in one call is still
+    // one call — the ceiling is on how often a handset may try, not how much
+    // it carries.
+    Route::post('attendance/sync', [AttendanceController::class, 'sync'])
+        ->middleware('throttle:punch')
+        ->name('api.attendance.sync');
     Route::get('attendance/today', [AttendanceController::class, 'today'])->name('api.attendance.today');
     Route::get('attendance/history', [AttendanceController::class, 'history'])->name('api.attendance.history');
 
