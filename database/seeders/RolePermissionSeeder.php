@@ -30,6 +30,7 @@ class RolePermissionSeeder extends Seeder
             'approve-swaps',
             'view-team',
             'manage-shifts',
+            'manage-announcements',
             'manage-roles',
             'manage-settings',
         ];
@@ -55,6 +56,11 @@ class RolePermissionSeeder extends Seeder
             'manage-employees', 'import-employees', 'view-attendance',
             'manage-attendance', 'view-reports', 'export-reports', 'manage-leave',
             'approve-leave', 'approve-swaps', 'view-team', 'manage-shifts',
+            // B5.5. Not granted to `manager`, deliberately: this broadcasts to
+            // a whole department or office, and a team lead speaking to
+            // everyone is a different feature from a team lead speaking to
+            // their own reports.
+            'manage-announcements',
         ]);
 
         // Employee — self-service portal only (check in/out + own attendance)

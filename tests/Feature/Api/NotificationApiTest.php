@@ -115,6 +115,10 @@ class NotificationApiTest extends TestCase
             // inventing a screen to point at would be worse.
             'document_expiring'             => null,
             'late_arrivals'                 => null,
+            // Null for a different reason (B5.5): the body *is* the message and
+            // the notification centre already shows it in full, so there is
+            // nowhere else to send anybody.
+            'announcement'                  => null,
         ];
 
         foreach ($cases as $type => $expected) {

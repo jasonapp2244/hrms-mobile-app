@@ -75,7 +75,7 @@
 				</li>
 				@endcan
 
-				@canany(['manage-employees', 'manage-departments', 'manage-designations', 'manage-company', 'manage-offices'])
+				@canany(['manage-employees', 'manage-departments', 'manage-designations', 'manage-company', 'manage-offices', 'manage-announcements'])
 				<li class="menu-title"><span>HR MANAGEMENT</span></li>
 				<li>
 					<ul>
@@ -129,6 +129,11 @@
 									<li><a class="{{ request()->routeIs('leave-types.*') ? 'active' : '' }}" href="{{ route('leave-types.index') }}">Leave Types</a></li>
 									<li><a class="{{ request()->routeIs('holidays.*') ? 'active' : '' }}" href="{{ route('holidays.index') }}">Holiday Calendar</a></li>
 								</ul>
+							</li>
+							@endcan
+							@can('manage-announcements')
+							<li class="{{ request()->routeIs('announcements.*') ? 'active' : '' }}">
+								<a href="{{ route('announcements.index') }}"><i class="ti ti-speakerphone"></i><span>Announcements</span></a>
 							</li>
 							@endcan
 							@canany(['manage-company', 'manage-offices'])

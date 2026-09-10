@@ -42,6 +42,11 @@ class AppRoute
      * `late_arrivals` are addressed to HR, who work at a desk — the app has no
      * screen for either and inventing one to point at would be worse than
      * opening where the person already was.
+     *
+     * `announcement` (B5.5) is null for a different reason, and a deliberate
+     * one: the body **is** the message, and the notification centre already
+     * shows it in full. There is nowhere else to go, so it offers no button
+     * rather than a button that lands somewhere unrelated.
      */
     public static function forType(?string $type): ?string
     {

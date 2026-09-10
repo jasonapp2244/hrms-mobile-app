@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\CrashReportController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
@@ -374,6 +375,17 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::post('shift-swaps/{swap}/reject', [ShiftSwapAdminController::class, 'reject'])->name('shift-swaps.reject');
     });
     Route::resource('shifts', ShiftController::class)->only(['index', 'store', 'update', 'destroy'])->middleware('permission:manage-shifts');
+
+    // Announcements (B5.5). HR and admin; not managers — see the seeder.
+    // `publish` is a separate POST rather than a flag on the form, because it
+    // is the irreversible half: it writes into everybody's notification table
+    // and wakes every registered handset.
+    Route::middleware('permission:manage-announcements')->group(function () {
+        Route::resource('announcements', AnnouncementController::class)
+            ->except(['create', 'show', 'edit']);
+        Route::post('announcements/{announcement}/publish', [AnnouncementController::class, 'publish'])
+            ->name('announcements.publish');
+    });
 
     // Company / Offices (admin only — HR lacks these permissions)
     Route::middleware('permission:manage-company')->group(function () {

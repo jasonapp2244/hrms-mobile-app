@@ -256,6 +256,10 @@ class ManagerRoleTest extends TestCase
             'hr late report'  => ['reports.late', []],
             'roster planner'  => ['shifts.roster', []],
             'org chart'       => ['employees.org-chart', []],
+            // B5.5. A team lead speaking to their own reports is a reasonable
+            // feature; this one broadcasts to a whole department or office, so
+            // the role does not hold it.
+            'announcements'   => ['announcements.index', []],
         ];
     }
 
