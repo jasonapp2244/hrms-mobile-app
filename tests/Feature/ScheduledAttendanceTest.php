@@ -393,6 +393,57 @@ class ScheduledAttendanceTest extends TestCase
         );
     }
 
+    // ================= a company that is not on UTC =================
+
+    /**
+     * A shift stores `17:00:00` and means five o'clock where the company is.
+     *
+     * Parsed without a zone that is five o'clock UTC, and both commands compare
+     * it against `now($company->tz())` — an instant, not a wall clock. For a
+     * company four hours behind, "has the shift ended?" was answering yes four
+     * hours early: the reminder went out at lunchtime and the day was
+     * auto-closed while people were still working, with the scheduled hours
+     * written to a punch nobody made.
+     *
+     * Invisible on UTC, which is every other test here and every seeded install.
+     */
+    public function test_a_shift_end_is_read_in_the_companys_own_timezone(): void
+    {
+        Notification::fake();
+
+        $this->company->update(['timezone' => 'America/New_York']);
+
+        // Clocked in at nine in the morning, New York time.
+        $this->punch('in', '2026-08-03 13:00:00');
+
+        // Half past one in the afternoon there. Three and a half hours of the
+        // shift left to work.
+        $this->travelTo(Carbon::parse('2026-08-03 17:30:00'));
+
+        $this->artisan('attendance:remind-checkout')->assertSuccessful();
+        $this->artisan('attendance:close-day')->assertSuccessful();
+
+        Notification::assertNothingSent();
+        $this->assertSame(0, AttendanceLog::where('type', 'out')->count());
+    }
+
+    public function test_the_same_company_is_reminded_once_its_own_evening_arrives(): void
+    {
+        Notification::fake();
+
+        $this->company->update(['timezone' => 'America/New_York']);
+
+        $this->punch('in', '2026-08-03 13:00:00');
+
+        // Quarter to six in the evening in New York — past the shift end and
+        // past the thirty-minute grace.
+        $this->travelTo(Carbon::parse('2026-08-03 21:45:00'));
+
+        $this->artisan('attendance:remind-checkout')->assertSuccessful();
+
+        Notification::assertSentTo($this->employee->user, MissingCheckoutReminder::class);
+    }
+
     // ================= the schedule itself =================
 
     public function test_both_commands_are_scheduled(): void
@@ -401,7 +452,7 @@ class ScheduledAttendanceTest extends TestCase
             ->map(fn ($event) => $event->command)
             ->filter();
 
-        foreach (['attendance:remind-checkout', 'attendance:close-day'] as $command) {
+        foreach (['attendance:remind-checkin', 'attendance:remind-checkout', 'attendance:close-day'] as $command) {
             $this->assertTrue(
                 $scheduled->contains(fn ($c) => str_contains($c, $command)),
                 "{$command} is not scheduled, so nothing would ever run it.",

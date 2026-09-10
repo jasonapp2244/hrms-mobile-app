@@ -644,6 +644,9 @@ class AttendanceService
             return null;
         }
 
+        // Both sides parsed the same way, deliberately: this is a duration, and
+        // a zone that applies to one end and not the other would make an
+        // eight-hour shift come out four hours long.
         $start = Carbon::parse($workDate . ' ' . $shift->start_time);
         $end   = Carbon::parse($workDate . ' ' . $shift->end_time);
 
@@ -731,6 +734,37 @@ class AttendanceService
     }
 
     /**
+     * The moment an employee's shift began on a given work date.
+     *
+     * Always on the work date itself — a shift that crosses midnight is still
+     * named for the day it started, which is what makes `shiftEndFor()` the
+     * asymmetric one. Null when nobody is rostered.
+     */
+    public function shiftStartFor(Employee $employee, string $workDate): ?Carbon
+    {
+        $shift = $employee->shiftOn($workDate);
+
+        return $shift
+            ? Carbon::parse($workDate . ' ' . $shift->start_time, $this->tzFor($employee))
+            : null;
+    }
+
+    /**
+     * The timezone a roster time is written in.
+     *
+     * A shift stores `09:00:00` and means nine in the morning where the company
+     * is. Parsing that without a zone gives nine o'clock UTC, and every caller
+     * here compares the result against `now($company->tz())` — an instant. For a
+     * company on UTC the two agree and nothing was ever wrong; for one four
+     * hours behind, "has the shift ended?" was answering yes four hours early,
+     * which auto-closed a day people were still working.
+     */
+    protected function tzFor(Employee $employee): string
+    {
+        return $employee->company?->tz() ?? config('app.timezone');
+    }
+
+    /**
      * The moment an employee's shift ended on a given work date.
      *
      * On a shift that crosses midnight this is the following morning, which is
@@ -746,7 +780,7 @@ class AttendanceService
             return null;
         }
 
-        $end = Carbon::parse($workDate . ' ' . $shift->end_time);
+        $end = Carbon::parse($workDate . ' ' . $shift->end_time, $this->tzFor($employee));
 
         return $shift->crossesMidnight() ? $end->addDay() : $end;
     }

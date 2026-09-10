@@ -61,6 +61,14 @@ return [
     ],
 
     // --- Still clocked in after the shift ended ---------------------------
+    // --- Your shift is about to start (B5.1) -----------------------------
+    // No mail leg: this one is useful for ten minutes. See the class.
+    'shift_starting' => [
+        'title' => 'Your shift starts soon',
+        'push'  => 'You start at :time. Tap to clock in.',
+        'body'  => 'Your shift starts at :time. Tap to clock in.',
+    ],
+
     'missing_checkout' => [
         'title'   => 'You are still clocked in',
         'push'    => 'You clocked in at :time. Tap to check out.',

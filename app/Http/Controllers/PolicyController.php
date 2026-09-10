@@ -65,6 +65,11 @@ class PolicyController extends Controller
         $data = $request->validate([
             'weekend_days'                  => 'nullable|array',
             'weekend_days.*'                => 'integer|between:0,6',
+            // Zero is off. Anything from 1 to 4 would be a window shorter than
+            // the gap between scheduler runs, so the reminder would land
+            // sometimes and not others — refused rather than accepted and
+            // quietly unreliable. See routes/console.php.
+            'checkin_reminder_before_minutes' => 'required|integer|min:0|max:120|not_in:1,2,3,4',
             'checkout_reminder_after_minutes' => 'required|integer|min:0|max:1440',
             'auto_close_after_minutes'      => 'required|integer|min:0|max:1440',
             'session_idle_timeout_minutes'  => 'required|integer|min:0|max:1440',
@@ -73,6 +78,7 @@ class PolicyController extends Controller
             'directory_show_contact_details' => 'nullable|boolean',
         ], [
             'session_idle_timeout_minutes.max' => 'An idle timeout longer than a day is the same as no timeout.',
+            'checkin_reminder_before_minutes.not_in' => 'Use 0 to switch the reminder off, or at least 5 minutes — anything shorter can be missed entirely.',
         ]);
 
         $weekend = array_values(array_unique(array_map('intval', $data['weekend_days'] ?? [])));
@@ -93,6 +99,7 @@ class PolicyController extends Controller
             // absence of one.
             'weekend_days' => $weekend,
 
+            'checkin_reminder_before_minutes' => (int) $data['checkin_reminder_before_minutes'],
             'checkout_reminder_after_minutes' => (int) $data['checkout_reminder_after_minutes'],
             'auto_close_after_minutes'        => (int) $data['auto_close_after_minutes'],
             'session_idle_timeout_minutes'    => (int) $data['session_idle_timeout_minutes'],

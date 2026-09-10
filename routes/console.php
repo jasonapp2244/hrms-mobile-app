@@ -27,6 +27,17 @@ Artisan::command('inspire', function () {
 |
 */
 
+// Every five minutes, and that number is load-bearing (B5.1). The reminder
+// fires inside a window that closes at the shift start, so the interval has to
+// be shorter than the shortest lead a company can configure — otherwise the
+// window falls between two runs and nobody is ever reminded, silently.
+// `PolicyController` refuses a lead below five minutes to hold that end up.
+Schedule::command('attendance:remind-checkin')
+    ->everyFiveMinutes()
+    // Two overlapping runs would send the same reminder twice.
+    ->withoutOverlapping()
+    ->runInBackground();
+
 // Quarter-hourly rather than at a fixed time: a company on rotating shifts has
 // no single end of day — the night shift finishes when the morning one starts.
 Schedule::command('attendance:remind-checkout')

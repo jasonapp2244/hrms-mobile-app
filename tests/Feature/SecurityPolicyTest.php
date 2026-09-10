@@ -279,6 +279,7 @@ class SecurityPolicyTest extends TestCase
     {
         $this->actingAs($this->admin)->put(route('policies.update'), [
             'weekend_days' => [5, 6],   // Friday and Saturday
+            'checkin_reminder_before_minutes' => 10,
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
@@ -292,6 +293,7 @@ class SecurityPolicyTest extends TestCase
         // Ticking nothing has to mean "no weekend", not "fall back to Sat/Sun" —
         // otherwise a seven-day operation cannot be expressed at all.
         $this->actingAs($this->admin)->put(route('policies.update'), [
+            'checkin_reminder_before_minutes' => 10,
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
@@ -304,6 +306,7 @@ class SecurityPolicyTest extends TestCase
     {
         $this->actingAs($this->admin)->put(route('policies.update'), [
             'weekend_days' => [0, 1, 2, 3, 4, 5, 6],
+            'checkin_reminder_before_minutes' => 10,
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
@@ -329,10 +332,61 @@ class SecurityPolicyTest extends TestCase
         $this->assertSame(0.0, $leave->chargeableDays($this->company->fresh(), '2026-08-07', '2026-08-07'));
     }
 
+    // -------------------------------------------------------------------------
+    // B5.1 — the clock-in reminder lead
+    // -------------------------------------------------------------------------
+
+    public function test_the_policy_form_renders_with_every_field_on_it(): void
+    {
+        // The only test that actually compiles this blade. A field added to the
+        // controller and forgotten on the form validates as required and can
+        // never be satisfied, which locks the whole page.
+        $response = $this->actingAs($this->admin)->get(route('policies.edit'))->assertOk();
+
+        foreach ([
+            'checkin_reminder_before_minutes',
+            'checkout_reminder_after_minutes',
+            'auto_close_after_minutes',
+            'session_idle_timeout_minutes',
+        ] as $field) {
+            $response->assertSee("name=\"{$field}\"", false);
+        }
+    }
+
+    public function test_the_clock_in_reminder_can_be_switched_off(): void
+    {
+        $this->actingAs($this->admin)->put(route('policies.update'), [
+            'weekend_days' => [0, 6],
+            'checkin_reminder_before_minutes' => 0,
+            'checkout_reminder_after_minutes' => 30,
+            'auto_close_after_minutes' => 240,
+            'session_idle_timeout_minutes' => 0,
+        ])->assertRedirect()->assertSessionHasNoErrors();
+
+        $this->assertSame(0, $this->company->fresh()->policy('checkin_reminder_before_minutes'));
+    }
+
+    public function test_a_lead_shorter_than_the_scheduler_interval_is_refused(): void
+    {
+        // Three minutes is a window the five-minute scheduler can step straight
+        // over, so the reminder would land for some people and not others with
+        // nothing to show why. Refused rather than accepted and unreliable.
+        $this->actingAs($this->admin)->put(route('policies.update'), [
+            'weekend_days' => [0, 6],
+            'checkin_reminder_before_minutes' => 3,
+            'checkout_reminder_after_minutes' => 30,
+            'auto_close_after_minutes' => 240,
+            'session_idle_timeout_minutes' => 0,
+        ])->assertSessionHasErrors('checkin_reminder_before_minutes');
+
+        $this->assertSame(10, $this->company->fresh()->policy('checkin_reminder_before_minutes'));
+    }
+
     public function test_hr_cannot_change_company_policy(): void
     {
         $this->actingAs($this->hr)->get(route('policies.edit'))->assertForbidden();
         $this->actingAs($this->hr)->put(route('policies.update'), [
+            'checkin_reminder_before_minutes' => 10,
             'checkout_reminder_after_minutes' => 5,
             'auto_close_after_minutes' => 5,
             'session_idle_timeout_minutes' => 5,
@@ -343,6 +397,7 @@ class SecurityPolicyTest extends TestCase
     {
         $this->actingAs($this->admin)->put(route('policies.update'), [
             'weekend_days' => [0, 6],
+            'checkin_reminder_before_minutes' => 10,
             'checkout_reminder_after_minutes' => 45,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,

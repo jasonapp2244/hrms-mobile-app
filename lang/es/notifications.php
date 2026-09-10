@@ -48,6 +48,13 @@ return [
     ],
 
     // --- Sigues fichado después de terminar el turno -----------------------
+    // --- Tu turno está a punto de empezar (B5.1) --------------------------
+    'shift_starting' => [
+        'title' => 'Tu turno empieza pronto',
+        'push'  => 'Empiezas a las :time. Toca para fichar la entrada.',
+        'body'  => 'Tu turno empieza a las :time. Toca para fichar la entrada.',
+    ],
+
     'missing_checkout' => [
         'title'  => 'Sigues con la entrada fichada',
         'push'   => 'Fichaste la entrada a las :time. Toca para fichar la salida.',

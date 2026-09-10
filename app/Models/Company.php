@@ -37,6 +37,18 @@ class Company extends Model
      * scattered through the commands that read them.
      */
     public const POLICY_DEFAULTS = [
+        // How long before a shift starts to remind somebody to clock in
+        // (B5.1). Zero switches it off, which is the one thing a company might
+        // reasonably want: this is the only notification here that arrives
+        // *before* the working day, on a personal phone, at whatever hour the
+        // early shift begins.
+        //
+        // **Must be at least as long as the gap between scheduler runs**, or
+        // the whole window can fall between two of them and nobody is ever
+        // reminded. `routes/console.php` runs it every five minutes and
+        // `PolicyController` refuses anything between 1 and 4 for that reason.
+        'checkin_reminder_before_minutes' => 10,
+
         // How long after a shift ends before somebody still clocked in is
         // nudged. Short enough to catch them before they get home.
         'checkout_reminder_after_minutes' => 30,

@@ -45,6 +45,18 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-md-4">
+          <label class="form-label">Clock-in reminder</label>
+          <div class="input-group">
+            <input type="number" min="0" max="120" name="checkin_reminder_before_minutes" class="form-control"
+                   value="{{ old('checkin_reminder_before_minutes', $company->policy('checkin_reminder_before_minutes')) }}">
+            <span class="input-group-text">minutes before the shift starts</span>
+          </div>
+          <div class="form-text">
+            Push and the app's bell only, never email. <strong>0 switches it off</strong> — this is the
+            one notification that arrives before the working day, on a personal phone.
+          </div>
+        </div>
+        <div class="col-md-4">
           <label class="form-label">Missing-checkout reminder</label>
           <div class="input-group">
             <input type="number" min="0" max="1440" name="checkout_reminder_after_minutes" class="form-control"
