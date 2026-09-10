@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ActivityLogController;
+use App\Http\Controllers\CrashReportController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
@@ -397,5 +398,11 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::get('settings/policies', [PolicyController::class, 'edit'])->name('policies.edit');
         Route::put('settings/policies', [PolicyController::class, 'update'])->name('policies.update');
         Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
+
+        // Crashes the mobile app did not survive (B6.5). Same audience as the
+        // activity log: a stack trace describes the system's internals, not
+        // anybody's attendance.
+        Route::get('crashes', [CrashReportController::class, 'index'])->name('crashes.index');
+        Route::delete('crashes', [CrashReportController::class, 'destroy'])->name('crashes.destroy');
     });
 });

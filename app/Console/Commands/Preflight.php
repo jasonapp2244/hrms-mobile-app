@@ -66,6 +66,7 @@ class Preflight extends Command
         $this->checkScheduler();
         $this->checkBackups();
         $this->checkPush();
+        $this->checkMobileGate();
         $this->checkDefaultCredentials();
 
         return $this->report();
@@ -544,6 +545,53 @@ class Preflight extends Command
             $problems === [] ? self::PASS : self::FAIL,
             'is enabled but ' . implode('; ', $problems),
             'configured',
+        );
+    }
+
+    /**
+     * The app gate (B6.6), which is the one setting here that can stop an
+     * entire company clocking in.
+     */
+    protected function checkMobileGate(): void
+    {
+        // A maintenance window is deliberate while it lasts, and forgotten
+        // afterwards — at which point every handset in the company shows a
+        // "back shortly" screen and nobody can record attendance. This is a
+        // failure rather than a warning for the same reason APP_DEBUG is: the
+        // only way to leave it on and still pass is to mean it.
+        $this->assert(
+            'App maintenance mode',
+            config('mobile.maintenance') ? self::FAIL : self::PASS,
+            'is ON — every handset is being shown a "back shortly" screen and '
+                . 'nobody can clock in from the app',
+            'off',
+        );
+
+        $minimum = (string) config('mobile.minimum_version');
+
+        if ($minimum === '') {
+            $this->assert('App minimum version', self::PASS, '', 'no floor — every build accepted');
+
+            return;
+        }
+
+        // A floor with no store link is an update screen whose button does
+        // nothing. Both platforms, because the fleet is never one of them.
+        $missing = [];
+
+        foreach (['android' => 'Play Store', 'ios' => 'App Store'] as $platform => $store) {
+            if ((string) config("mobile.store_url.{$platform}") === '') {
+                $missing[] = $store;
+            }
+        }
+
+        $this->assert(
+            'App minimum version',
+            $missing === [] ? self::PASS : self::FAIL,
+            "is {$minimum} but there is no link to the "
+                . implode(' or the ', $missing)
+                . ' — the update screen would have nowhere to send anybody',
+            $minimum,
         );
     }
 

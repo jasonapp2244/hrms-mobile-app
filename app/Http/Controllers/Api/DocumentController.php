@@ -61,14 +61,14 @@ class DocumentController extends ApiController
         // that a given id exists, which is the one bit of information worth
         // withholding when the ids are sequential and the files are passports.
         if ($document->employee_id !== $employee->id) {
-            return $this->fail('not_found', 'No such document.', 404);
+            return $this->fail('not_found', __('api.document_not_found'), 404);
         }
 
         if (! $document->path || ! Storage::disk(EmployeeDocument::DISK)->exists($document->path)) {
             // The row outliving its file means a restore brought back the
             // database without `storage/app/employee-documents/`. Say so plainly
             // rather than streaming nothing — see the deployment guide.
-            return $this->fail('file_missing', 'This document is no longer on file. Contact HR.', 404);
+            return $this->fail('file_missing', __('api.document_missing'), 404);
         }
 
         return Storage::disk(EmployeeDocument::DISK)

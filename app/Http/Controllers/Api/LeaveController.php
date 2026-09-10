@@ -133,8 +133,8 @@ class LeaveController extends ApiController
         return $this->ok([
             'request' => $this->requestPayload($leaveRequest->load('leaveType', 'employee')),
             'message' => $leaveRequest->status === 'approved'
-                ? 'Leave approved — this type does not need sign-off.'
-                : 'Leave request submitted. You will be notified once it is reviewed.',
+                ? __('api.leave_auto_approved')
+                : __('api.leave_submitted'),
         ], 201);
     }
 
@@ -147,7 +147,7 @@ class LeaveController extends ApiController
 
         return $this->ok([
             'request' => $this->requestPayload($leaveRequest->fresh()->load('leaveType', 'employee')),
-            'message' => 'Leave request withdrawn.',
+            'message' => __('api.leave_withdrawn'),
         ]);
     }
 
@@ -163,7 +163,7 @@ class LeaveController extends ApiController
         abort_unless(
             $leaveRequest->employee_id === $this->employee()->id,
             403,
-            'That leave request is not yours.',
+            __('api.leave_not_yours'),
         );
     }
 

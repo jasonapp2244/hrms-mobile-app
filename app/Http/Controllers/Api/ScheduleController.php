@@ -39,13 +39,13 @@ class ScheduleController extends ApiController
         $to   = $data['to'] ?? Carbon::parse($from)->addDays(13)->toDateString();
 
         if ($from > $to) {
-            return $this->fail('invalid_range', 'The start date must fall on or before the end date.');
+            return $this->fail('invalid_range', __('api.invalid_range'));
         }
 
         if (Carbon::parse($from)->diffInDays(Carbon::parse($to)) >= self::MAX_DAYS) {
-            return $this->fail('range_too_large', sprintf(
-                'Ask for at most %d days at a time.', self::MAX_DAYS,
-            ));
+            return $this->fail('range_too_large', __('api.range_too_large', [
+                'days' => self::MAX_DAYS,
+            ]));
         }
 
         // One pass over the window rather than a query per day.

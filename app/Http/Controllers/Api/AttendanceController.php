@@ -8,6 +8,7 @@ use App\Models\Holiday;
 use App\Models\Office;
 use App\Services\AttendanceService;
 use App\Services\LeaveService;
+use App\Support\Clock;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -47,7 +48,7 @@ class AttendanceController extends ApiController
         if ($this->attendance->recentlyScanned($employee)) {
             return $this->fail(
                 'duplicate_scan',
-                'Already recorded moments ago. Please wait a minute.',
+                __('attendance.duplicate_scan'),
                 429,
             );
         }
@@ -60,7 +61,7 @@ class AttendanceController extends ApiController
         if (! $office) {
             return $this->fail(
                 'no_office',
-                'No office is set up for your company yet. Please contact HR.',
+                __('attendance.no_office'),
                 422,
             );
         }
@@ -86,11 +87,12 @@ class AttendanceController extends ApiController
             // What the button should say next, so the app does not have to
             // re-fetch the day just to relabel itself.
             'next_action' => $result['type'] === 'in' ? 'out' : 'in',
-            'message' => sprintf(
-                'You clocked %s at %s.',
-                strtoupper($result['type']),
-                $log->scanned_at->format('h:i A'),
-            ),
+            // Two messages rather than one with the direction dropped into it:
+            // "You clocked :type at" cannot be translated without knowing what
+            // the type is, and languages do not agree on where it goes.
+            'message' => $result['type'] === 'in'
+                ? __('attendance.clocked_in', ['time' => Clock::time($log->scanned_at)])
+                : __('attendance.clocked_out', ['time' => Clock::time($log->scanned_at)]),
         ]);
     }
 
@@ -130,7 +132,7 @@ class AttendanceController extends ApiController
         if (! $office) {
             return $this->fail(
                 'no_office',
-                'No office is set up for your company yet. Please contact HR.',
+                __('attendance.no_office'),
                 422,
             );
         }
@@ -207,7 +209,7 @@ class AttendanceController extends ApiController
         if ($this->attendance->recentlyScanned($employee)) {
             return $this->fail(
                 'duplicate_scan',
-                'Already recorded moments ago. Please wait a minute.',
+                __('attendance.duplicate_scan'),
                 429,
             );
         }
@@ -218,7 +220,7 @@ class AttendanceController extends ApiController
         if (! $office) {
             return $this->fail(
                 'no_office',
-                'No office is set up for your company yet. Please contact HR.',
+                __('attendance.no_office'),
                 422,
             );
         }
@@ -249,8 +251,8 @@ class AttendanceController extends ApiController
             // carries both and they move independently.
             'next_break_action' => $started ? 'end' : 'start',
             'message' => $started
-                ? sprintf('Break started at %s. Your worked time pauses until you return.', $at->format('h:i A'))
-                : sprintf('Break ended at %s. Welcome back.', $at->format('h:i A')),
+                ? __('attendance.break_started', ['time' => Clock::time($at)])
+                : __('attendance.break_ended', ['time' => Clock::time($at)]),
         ]);
     }
 
@@ -337,13 +339,13 @@ class AttendanceController extends ApiController
         }
 
         if ($from > $to) {
-            return $this->fail('invalid_range', 'The start date must fall on or before the end date.');
+            return $this->fail('invalid_range', __('api.invalid_range'));
         }
 
         if (Carbon::parse($from)->diffInDays(Carbon::parse($to)) >= self::MAX_HISTORY_DAYS) {
-            return $this->fail('range_too_large', sprintf(
-                'Ask for at most %d days at a time.', self::MAX_HISTORY_DAYS,
-            ));
+            return $this->fail('range_too_large', __('api.range_too_large', [
+                'days' => self::MAX_HISTORY_DAYS,
+            ]));
         }
 
         $logs = AttendanceLog::with('office')
@@ -465,7 +467,7 @@ class AttendanceController extends ApiController
             'type'       => $log->type,
             'status'     => $log->status,
             'scanned_at' => $at->toIso8601String(),
-            'time'       => $at->format('h:i A'),
+            'time'       => Clock::time($at),
             'office'     => $log->office?->name,
             'source'     => $log->source,
         ];

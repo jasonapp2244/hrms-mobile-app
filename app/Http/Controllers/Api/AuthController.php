@@ -32,11 +32,11 @@ class AuthController extends ApiController
         // One message for both a wrong address and a wrong password: saying
         // which was wrong tells an attacker which addresses exist.
         if (! $user || ! Hash::check($data['password'], $user->password)) {
-            return $this->fail('invalid_credentials', 'Those details do not match our records.', 401);
+            return $this->fail('invalid_credentials', __('api.invalid_credentials'), 401);
         }
 
         if ($user->is_active === false) {
-            return $this->fail('account_disabled', 'This account has been disabled. Contact HR.', 403);
+            return $this->fail('account_disabled', __('api.account_disabled'), 403);
         }
 
         // Same device name twice means the app reinstalled or re-authenticated;
@@ -73,7 +73,7 @@ class AuthController extends ApiController
         }
 
         return $this->ok([
-            'message' => 'If that email address has an account, a reset link is on its way.',
+            'message' => __('api.reset_link_sent'),
         ]);
     }
 
@@ -101,7 +101,7 @@ class AuthController extends ApiController
 
         $request->user()->currentAccessToken()->delete();
 
-        return $this->ok(['message' => 'Signed out.']);
+        return $this->ok(['message' => __('api.signed_out')]);
     }
 
     /** Sign out everywhere — for a lost or stolen phone. */
@@ -115,7 +115,7 @@ class AuthController extends ApiController
         $devices = $request->user()->pushDevices()->delete();
 
         return $this->ok([
-            'message'          => 'Signed out on all devices.',
+            'message'          => __('api.signed_out_all'),
             'tokens_revoked'   => $count,
             'devices_removed'  => (int) $devices,
         ]);

@@ -4,7 +4,9 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Notifications\PasswordResetLink;
+use App\Support\Locales;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -14,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements HasLocalePreference
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasApiTokens, Notifiable, HasRoles;
@@ -33,6 +35,23 @@ class User extends Authenticatable
         'avatar',
         'is_active',
     ];
+
+    /**
+     * The language anything sent to this person is written in (C1.18).
+     *
+     * The framework calls this on its own — for a notification and for the mail
+     * behind it — which is what makes a message read in the **recipient's**
+     * language rather than in whatever the request that triggered it happened to
+     * be. HR approving leave in English is the ordinary case.
+     *
+     * Null until the app has said otherwise, and a language this build no longer
+     * has is treated the same way: fall back, rather than render a message in a
+     * language with no strings behind it.
+     */
+    public function preferredLocale(): ?string
+    {
+        return Locales::isSupported($this->locale) ? $this->locale : null;
+    }
 
     public function company(): BelongsTo
     {

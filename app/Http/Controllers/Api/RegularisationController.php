@@ -6,6 +6,7 @@ use App\Models\AttendanceLog;
 use App\Models\AttendanceRegularisation;
 use App\Services\AttendanceService;
 use App\Services\RegularisationService;
+use App\Support\Clock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -82,7 +83,7 @@ class RegularisationController extends ApiController
                 'status'     => $log->status,
                 'work_date'  => $log->work_date?->toDateString(),
                 'scanned_at' => $this->attendance->wallClock($log->scanned_at, $timezone)->toIso8601String(),
-                'time'       => $this->attendance->wallClock($log->scanned_at, $timezone)->format('h:i A'),
+                'time'       => Clock::time($this->attendance->wallClock($log->scanned_at, $timezone)),
                 'office'     => $log->office?->name,
             ])->values(),
         ]);
@@ -112,7 +113,7 @@ class RegularisationController extends ApiController
 
         return $this->ok([
             'request' => $this->payload($created, $this->timezone($employee)),
-            'message' => 'Request submitted. HR will review it.',
+            'message' => __('api.correction_submitted'),
         ], 201);
     }
 
@@ -124,14 +125,14 @@ class RegularisationController extends ApiController
         abort_unless(
             $regularisation->employee_id === $employee->id,
             403,
-            'That request is not yours.',
+            __('api.correction_not_yours'),
         );
 
         $cancelled = $this->regularisation->cancel($regularisation);
 
         return $this->ok([
             'request' => $this->payload($cancelled, $this->timezone($employee)),
-            'message' => 'Request withdrawn.',
+            'message' => __('api.correction_withdrawn'),
         ]);
     }
 

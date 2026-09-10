@@ -41,16 +41,20 @@ class DocumentExpiring extends Notification implements ShouldQueue
         $expires = $this->document->expires_on;
 
         if (! $expires) {
-            return 'has no expiry date';
+            return __('notifications.document_expiring.timing.none');
         }
 
         $days = (int) now()->startOfDay()->diffInDays($expires->copy()->startOfDay(), absolute: true);
 
         if ($expires->isPast()) {
-            return $days === 0 ? 'expired today' : "expired {$days} day(s) ago";
+            return $days === 0
+                ? __('notifications.document_expiring.timing.expired_today')
+                : __('notifications.document_expiring.timing.expired_days', ['days' => $days]);
         }
 
-        return $days === 0 ? 'expires today' : "expires in {$days} day(s)";
+        return $days === 0
+            ? __('notifications.document_expiring.timing.expires_today')
+            : __('notifications.document_expiring.timing.expires_days', ['days' => $days]);
     }
 
     public function toArray(object $notifiable): array
@@ -59,14 +63,15 @@ class DocumentExpiring extends Notification implements ShouldQueue
 
         return [
             'type'      => 'document_expiring',
-            'title'     => $this->document->hasExpired() ? 'Document expired' : 'Document expiring',
-            'message'   => sprintf(
-                '%s — %s (%s) %s.',
-                $employee?->full_name ?? 'An employee',
-                $this->document->title,
-                $this->document->type_label,
-                $this->timing(),
-            ),
+            'title'     => $this->document->hasExpired()
+                ? __('notifications.document_expiring.title_expired')
+                : __('notifications.document_expiring.title_expiring'),
+            'message'   => __('notifications.document_expiring.body', [
+                'employee' => $employee?->full_name ?? __('notifications.document_expiring.an_employee'),
+                'title'    => $this->document->title,
+                'type'     => $this->document->type_label,
+                'timing'   => $this->timing(),
+            ]),
             'document_id' => $this->document->id,
             'employee_id' => $this->document->employee_id,
             'expires_on'  => $this->document->expires_on?->toDateString(),
@@ -80,20 +85,30 @@ class DocumentExpiring extends Notification implements ShouldQueue
         $expired = $this->document->hasExpired();
 
         return (new MailMessage())
-            ->subject(($expired ? 'Expired: ' : 'Expiring soon: ')
-                . $this->document->title . ' — ' . ($employee?->full_name ?? 'employee'))
-            ->greeting($expired ? 'A document has expired' : 'A document is about to expire')
-            ->line(sprintf(
-                '%s (%s) for %s %s.',
-                $this->document->title,
-                $this->document->type_label,
-                $employee?->full_name ?? 'an employee',
-                $this->timing(),
+            ->subject(__(
+                $expired
+                    ? 'notifications.document_expiring.subject_expired'
+                    : 'notifications.document_expiring.subject_expiring',
+                [
+                    'title'    => $this->document->title,
+                    'employee' => $employee?->full_name
+                        ?? __('notifications.document_expiring.employee_word'),
+                ],
             ))
+            ->greeting(__($expired
+                ? 'notifications.document_expiring.greeting_expired'
+                : 'notifications.document_expiring.greeting_expiring'))
+            ->line(__('notifications.document_expiring.line', [
+                'title'    => $this->document->title,
+                'type'     => $this->document->type_label,
+                'employee' => $employee?->full_name
+                    ?? __('notifications.document_expiring.an_employee_lower'),
+                'timing'   => $this->timing(),
+            ]))
             ->when($employee !== null, fn (MailMessage $mail) => $mail->action(
-                'Open their documents',
+                __('notifications.document_expiring.action'),
                 route('employees.documents.index', $employee),
             ))
-            ->line('You are receiving this because you manage employee records.');
+            ->line(__('notifications.document_expiring.why'));
     }
 }

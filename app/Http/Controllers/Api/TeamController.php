@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Services\AttendanceService;
 use App\Services\ManagerScope;
 use App\Services\TeamAttendance;
+use App\Support\Clock;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -55,7 +56,7 @@ class TeamController extends ApiController
         // A day that has not happened cannot be reported on, and calling anyone
         // absent for it would be a lie they cannot answer.
         if ($date > $today) {
-            return $this->fail('invalid_range', 'That day has not happened yet.');
+            return $this->fail('invalid_range', __('api.future_day'));
         }
 
         $team = $this->scope->team($manager);
@@ -86,10 +87,10 @@ class TeamController extends ApiController
                 // Wall clock in the company's zone. The service returns the raw
                 // instant so the web side can format it its own way.
                 'first_in' => $row['first_in']
-                    ? $this->attendance->wallClock($row['first_in'], $timezone)->format('h:i A')
+                    ? Clock::time($this->attendance->wallClock($row['first_in'], $timezone))
                     : null,
                 'last_out' => $row['last_out']
-                    ? $this->attendance->wallClock($row['last_out'], $timezone)->format('h:i A')
+                    ? Clock::time($this->attendance->wallClock($row['last_out'], $timezone))
                     : null,
                 'is_clocked_in'  => $row['is_clocked_in'],
                 'worked_minutes' => $row['worked_minutes'],

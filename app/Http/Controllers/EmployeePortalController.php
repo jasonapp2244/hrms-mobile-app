@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceLog;
 use App\Models\Office;
 use App\Services\AttendanceService;
+use App\Support\Clock;
 use Illuminate\Http\Request;
 
 class EmployeePortalController extends Controller
@@ -112,9 +113,9 @@ class EmployeePortalController extends Controller
             'ok'      => true,
             'type'    => $result['type'],
             'status'  => $result['status'],
-            'time'    => $result['log']->scanned_at->format('h:i A'),
+            'time'    => Clock::time($result['log']->scanned_at),
             'message' => sprintf('You clocked %s (%s) at %s.',
-                strtoupper($result['type']), $result['status'], $result['log']->scanned_at->format('h:i A')),
+                strtoupper($result['type']), $result['status'], Clock::time($result['log']->scanned_at)),
         ]);
     }
 
@@ -162,10 +163,10 @@ class EmployeePortalController extends Controller
         return response()->json([
             'ok'      => true,
             'type'    => $result['type'],
-            'time'    => $result['log']->scanned_at->format('h:i A'),
+            'time'    => Clock::time($result['log']->scanned_at),
             'message' => $started
-                ? sprintf('Break started at %s. Your worked time pauses until you return.', $result['log']->scanned_at->format('h:i A'))
-                : sprintf('Break ended at %s. Welcome back.', $result['log']->scanned_at->format('h:i A')),
+                ? sprintf('Break started at %s. Your worked time pauses until you return.', Clock::time($result['log']->scanned_at))
+                : sprintf('Break ended at %s. Welcome back.', Clock::time($result['log']->scanned_at)),
         ]);
     }
 }

@@ -60,7 +60,7 @@ abstract class ApiController extends Controller
         abort_if(
             ! $employee,
             403,
-            'No employee record is linked to this account. Contact HR.',
+            __('api.no_employee_record'),
         );
 
         return $employee;

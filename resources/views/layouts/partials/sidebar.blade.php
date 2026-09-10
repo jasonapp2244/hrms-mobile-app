@@ -166,6 +166,9 @@
 						<li class="{{ request()->routeIs('activity.*') ? 'active' : '' }}">
 							<a href="{{ route('activity.index') }}"><i class="ti ti-list-check"></i><span>Activity Log</span></a>
 						</li>
+						<li class="{{ request()->routeIs('crashes.*') ? 'active' : '' }}">
+							<a href="{{ route('crashes.index') }}"><i class="ti ti-bug"></i><span>App Crash Reports</span></a>
+						</li>
 						<li class="{{ request()->routeIs('settings.*') ? 'active' : '' }}">
 							<a href="{{ route('settings.index') }}"><i class="ti ti-settings"></i><span>Settings</span></a>
 						</li>

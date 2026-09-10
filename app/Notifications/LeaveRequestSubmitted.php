@@ -61,18 +61,19 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
         $request = $this->leaveRequest;
 
         return new PushMessage(
-            title: sprintf('%s requested leave', $request->employee?->full_name),
-            body: sprintf(
-                '%s, %s to %s.',
-                $request->leaveType?->name,
-                $request->start_date->format('j M'),
-                $request->end_date->format('j M'),
-            ),
+            title: __('notifications.leave_submitted.title', [
+                'name' => $request->employee?->full_name,
+            ]),
+            body: __('notifications.leave_submitted.push', [
+                'type' => $request->leaveType?->name,
+                'from' => $request->start_date->format('j M'),
+                'to'   => $request->end_date->format('j M'),
+            ]),
             data: [
                 'type'             => 'leave.submitted',
                 'leave_request_id' => $request->id,
                 // Tells the app which screen to open when it is tapped.
-                'route' => 'approvals',
+                'route' => AppRoute::forType('leave.submitted'),
             ],
         );
     }
@@ -99,14 +100,15 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
 
         return [
             'type'         => 'leave.submitted',
-            'title'        => sprintf('%s requested leave', $request->employee?->full_name),
-            'body'         => sprintf(
-                '%s day(s) of %s, %s to %s.',
-                rtrim(rtrim(number_format((float) $request->days, 1), '0'), '.'),
-                $request->leaveType?->name,
-                $request->start_date->format('M j'),
-                $request->end_date->format('M j, Y'),
-            ),
+            'title'        => __('notifications.leave_submitted.title', [
+                'name' => $request->employee?->full_name,
+            ]),
+            'body'         => __('notifications.leave_submitted.body', [
+                'days' => rtrim(rtrim(number_format((float) $request->days, 1), '0'), '.'),
+                'type' => $request->leaveType?->name,
+                'from' => $request->start_date->format('M j'),
+                'to'   => $request->end_date->format('M j, Y'),
+            ]),
             'leave_request_id' => $request->id,
             'employee_id'      => $request->employee_id,
             'employee'         => $request->employee?->full_name,
@@ -123,21 +125,23 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
         $request = $this->leaveRequest;
 
         return (new MailMessage)
-            ->subject(sprintf('Leave request from %s', $request->employee?->full_name))
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line(sprintf(
-                '%s has requested %s day(s) of %s.',
-                $request->employee?->full_name,
-                rtrim(rtrim(number_format((float) $request->days, 1), '0'), '.'),
-                $request->leaveType?->name,
+            ->subject(__('notifications.leave_submitted.subject', [
+                'name' => $request->employee?->full_name,
+            ]))
+            ->greeting(__('notifications.greeting', ['name' => $notifiable->name]))
+            ->line(__('notifications.leave_submitted.line', [
+                'name' => $request->employee?->full_name,
+                'days' => rtrim(rtrim(number_format((float) $request->days, 1), '0'), '.'),
+                'type' => $request->leaveType?->name,
+            ]))
+            ->line(__('notifications.leave_submitted.dates', [
+                'from' => $request->start_date->format('D j M Y'),
+                'to'   => $request->end_date->format('D j M Y'),
+            ]))
+            ->when((bool) $request->reason, fn (MailMessage $mail) => $mail->line(
+                __('notifications.leave_submitted.reason', ['reason' => $request->reason]),
             ))
-            ->line(sprintf(
-                'Dates: %s to %s.',
-                $request->start_date->format('D j M Y'),
-                $request->end_date->format('D j M Y'),
-            ))
-            ->when((bool) $request->reason, fn (MailMessage $mail) => $mail->line('Reason: ' . $request->reason))
-            ->action('Review the request', route('employee.approvals.index'))
-            ->line('You are receiving this because the request is waiting on you.');
+            ->action(__('notifications.leave_submitted.action'), route('employee.approvals.index'))
+            ->line(__('notifications.leave_submitted.why'));
     }
 }

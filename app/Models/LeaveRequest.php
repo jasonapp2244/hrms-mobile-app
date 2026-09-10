@@ -36,7 +36,14 @@ class LeaveRequest extends Model
         'is_half_day' => false,
     ];
 
-    /** Human labels for the status enum. */
+    /**
+     * The statuses a request can be in.
+     *
+     * **Keys, not words.** The values are the English fallback and the order
+     * the filters are drawn in; what a person actually reads comes from the
+     * `leave.status` translations through [getStatusLabelAttribute], because
+     * the API answers in the caller's language now (C1.18).
+     */
     public const STATUSES = [
         'pending'   => 'Pending',
         'approved'  => 'Approved',
@@ -81,7 +88,11 @@ class LeaveRequest extends Model
 
     public function getStatusLabelAttribute(): string
     {
-        return self::STATUSES[$this->status] ?? $this->status;
+        if (! array_key_exists($this->status, self::STATUSES)) {
+            return $this->status;
+        }
+
+        return __('leave.status.' . $this->status);
     }
 
     public function getStatusBadgeAttribute(): string
@@ -128,7 +139,9 @@ class LeaveRequest extends Model
             return $this->status_label;
         }
 
-        return $this->isAwaitingManager() ? 'Awaiting Manager' : 'Awaiting HR';
+        return $this->isAwaitingManager()
+            ? __('leave.stage.awaiting_manager')
+            : __('leave.stage.awaiting_hr');
     }
 
     public function scopePending($query)

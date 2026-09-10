@@ -72,10 +72,9 @@ class LeaveApprovalController extends ApiController
         $this->leave->managerApprove($leaveRequest, auth()->id(), $data['manager_note'] ?? null);
 
         return $this->ok([
-            'message' => sprintf(
-                "%s's request has been passed to HR for final approval.",
-                $leaveRequest->employee->first_name,
-            ),
+            'message' => __('api.leave_passed_to_hr', [
+                'name' => $leaveRequest->employee->first_name,
+            ]),
             'status' => $leaveRequest->fresh()->stage_label,
         ]);
     }
@@ -86,12 +85,12 @@ class LeaveApprovalController extends ApiController
 
         $data = $request->validate(
             ['decision_note' => 'required|string|max:1000'],
-            ['decision_note.required' => 'Please give a reason — the employee sees this.'],
+            ['decision_note.required' => __('api.leave_reason_needed')],
         );
 
         $this->leave->reject($leaveRequest, auth()->id(), $data['decision_note']);
 
-        return $this->ok(['message' => 'Request rejected.', 'status' => 'rejected']);
+        return $this->ok(['message' => __('api.leave_rejected'), 'status' => 'rejected']);
     }
 
     /** Approved leave already covering the same dates, elsewhere in the team. */
@@ -119,9 +118,9 @@ class LeaveApprovalController extends ApiController
         $manager = $this->employee();
 
         abort_if($leaveRequest->employee_id === $manager->id, 403,
-            'You cannot decide on your own leave request.');
+            __('api.leave_own_request'));
 
         abort_unless($leaveRequest->employee?->manager_id === $manager->id, 403,
-            'That request belongs to someone outside your team.');
+            __('api.leave_outside_team'));
     }
 }

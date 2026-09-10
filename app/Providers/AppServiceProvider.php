@@ -192,5 +192,15 @@ class AppServiceProvider extends ServiceProvider
         // fill the leave register.
         RateLimiter::for('write', fn (Request $request) => Limit::perMinute(30)
             ->by($request->user()?->id ?: $request->ip()));
+
+        // Crash reports (B6.5) are a public write, so this is the fence around
+        // it. Deliberately tight: a handset delivers whatever it queued once
+        // per launch, and an app crashing hard enough to relaunch six times a
+        // minute has already told us what we needed to know — the reports
+        // beyond that are the same stack over again. Keyed on IP rather than
+        // on the user, because the report that matters most arrives before
+        // anybody has signed in.
+        RateLimiter::for('crash', fn (Request $request) => Limit::perMinute(6)
+            ->by($request->ip()));
     }
 }

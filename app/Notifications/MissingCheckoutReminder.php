@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\AttendanceLog;
 use App\Notifications\Messages\PushMessage;
+use App\Support\Clock;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -64,15 +65,14 @@ class MissingCheckoutReminder extends Notification implements ShouldQueue
     public function toPush(object $notifiable): PushMessage
     {
         return new PushMessage(
-            title: 'You are still clocked in',
-            body: sprintf(
-                'You clocked in at %s. Tap to check out.',
-                $this->openPunch->scanned_at->format('h:i A'),
-            ),
+            title: __('notifications.missing_checkout.title'),
+            body: __('notifications.missing_checkout.push', [
+                'time' => Clock::time($this->openPunch->scanned_at),
+            ]),
             data: [
                 'type'      => 'attendance.missing_checkout',
                 'work_date' => $this->workDate,
-                'route'     => 'clock',
+                'route'     => AppRoute::forType('attendance.missing_checkout'),
             ],
         );
     }
@@ -90,11 +90,10 @@ class MissingCheckoutReminder extends Notification implements ShouldQueue
     {
         return [
             'type'  => 'attendance.missing_checkout',
-            'title' => 'You are still clocked in',
-            'body'  => sprintf(
-                'You clocked in at %s and no clock-out has been recorded. Tap to check out.',
-                $this->openPunch->scanned_at->format('h:i A'),
-            ),
+            'title' => __('notifications.missing_checkout.title'),
+            'body'  => __('notifications.missing_checkout.body', [
+                'time' => Clock::time($this->openPunch->scanned_at),
+            ]),
             'work_date' => $this->workDate,
             'url'       => route('employee.dashboard'),
         ];
@@ -103,16 +102,15 @@ class MissingCheckoutReminder extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('You are still clocked in')
-            ->greeting('Hello ' . $notifiable->name . ',')
-            ->line(sprintf(
-                'You clocked in at %s on %s, and no clock-out has been recorded.',
-                $this->openPunch->scanned_at->format('h:i A'),
-                $this->openPunch->work_date->format('D j M Y'),
-            ))
-            ->line('If you have finished for the day, please clock out.')
+            ->subject(__('notifications.missing_checkout.title'))
+            ->greeting(__('notifications.greeting', ['name' => $notifiable->name]))
+            ->line(__('notifications.missing_checkout.line', [
+                'time' => Clock::time($this->openPunch->scanned_at),
+                'date' => $this->openPunch->work_date->format('D j M Y'),
+            ]))
+            ->line(__('notifications.missing_checkout.finish'))
             // Said plainly so nobody is surprised by the row appearing later.
-            ->line('If nothing is recorded, the day will be closed automatically at your scheduled shift end.')
-            ->action('Clock out', route('employee.dashboard'));
+            ->line(__('notifications.missing_checkout.auto'))
+            ->action(__('notifications.missing_checkout.action'), route('employee.dashboard'));
     }
 }

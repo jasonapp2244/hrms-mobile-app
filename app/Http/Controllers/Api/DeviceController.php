@@ -53,7 +53,7 @@ class DeviceController extends ApiController
                 'device_name'  => $device->device_name,
                 'last_seen_at' => $device->last_seen_at?->toIso8601String(),
             ],
-            'message' => 'Device registered for notifications.',
+            'message' => __('api.device_registered'),
         ]);
     }
 
@@ -75,7 +75,7 @@ class DeviceController extends ApiController
 
         return $this->ok([
             'removed' => (int) $removed,
-            'message' => 'Device will no longer receive notifications.',
+            'message' => __('api.device_unregistered'),
         ]);
     }
 }

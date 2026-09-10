@@ -49,6 +49,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // stricter per-route limiters stack on top of it.
         $middleware->throttleApi();
 
+        // Answer in the language the caller asked for (C1.18). On the API group
+        // only: the web dashboard stays English by decision, and every message the
+        // two halves share resolves under the default locale there.
+        //
+        // Prepended, so it runs before `auth:sanctum` — the locale is then set for
+        // the whole request including a refusal, which is the one response somebody
+        // is most likely to have to read out to a colleague.
+        $middleware->api(prepend: [
+            \App\Http\Middleware\SetApiLocale::class,
+        ]);
+
         // Sign people out after the inactivity their company allows (A1.9).
         // Appended to the web group rather than aliased onto routes: a timeout
         // that applies to most screens and not the one somebody happened to
@@ -94,26 +105,41 @@ return Application::configure(basePath: dirname(__DIR__))
                 503 => 'unavailable',
             ];
 
+            // Answered in the caller's language (C1.18). SetApiLocale runs
+            // before authentication, so a refusal is translated too — which is
+            // the response somebody is most likely to have to read out.
             [$status, $code, $message] = match (true) {
-                $e instanceof ValidationException      => [422, 'validation_failed', 'The given data was invalid.'],
-                $e instanceof AuthenticationException  => [401, 'unauthenticated', 'Authentication required.'],
+                $e instanceof ValidationException      => [422, 'validation_failed', __('api.validation_failed')],
+                $e instanceof AuthenticationException  => [401, 'unauthenticated', __('api.unauthenticated')],
                 $e instanceof AccessDeniedHttpException,
-                $e instanceof AuthorizationException   => [403, 'forbidden', 'You are not allowed to do that.'],
+                $e instanceof AuthorizationException   => [403, 'forbidden', __('api.forbidden')],
                 $e instanceof ModelNotFoundException,
-                $e instanceof NotFoundHttpException    => [404, 'not_found', 'Resource not found.'],
-                $e instanceof ThrottleRequestsException => [429, 'too_many_requests', 'Too many requests. Please slow down.'],
+                $e instanceof NotFoundHttpException    => [404, 'not_found', __('api.not_found')],
+                $e instanceof ThrottleRequestsException => [429, 'too_many_requests', __('api.too_many_requests')],
                 $e instanceof HttpExceptionInterface   => [
                     $e->getStatusCode(),
                     $byStatus[$e->getStatusCode()] ?? 'http_error',
-                    $e->getMessage() ?: 'Request failed.',
+                    // An abort() message is already translated at the raise
+                    // site; only the fallback belongs here.
+                    $e->getMessage() ?: __('api.request_failed'),
                 ],
-                default                                => [500, 'server_error', 'Something went wrong.'],
+                default                                => [500, 'server_error', __('api.server_error')],
             };
 
             $payload = [
                 'ok'      => false,
                 'error'   => $code,
-                'message' => $e instanceof ValidationException ? $message : ($e->getMessage() ?: $message),
+                // Whatever the arm above decided, and nothing else.
+                //
+                // This used to prefer `$e->getMessage()`, so that an
+                // `abort(403, '…')` reached the client with its own wording —
+                // and the arm for that case still does exactly that. Preferring
+                // it *here* as well put the framework's own English defaults
+                // back in front of the translation: `AuthenticationException`
+                // carries "Unauthenticated.", `AuthorizationException` carries
+                // "This action is unauthorized.", and a Spanish handset was
+                // shown both (C1.18).
+                'message' => $message,
             ];
 
             // Field-level detail only for validation, which is the only case a
@@ -122,10 +148,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 $payload['errors'] = $e->errors();
             }
 
-            // Never leak an internal message or stack trace to a mobile client
-            // in production; the real one is still in the log.
-            if ($status === 500 && ! config('app.debug')) {
-                $payload['message'] = 'Something went wrong.';
+            // The reverse of the old guard: a 500 says nothing useful by
+            // default — which is what production wants, and the real one is
+            // still in the log — but while debugging, the actual exception
+            // message is the whole point of looking.
+            if ($status === 500 && config('app.debug') && $e->getMessage() !== '') {
+                $payload['message'] = $e->getMessage();
             }
 
             return response()->json($payload, $status);

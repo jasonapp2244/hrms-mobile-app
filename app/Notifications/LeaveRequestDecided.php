@@ -62,7 +62,7 @@ class LeaveRequestDecided extends Notification implements ShouldQueue
             data: [
                 'type'             => 'leave.' . $this->outcome,
                 'leave_request_id' => $this->leaveRequest->id,
-                'route'            => 'leave',
+                'route'            => AppRoute::forType('leave.' . $this->outcome),
             ],
         );
     }
@@ -92,43 +92,47 @@ class LeaveRequestDecided extends Notification implements ShouldQueue
     {
         $mail = (new MailMessage)
             ->subject($this->title())
-            ->greeting('Hello ' . $notifiable->name . ',')
+            ->greeting(__('notifications.greeting', ['name' => $notifiable->name]))
             ->line($this->body());
 
         // The decision note is the whole substance of a rejection — without it
         // the employee has been told no and nothing else.
         if ($this->leaveRequest->decision_note) {
-            $mail->line('Note: ' . $this->leaveRequest->decision_note);
+            $mail->line(__('notifications.leave_decided.note', [
+                'note' => $this->leaveRequest->decision_note,
+            ]));
         }
 
         return $mail
-            ->action('View your leave', route('employee.leave.index'))
-            ->line('Dates: ' . $this->dates());
+            ->action(__('notifications.leave_decided.action'), route('employee.leave.index'))
+            ->line(__('notifications.leave_decided.dates', ['dates' => $this->dates()]));
     }
+
+    /**
+     * The outcomes this knows how to word.
+     *
+     * An outcome invented later falls to `default` rather than to a missing
+     * translation key, which would print the key itself onto somebody's lock
+     * screen.
+     */
+    protected const WORDED = ['approved', 'rejected', 'cancelled', 'manager_approved'];
 
     protected function title(): string
     {
-        return match ($this->outcome) {
-            'approved'         => 'Your leave was approved',
-            'rejected'         => 'Your leave request was declined',
-            'cancelled'        => 'Your leave request was withdrawn',
-            'manager_approved' => 'Your leave request has moved to HR',
-            default            => 'Your leave request was updated',
-        };
+        return __('notifications.leave_decided.title.' . $this->key());
     }
 
     protected function body(): string
     {
-        $type  = $this->leaveRequest->leaveType?->name;
-        $dates = $this->dates();
+        return __('notifications.leave_decided.body.' . $this->key(), [
+            'type'  => $this->leaveRequest->leaveType?->name,
+            'dates' => $this->dates(),
+        ]);
+    }
 
-        return match ($this->outcome) {
-            'approved'         => "Your {$type} for {$dates} has been approved.",
-            'rejected'         => "Your {$type} for {$dates} was not approved.",
-            'cancelled'        => "Your {$type} for {$dates} has been withdrawn.",
-            'manager_approved' => "Your manager approved {$type} for {$dates}. It is now with HR for the final decision.",
-            default            => "Your {$type} for {$dates} was updated.",
-        };
+    protected function key(): string
+    {
+        return in_array($this->outcome, self::WORDED, true) ? $this->outcome : 'default';
     }
 
     protected function dates(): string

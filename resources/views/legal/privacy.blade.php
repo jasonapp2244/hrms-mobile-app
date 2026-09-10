@@ -76,6 +76,33 @@
 		recorded without a location. You are never blocked from clocking in.
 	</p>
 
+	<h2>Fingerprint and Face ID</h2>
+	<p>
+		You can choose to lock the app on your own phone with the fingerprint or
+		face check the phone already has. It is off unless you switch it on, under
+		<strong>Profile</strong>.
+	</p>
+	<p>
+		The check is made by your phone. We never see your fingerprint or your
+		face, and nothing about them is sent anywhere or stored on our servers —
+		the app is told only whether the phone recognised you. All that is kept is
+		a yes-or-no setting on that handset, and signing out clears it.
+	</p>
+
+	<h2>When the app crashes</h2>
+	<p>
+		If the app stops unexpectedly, it makes a note of what went wrong — the
+		type of error, a short description of it, and the list of code steps that
+		led there — and sends that note the next time you open it.
+	</p>
+	<p>
+		It goes to <strong>this server and nowhere else</strong>. There is no
+		crash-reporting or analytics service behind the app, and nothing about a
+		crash is shared with anybody outside your employer. If you were signed in
+		at the time the note says which account it was, so that somebody can ask
+		you what you were doing; if you were not, it carries no name at all.
+	</p>
+
 	<h2>Who can see it</h2>
 	<ul>
 		<li><strong>You</strong> — your own attendance, leave and schedule.</li>

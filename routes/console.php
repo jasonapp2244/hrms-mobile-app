@@ -87,3 +87,16 @@ Schedule::command('db:backup --verify')
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
+
+// Crash reports past their keeping (B6.5). 03:20 — after the backup at 02:10,
+// so the dump still contains the night's reports and the delete is not
+// competing with it for the same tables.
+//
+// This is housekeeping, not a defence: the endpoint that feeds the table is
+// rate-limited and every field is capped. It exists because `crash_reports` is
+// the one table an unauthenticated caller can add to, and a server nobody
+// watches should not accumulate a year of stack traces for a bug fixed in March.
+Schedule::command('crashes:prune')
+    ->dailyAt('03:20')
+    ->withoutOverlapping()
+    ->onOneServer();

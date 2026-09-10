@@ -45,17 +45,18 @@ class ScheduleUpdated extends Notification implements ShouldQueue
 
     protected function headline(): string
     {
-        return $this->isChange ? 'Your schedule has changed' : 'Your schedule is ready';
+        return $this->isChange
+            ? __('notifications.schedule_updated.changed')
+            : __('notifications.schedule_updated.ready');
     }
 
     protected function summary(): string
     {
-        return sprintf(
-            '%d day(s) between %s and %s.',
-            $this->days,
-            \Carbon\Carbon::parse($this->from)->format('M j'),
-            \Carbon\Carbon::parse($this->to)->format('M j'),
-        );
+        return __('notifications.schedule_updated.summary', [
+            'days' => $this->days,
+            'from' => \Carbon\Carbon::parse($this->from)->format('M j'),
+            'to'   => \Carbon\Carbon::parse($this->to)->format('M j'),
+        ]);
     }
 
     public function toArray(object $notifiable): array
@@ -77,8 +78,8 @@ class ScheduleUpdated extends Notification implements ShouldQueue
             ->subject($this->headline())
             ->greeting($this->headline())
             ->line($this->summary())
-            ->action('View your schedule', route('employee.dashboard'))
-            ->line('Check the times before your next shift — they may have moved.');
+            ->action(__('notifications.schedule_updated.action'), route('employee.dashboard'))
+            ->line(__('notifications.schedule_updated.check'));
     }
 
     /** Tapping it opens the schedule tab rather than just the app. */
@@ -89,7 +90,7 @@ class ScheduleUpdated extends Notification implements ShouldQueue
             body: $this->summary(),
             data: [
                 'type'  => 'schedule_updated',
-                'route' => 'schedule',
+                'route' => AppRoute::forType('schedule_updated'),
                 'from'  => $this->from,
                 'to'    => $this->to,
             ],

@@ -37,15 +37,17 @@ class PasswordResetLink extends Notification implements ShouldQueue
         $minutes = config('auth.passwords.users.expire', 60);
 
         return (new MailMessage)
-            ->subject('Reset your ' . config('app.name') . ' password')
-            ->greeting('Hello ' . ($notifiable->name ?: 'there') . ',')
-            ->line('Someone asked to reset the password for this account.')
-            ->action('Choose a new password', $this->resetUrl($notifiable))
-            ->line("This link stops working in {$minutes} minutes, and can only be used once.")
+            ->subject(__('notifications.password_reset.subject', ['app' => config('app.name')]))
+            ->greeting(__('notifications.password_reset.greeting', [
+                'name' => $notifiable->name ?: __('notifications.password_reset.there'),
+            ]))
+            ->line(__('notifications.password_reset.line'))
+            ->action(__('notifications.password_reset.action'), $this->resetUrl($notifiable))
+            ->line(__('notifications.password_reset.expiry', ['minutes' => $minutes]))
             // No "contact support" instruction: an unsolicited reset request is
             // usually a mistyped address, not an attack, and telling people to
             // report every one of them trains them to ignore the real thing.
-            ->line('If this was not you, nothing has changed — you can ignore this email and your password stays as it is.');
+            ->line(__('notifications.password_reset.ignore'));
     }
 
     /**

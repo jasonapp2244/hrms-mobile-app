@@ -114,15 +114,13 @@ class AttendanceService
         $distance = $this->metresBetween((float) $lat, (float) $lng, (float) $office->latitude, (float) $office->longitude);
 
         if ($distance > $radius) {
-            throw new \RuntimeException(sprintf(
-                'You appear to be %s from %s, which is outside the %dm check-in area. '
-                . 'Move closer, or ask HR to record this punch for you.',
-                $distance >= 1000
+            throw new \RuntimeException(__('attendance.outside_geofence', [
+                'distance' => $distance >= 1000
                     ? round($distance / 1000, 1) . 'km'
                     : round($distance) . 'm',
-                $office->name,
-                $radius,
-            ));
+                'office' => $office->name,
+                'radius' => $radius,
+            ]));
         }
     }
 
@@ -201,17 +199,13 @@ class AttendanceService
         $at       = $at->copy()->setTimezone($timezone);
 
         if ($at->greaterThan($now)) {
-            throw new \RuntimeException(
-                'That punch is dated in the future. Check the date and time on this device.',
-            );
+            throw new \RuntimeException(__('attendance.punch_in_future'));
         }
 
         if ($at->diffInHours($now) > self::OFFLINE_MAX_AGE_HOURS) {
-            throw new \RuntimeException(sprintf(
-                'That punch is more than %d hours old. Ask for a correction instead, so it '
-                . 'can be checked and recorded properly.',
-                self::OFFLINE_MAX_AGE_HOURS,
-            ));
+            throw new \RuntimeException(__('attendance.punch_too_old', [
+                'hours' => self::OFFLINE_MAX_AGE_HOURS,
+            ]));
         }
 
         $workDate = $this->workDateFor($employee, $at);
@@ -301,7 +295,7 @@ class AttendanceService
         $state = $this->breakState($employee, $workDate);
 
         if (! $state['clocked_in']) {
-            throw new \RuntimeException('You need to be checked in before starting a break.');
+            throw new \RuntimeException(__('attendance.not_clocked_in'));
         }
 
         $type = $state['on_break'] ? 'break_end' : 'break_start';

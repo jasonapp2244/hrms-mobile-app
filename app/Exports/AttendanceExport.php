@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Support\Clock;
 use Illuminate\Support\Collection;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -32,7 +33,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
             $log->office->name ?? '—',
             strtoupper($log->type),
             ucfirst(str_replace('_', ' ', $log->status)),
-            $log->scanned_at->format('h:i A'),
+            Clock::time($log->scanned_at),
             $log->work_date->format('m/d/Y'),
             $log->source,
             ($log->latitude && $log->longitude) ? $log->latitude . ', ' . $log->longitude : '—',

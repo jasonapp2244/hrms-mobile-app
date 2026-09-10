@@ -80,7 +80,7 @@ class ProfileController extends ApiController
         $user->update($data);
 
         return $this->ok([
-            'message' => 'Profile updated.',
+            'message' => __('api.profile_updated'),
             'account' => [
                 'id'    => $user->id,
                 'name'  => $user->name,
@@ -109,8 +109,8 @@ class ProfileController extends ApiController
         ]);
 
         if (! Hash::check($data['current_password'], $user->password)) {
-            return $this->fail('wrong_password', 'Your current password is incorrect.', 422, [
-                'errors' => ['current_password' => ['Your current password is incorrect.']],
+            return $this->fail('wrong_password', __('api.wrong_password'), 422, [
+                'errors' => ['current_password' => [__('api.wrong_password')]],
             ]);
         }
 
@@ -121,7 +121,7 @@ class ProfileController extends ApiController
         $user->tokens()->where('id', '!=', $current->id)->delete();
 
         return $this->ok([
-            'message'                  => 'Password changed.',
+            'message'                  => __('api.password_changed'),
             'other_devices_signed_out' => $signedOut,
         ]);
     }

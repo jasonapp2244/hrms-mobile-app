@@ -44,10 +44,16 @@ class LateArrivalsDigest extends Notification implements ShouldQueue
 
         return [
             'type'    => 'late_arrivals',
-            'title'   => $count . ' late arrival' . ($count === 1 ? '' : 's'),
+            'title'   => __('notifications.late_arrivals.title', ['count' => $count]),
             'message' => $count === 1
-                ? sprintf('%s clocked in %d minute(s) late.', $this->arrivals[0]['name'], $this->arrivals[0]['minutes'])
-                : sprintf('%d people clocked in late on %s.', $count, $this->workDate),
+                ? __('notifications.late_arrivals.body_one', [
+                    'name'    => $this->arrivals[0]['name'],
+                    'minutes' => $this->arrivals[0]['minutes'],
+                ])
+                : __('notifications.late_arrivals.body_many', [
+                    'count' => $count,
+                    'date'  => $this->workDate,
+                ]),
             'work_date' => $this->workDate,
             'arrivals'  => $this->arrivals,
             'url'       => route('reports.late', ['from' => $this->workDate, 'to' => $this->workDate]),
@@ -59,24 +65,26 @@ class LateArrivalsDigest extends Notification implements ShouldQueue
         $count = count($this->arrivals);
 
         $mail = (new MailMessage())
-            ->subject(sprintf('%d late arrival%s — %s', $count, $count === 1 ? '' : 's', $this->workDate))
-            ->greeting('Late arrivals for ' . $this->workDate)
-            ->line('These clock-ins were past the shift start and outside the grace period.');
+            ->subject(__('notifications.late_arrivals.subject', [
+                'count' => $count,
+                'date'  => $this->workDate,
+            ]))
+            ->greeting(__('notifications.late_arrivals.greeting', ['date' => $this->workDate]))
+            ->line(__('notifications.late_arrivals.intro'));
 
         foreach ($this->arrivals as $arrival) {
-            $mail->line(sprintf(
-                '· %s (%s) — in at %s, %d minute(s) late',
-                $arrival['name'],
-                $arrival['department'],
-                $arrival['at'],
-                $arrival['minutes'],
-            ));
+            $mail->line(__('notifications.late_arrivals.row', [
+                'name'       => $arrival['name'],
+                'department' => $arrival['department'],
+                'at'         => $arrival['at'],
+                'minutes'    => $arrival['minutes'],
+            ]));
         }
 
         return $mail
-            ->action('Open the late arrivals report', route('reports.late', [
+            ->action(__('notifications.late_arrivals.action'), route('reports.late', [
                 'from' => $this->workDate, 'to' => $this->workDate,
             ]))
-            ->line('You are receiving this because you hold the reporting permission.');
+            ->line(__('notifications.late_arrivals.why'));
     }
 }

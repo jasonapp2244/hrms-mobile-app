@@ -1,12 +1,15 @@
 <?php
 
+use App\Http\Controllers\Api\AppStatusController;
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CrashReportController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DirectoryController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\RegularisationController;
 use App\Http\Controllers\Api\ScheduleController;
@@ -35,6 +38,23 @@ Route::get('ping', fn () => response()->json([
     'time'    => now()->toIso8601String(),
 ]))->name('api.ping');
 
+// Whether this build may carry on (B6.6). Unauthenticated by necessity: it is
+// the one question the app asks before it knows anything, and during a
+// maintenance window it is the only endpoint that can explain why everything
+// else is refusing. Left on the general limiter — it is a cheap read, and one
+// call per launch and per resume is not a shape worth constraining further.
+Route::get('app/status', [AppStatusController::class, 'show'])->name('api.app.status');
+
+// Crashes the app did not survive (B6.5), delivered on the next launch.
+// Unauthenticated for the same reason as the gate above, and a stronger one:
+// the crash worth having is the one that stops the app opening, and an endpoint
+// behind auth:sanctum would collect every crash except that one. The controller
+// reads a token when the request carries one. Its own limiter, because it is a
+// public write.
+Route::post('app/crashes', [CrashReportController::class, 'store'])
+    ->middleware('throttle:crash')
+    ->name('api.app.crashes');
+
 // Login is throttled harder than the rest: it is the one endpoint where
 // guessing is the attack, and it is reachable without a token. The named
 // limiters are defined in AppServiceProvider, where the reasoning for each
@@ -56,6 +76,17 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
     Route::post('auth/logout-all', [AuthController::class, 'logoutAll'])->name('api.auth.logout-all');
     Route::get('auth/devices', [AuthController::class, 'devices'])->name('api.auth.devices');
+
+    // The notification history (B5.6). Not gated on an employee record, unlike
+    // almost everything below: a notification is addressed to a *user*, and an
+    // HR account with no employee row still receives document-expiry warnings.
+    Route::get('notifications', [NotificationController::class, 'index'])
+        ->name('api.notifications.index');
+    Route::post('notifications/read-all', [NotificationController::class, 'markAllRead'])
+        ->middleware('throttle:write')->name('api.notifications.read-all');
+    // After read-all, or the literal segment is captured as an id.
+    Route::post('notifications/{id}/read', [NotificationController::class, 'markRead'])
+        ->middleware('throttle:write')->name('api.notifications.read');
 
     // Push registration. Not itself a notification channel — it records where
     // to send, so Phase 5 has somewhere to deliver to.
