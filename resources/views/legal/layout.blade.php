@@ -11,7 +11,7 @@
 	     permission checks. --}}
 	<style>
 		:root {
-			--brand: #F26522;
+			--brand: #033C93;
 			--ink: #1A1815;
 			--muted: #6F6A63;
 			--rule: #E3E0DB;
