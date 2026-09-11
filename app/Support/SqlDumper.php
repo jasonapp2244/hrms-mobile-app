@@ -174,7 +174,7 @@ final class SqlDumper
      */
     public static function header(string $database): string
     {
-        return "-- Klutch Cleaning - Employment Management Portal (EMP) — database dump\n"
+        return "-- KEMP — Klutch Employment Management Program — database dump\n"
             . "-- Written by App\\Support\\SqlDumper, not mysqldump: this host has no\n"
             . "-- mysqldump binary. Restores with any MySQL client, phpMyAdmin included.\n"
             . '-- Database: ' . $database . "\n"

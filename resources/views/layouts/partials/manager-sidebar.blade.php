@@ -13,13 +13,13 @@
 	<!-- Logo -->
 	<div class="sidebar-logo">
 		<a href="{{ route('manager.dashboard') }}" class="logo logo-normal">
-			<img src="{{ asset('assets/img/logo.png') }}" width="130" height="29" alt="Klutch Cleaning">
+			<img src="{{ asset('assets/img/logo.png') }}" width="130" height="29" alt="{{ config('app.name') }}">
 		</a>
 		<a href="{{ route('manager.dashboard') }}" class="logo-small">
-			<img src="{{ asset('assets/img/logo-small.png') }}" width="30" height="30" alt="Klutch Cleaning">
+			<img src="{{ asset('assets/img/logo-small.png') }}" width="30" height="30" alt="{{ config('app.name') }}">
 		</a>
 		<a href="{{ route('manager.dashboard') }}" class="dark-logo">
-			<img src="{{ asset('assets/img/logo-white.png') }}" width="130" height="29" alt="Klutch Cleaning">
+			<img src="{{ asset('assets/img/logo-white.png') }}" width="130" height="29" alt="{{ config('app.name') }}">
 		</a>
 	</div>
 	<!-- /Logo -->
