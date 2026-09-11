@@ -16,7 +16,7 @@
 		.emp-topbar { background:#fff; border-bottom:1px solid #e6e9ef; }
 		.emp-topbar .logo { height:34px; }
 		.emp-wrap { max-width:760px; margin:0 auto; padding:20px 16px 60px; }
-		.emp-avatar { width:44px; height:44px; border-radius:50%; background:#fff2ec; color:#e8622e;
+		.emp-avatar { width:44px; height:44px; border-radius:50%; background:#EAF0FA; color:#033C93;
 			display:inline-flex; align-items:center; justify-content:center; font-weight:700; }
 	</style>
 </head>

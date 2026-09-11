@@ -169,7 +169,7 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Color</label>
-              <input type="color" name="color" class="form-control form-control-color" value="{{ old('color', '#e8622e') }}">
+              <input type="color" name="color" class="form-control form-control-color" value="{{ old('color', '#033C93') }}">
             </div>
           </div>
           <div class="row g-3 mt-0">
