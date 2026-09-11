@@ -216,4 +216,63 @@ class QuickLoginTest extends TestCase
 
         $this->assertCount(1, QuickLogin::accounts());
     }
+
+    // -------------------------------------------------------------------------
+    // One button per role, in role order
+    //
+    // The panel is how somebody evaluating the system reaches each area, so it
+    // is four clicks — not however many accounts the env file happens to name.
+    // -------------------------------------------------------------------------
+
+    public function test_it_shows_the_roles_in_descending_reach(): void
+    {
+        $this->makeUser('e@acme.test', 'Pw1', 'employee');
+        $this->makeUser('m@acme.test', 'Pw2', 'manager');
+        $this->makeUser('a@acme.test', 'Pw3', 'admin');
+        $this->makeUser('h@acme.test', 'Pw4', 'hr');
+
+        // Listed worst-first on purpose: the order must come from the role, not
+        // from the env file.
+        $this->enable('e@acme.test:Pw1,m@acme.test:Pw2,a@acme.test:Pw3,h@acme.test:Pw4');
+
+        $this->assertSame(
+            ['Admin', 'HR', 'Manager', 'Employee'],
+            QuickLogin::accounts()->pluck('roles')->all(),
+        );
+    }
+
+    public function test_a_second_account_for_a_role_it_already_shows_is_dropped(): void
+    {
+        // What the live box actually had: two employees and no manager, so the
+        // one area a client most wants to see was unreachable and the one they
+        // had already seen was offered twice.
+        $this->makeUser('first@acme.test', 'Pw1', 'employee');
+        $this->makeUser('second@acme.test', 'Pw2', 'employee');
+        $this->enable('first@acme.test:Pw1,second@acme.test:Pw2');
+
+        $accounts = QuickLogin::accounts();
+
+        $this->assertCount(1, $accounts);
+        // The env file still decides *which* account represents the role —
+        // the first one named — it no longer decides how many.
+        $this->assertSame('first@acme.test', $accounts->firstOrFail()['email']);
+    }
+
+    public function test_a_manager_is_offered_as_a_manager_and_not_as_an_employee(): void
+    {
+        // Managers hold the employee role too, by design. If the panel grouped
+        // on the display label or took the first role off the record, the
+        // manager button would collide with the employee one and one of the two
+        // would silently disappear.
+        $manager = $this->makeUser('m@acme.test', 'Pw1', 'manager');
+        $manager->assignRole('employee');
+
+        $this->makeUser('e@acme.test', 'Pw2', 'employee');
+        $this->enable('m@acme.test:Pw1,e@acme.test:Pw2');
+
+        $this->assertSame(
+            ['Manager', 'Employee'],
+            QuickLogin::accounts()->pluck('roles')->all(),
+        );
+    }
 }

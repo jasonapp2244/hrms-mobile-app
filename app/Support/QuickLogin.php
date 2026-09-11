@@ -90,8 +90,25 @@ final class QuickLogin
         return $candidates
             ->map(fn (array $pair) => self::row($pair, $users->get($pair['email'])))
             ->filter()
+            // One button per role, in the order the roles screen lists them.
+            //
+            // The panel exists so somebody evaluating the system can see each
+            // area in one click, and that is four clicks — not "whatever order
+            // the env file happens to be in, with two employees and no
+            // manager", which is what it was showing. `unique` keeps the first
+            // account named for each role, so the env file still decides *which*
+            // account represents a role; it no longer decides how many.
+            ->unique('role_key')
+            ->sortBy(fn (array $row) => array_search($row['role_key'], self::ROLE_ORDER, true))
             ->values();
     }
+
+    /**
+     * Descending reach, the same order as the Roles & Permissions screen and
+     * as `User::homeRoute()`'s precedence. All three answer a version of the
+     * same question and should not disagree.
+     */
+    private const ROLE_ORDER = ['admin', 'hr', 'manager', 'employee'];
 
     /** @return array<string, mixed>|null */
     private static function row(array $pair, ?User $user): ?array
@@ -114,11 +131,17 @@ final class QuickLogin
             return null;
         }
 
+        $primary = self::primaryRole($roles);
+
         return [
             'email'    => $user->email,
             'password' => $pair['password'],
             'name'     => $user->name,
-            'roles'    => self::label(self::primaryRole($roles)),
+            // The raw role, for ordering and de-duplication. `roles` below is
+            // the display string and must not be used for either — 'HR' and
+            // 'hr' would sort and group as two different things.
+            'role_key' => $primary,
+            'roles'    => self::label($primary),
             'is_admin' => $roles->contains('admin'),
         ];
     }

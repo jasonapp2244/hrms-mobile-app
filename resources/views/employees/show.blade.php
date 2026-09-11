@@ -175,10 +175,34 @@
           </form>
         @else
           <ul class="list-group list-group-flush mb-3">
-            <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">Email</span><span>{{ $account->email }}</span></li>
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+              <span class="text-muted">Email</span>
+              <span class="text-break ms-2 text-end">{{ $account->email }}</span>
+            </li>
+            {{-- This row says "cannot be shown" rather than being absent.
+                 Without it the panel simply has no password on it, which reads
+                 as something missing, and the reasonable next question is
+                 "where is it?" — asked of whoever built this, repeatedly.
+                 Passwords are bcrypt-hashed (User casts 'password' => 'hashed'),
+                 so there is nothing to print: the stored value cannot be turned
+                 back into what somebody types. Reset is the only route, and it
+                 is the button directly below. --}}
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+              <span class="text-muted">Password</span>
+              <span class="text-muted small text-end ms-2">
+                <i class="ti ti-lock me-1"></i>Encrypted — cannot be displayed
+              </span>
+            </li>
             <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">Role</span><span>{{ $currentRole ? \App\Http\Controllers\EmployeeAccountController::roleLabel($currentRole) : '—' }}</span></li>
             <li class="list-group-item d-flex justify-content-between px-0"><span class="text-muted">Last signed in</span><span>{{ $lastLogin?->diffForHumans() ?? 'Never' }}</span></li>
           </ul>
+
+          <p class="text-muted small mb-2">
+            Nobody can read an existing password, including an administrator.
+            If {{ $employee->first_name }} has lost theirs, use
+            <strong>Reset password</strong> — it generates a new one and shows
+            it here once, to hand over directly.
+          </p>
 
           @if($locked)
             <p class="text-muted small mb-2">
