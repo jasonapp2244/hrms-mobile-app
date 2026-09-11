@@ -91,7 +91,7 @@ echo "    env:   ${APP_ENV_VALUE:-unset}"
 # ---------------------------------------------------------------------------
 echo "==> Maintenance mode"
 # --secret lets you check the deploy through the maintenance page before letting
-# staff back in: visit https://emp.klutchcleaning.com/deploying-now once and the
+# staff back in: visit https://hrams.devonlinetestserver.com/deploying-now once and the
 # browser is allowed through for the rest of the session.
 $PHP artisan down --secret="deploying-now" --render="errors::503" || true
 
