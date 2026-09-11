@@ -1034,8 +1034,160 @@ class AttendanceService
                 'leave_days'   => $leaveDates->count(),
                 'absent_count' => max(0, $expected - $covered),
                 'ontime_pct'   => $ontimePct,
-                'score'        => $ontimePct,
+                'score'        => $this->scorePercent(
+                    ontimeDays: max(0, $presentDays - $lateCount),
+                    obligedDays: max(0, $expected - $leaveDates->count()),
+                ) ?? 0,
             ]
         );
+    }
+
+    /**
+     * The attendance score, as a whole percentage (B3.5).
+     *
+     * One sentence: **of the days you were meant to be here, how many did you
+     * make on time?** Approved leave is neither credit nor penalty — it comes
+     * out of the denominator, because a booked day off is not a day you failed
+     * to attend.
+     *
+     * `null`, never zero, when nothing was expected. A month spent entirely on
+     * leave, or a week with no working days in it, has no score; showing 0 for
+     * that would read as a failure and would be the worst possible thing to put
+     * in front of somebody on their first day back.
+     *
+     * The arithmetic lives here so the monthly row and the API answer cannot
+     * drift into meaning different things by the same name.
+     */
+    public function scorePercent(int $ontimeDays, int $obligedDays): ?int
+    {
+        if ($obligedDays <= 0) {
+            return null;
+        }
+
+        // Clamped: a day worked while on approved leave counts as attendance
+        // but was never in the denominator, so the ratio can exceed 1.
+        return (int) min(100, round($ontimeDays / $obligedDays * 100));
+    }
+
+    /**
+     * The score for a window, read off the same day rows the caller is showing.
+     *
+     * Deliberately computed from the rows rather than from a second pass over
+     * the calendar. The number sits directly above the list it summarises, and
+     * a score that disagreed with the days printed under it would be worse than
+     * no score at all — so it is the same data or nothing.
+     *
+     * A day counts as "meant to be here" when its status is `present` or
+     * `absent`; `leave`, `holiday`, `weekend` and `day_off` are all days nobody
+     * expected. See dayStatus() for why turning up beats every reason not to.
+     *
+     * @param  iterable<array{status: string, late: bool}>  $days
+     * @return array{score: int|null, ontime_days: int, obliged_days: int}
+     */
+    public function scoreFromDays(iterable $days): array
+    {
+        $obliged = 0;
+        $ontime  = 0;
+
+        foreach ($days as $day) {
+            if (! in_array($day['status'] ?? null, ['present', 'absent'], true)) {
+                continue;
+            }
+
+            $obliged++;
+
+            if ($day['status'] === 'present' && ! ($day['late'] ?? false)) {
+                $ontime++;
+            }
+        }
+
+        return [
+            'score'        => $this->scorePercent($ontime, $obliged),
+            'ontime_days'  => $ontime,
+            'obliged_days' => $obliged,
+        ];
+    }
+
+    /** How far back a streak is counted before it is simply called long. */
+    public const STREAK_MAX_DAYS = 366;
+
+    /**
+     * Consecutive days arrived on time, counting backwards from today (B3.5).
+     *
+     * **Not a property of the window on screen.** The history screen offers 7,
+     * 30 and 92 days and the score follows whichever is chosen; a streak does
+     * not — "eleven days" means eleven days, and a number that reset when
+     * somebody changed a dropdown would be nonsense.
+     *
+     * Three rules, and the third is the one that makes it usable:
+     *
+     *  - A day nobody expected — weekend, holiday, approved leave, rostered
+     *    day off — neither breaks the streak nor extends it. A week's holiday
+     *    should not cost somebody their record.
+     *  - A day they were expected and were absent, or arrived late, ends it.
+     *  - **Today is only ever counted, never held against them.** Ask at nine
+     *    in the morning before anybody has clocked in and the honest answer is
+     *    still yesterday's streak; treating an unfinished day as an absence
+     *    would show every employee a zero every morning.
+     */
+    public function onTimeStreak(Employee $employee, ?string $asOf = null): int
+    {
+        $tz    = $this->tzFor($employee);
+        $today = $asOf ?: Carbon::now($tz)->toDateString();
+        $from  = Carbon::parse($today)->subDays(self::STREAK_MAX_DAYS)->toDateString();
+
+        // Everything for the whole window in three queries rather than three
+        // per day walked.
+        $firstIn = AttendanceLog::where('employee_id', $employee->id)
+            ->whereDate('work_date', '>=', $from)
+            ->whereDate('work_date', '<=', $today)
+            ->where('type', 'in')
+            ->orderBy('scanned_at')
+            ->get()
+            ->groupBy(fn (AttendanceLog $log) => $log->work_date->toDateString())
+            ->map(fn ($logs) => $logs->first());
+
+        $working = array_flip($this->leave->workingDatesBetween($employee->company, $from, $today));
+        $onLeave = array_flip($this->leave->leaveDatesByEmployee($employee->company_id, $from, $today)[$employee->id] ?? []);
+
+        $daysOff = $employee->shiftAssignments()
+            ->whereDate('date', '>=', $from)->whereDate('date', '<=', $today)
+            ->where('is_day_off', true)
+            ->pluck('date')
+            ->map(fn ($d) => $d instanceof Carbon ? $d->toDateString() : (string) $d)
+            ->flip();
+
+        $streak = 0;
+
+        for ($day = Carbon::parse($today); $day->toDateString() >= $from; $day->subDay()) {
+            $date = $day->toDateString();
+            $punch = $firstIn->get($date);
+
+            // Turning up beats every reason not to, the same way dayStatus()
+            // reads it: somebody who came in on their day off was on time.
+            if ($punch) {
+                if ($punch->status === 'late') {
+                    break;
+                }
+
+                $streak++;
+                continue;
+            }
+
+            // Nobody expected them. Neither breaks it nor extends it.
+            if (! isset($working[$date]) || isset($onLeave[$date]) || $daysOff->has($date)) {
+                continue;
+            }
+
+            // Expected, and no punch. The day is over, so it is an absence —
+            // unless it is today, which is not over yet.
+            if ($date === $today) {
+                continue;
+            }
+
+            break;
+        }
+
+        return $streak;
     }
 }

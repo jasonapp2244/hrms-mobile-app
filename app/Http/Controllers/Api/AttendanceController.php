@@ -410,6 +410,12 @@ class AttendanceController extends ApiController
                 'absent_days'    => $rows->where('status', 'absent')->count(),
                 'worked_minutes' => $rows->sum('worked_minutes'),
             ],
+            // B3.5. Read off the rows above rather than recomputed, so the
+            // number and the list it sits on cannot disagree. `streak` is the
+            // one thing here that ignores the window — see onTimeStreak().
+            'score' => $this->attendance->scoreFromDays($days) + [
+                'streak' => $this->attendance->onTimeStreak($employee),
+            ],
         ]);
     }
 
