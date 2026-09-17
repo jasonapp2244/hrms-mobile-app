@@ -62,7 +62,7 @@ class RegularisationController extends ApiController
             $query->where('status', $data['status']);
         }
 
-        $page = $query->paginate(15);
+        $page = $query->paginate($this->perPage());
 
         // Voided punches are already excluded by the model's global scope —
         // there is nothing to dispute about a reading that has been struck out.

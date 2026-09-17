@@ -37,4 +37,29 @@ abstract class Controller
 
         return (int) $companyId;
     }
+
+    /**
+     * How many rows a list shows at once.
+     *
+     * Twenty-three controllers carried a literal `paginate(n)` between them,
+     * across five different values, with no stated rule for which list got
+     * which. The numbers themselves were mostly reasonable — a dense audit
+     * table does want more rows than a card grid — but they lived at the call
+     * site, so the only way to learn the house default was to read all of them
+     * and take a vote.
+     *
+     * `$list` names an entry in `config('pagination.web.lists')`. **An unknown
+     * key falls back to the default rather than failing**: a list added next
+     * year should render at a sane size without its author having to discover
+     * this file first, and a typo should cost a slightly wrong page length
+     * rather than a 500 on a screen that was working.
+     */
+    protected function perPage(?string $list = null): int
+    {
+        $default = (int) config('pagination.web.default', 15);
+
+        return $list === null
+            ? $default
+            : (int) config("pagination.web.lists.$list", $default);
+    }
 }

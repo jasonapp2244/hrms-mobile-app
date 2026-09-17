@@ -74,7 +74,7 @@ class DirectoryController extends ApiController
             $query->where('office_id', $data['office_id']);
         }
 
-        $page = $query->paginate(30);
+        $page = $query->paginate($this->perPage('directory'));
 
         return $this->ok([
             'people' => collect($page->items())

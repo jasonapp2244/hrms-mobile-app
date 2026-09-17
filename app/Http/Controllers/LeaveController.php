@@ -47,7 +47,7 @@ class LeaveController extends Controller
                 $request->input('to', '9999-12-31'),
             ))
             ->latest('start_date')
-            ->paginate(20)
+            ->paginate($this->perPage('leave'))
             ->withQueryString();
 
         $today = now()->toDateString();

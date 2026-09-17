@@ -37,7 +37,7 @@ class RegularisationRequestController extends Controller
         $requests = AttendanceRegularisation::with(['attendanceLog', 'createdLog'])
             ->where('employee_id', $employee->id)
             ->latest()
-            ->paginate(15);
+            ->paginate($this->perPage());
 
         // Offered for challenge: the employee's recent punches. Voided ones are
         // already excluded by the model's global scope — there is no sense in

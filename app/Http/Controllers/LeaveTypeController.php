@@ -14,7 +14,7 @@ class LeaveTypeController extends Controller
         $leaveTypes = LeaveType::withCount(['requests', 'balances'])
             ->where('company_id', $this->companyId())
             ->orderBy('name')
-            ->paginate(15);
+            ->paginate($this->perPage());
 
         return view('leave-types.index', compact('leaveTypes'));
     }

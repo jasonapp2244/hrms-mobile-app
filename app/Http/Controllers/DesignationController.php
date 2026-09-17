@@ -13,7 +13,7 @@ class DesignationController extends Controller
     {
         $companyId = $this->companyId();
         $designations = Designation::with('department')->withCount('employees')
-            ->where('company_id', $companyId)->latest()->paginate(15);
+            ->where('company_id', $companyId)->latest()->paginate($this->perPage());
         $departments = Department::where('company_id', $companyId)->get();
 
         return view('designations.index', compact('designations', 'departments'));

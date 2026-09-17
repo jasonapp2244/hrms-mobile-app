@@ -82,7 +82,7 @@ class AttendanceController extends Controller
                 return $q->where('employee_id', in_array($wanted, $teamIds, true) ? $wanted : 0);
             })
             ->latest('scanned_at')
-            ->paginate(25)
+            ->paginate($this->perPage('attendance'))
             ->withQueryString();
 
         return view('manager.attendance.logs', [

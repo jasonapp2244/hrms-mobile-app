@@ -41,7 +41,7 @@ class EmployeePortalController extends Controller
         $logs = AttendanceLog::with('office')
             ->where('employee_id', $employee->id)
             ->latest('scanned_at')
-            ->paginate(15);
+            ->paginate($this->perPage());
 
         // Approved leave covering today. The button still works — someone on
         // leave who comes in anyway should be recorded as present — but the

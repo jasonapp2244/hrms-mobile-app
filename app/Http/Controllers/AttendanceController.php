@@ -78,7 +78,7 @@ class AttendanceController extends Controller
                 ->orWhere('device_rooted', true)
                 ->orWhere('device_emulator', true)))
             ->latest('scanned_at')
-            ->paginate(25)
+            ->paginate($this->perPage('attendance'))
             ->withQueryString();
 
         $offices = Office::where('company_id', $companyId)->get();

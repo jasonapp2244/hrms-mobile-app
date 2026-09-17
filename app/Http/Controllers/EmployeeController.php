@@ -33,7 +33,7 @@ class EmployeeController extends Controller
             ->when($request->filled('department_id'), fn ($q) => $q->where('department_id', $request->department_id))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->latest()
-            ->paginate(15)
+            ->paginate($this->perPage())
             ->withQueryString();
 
         $departments = Department::where('company_id', $companyId)->get();

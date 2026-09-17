@@ -91,7 +91,7 @@ class LeaveController extends ApiController
             $query->whereYear('start_date', $data['year']);
         }
 
-        $page = $query->paginate(15);
+        $page = $query->paginate($this->perPage());
 
         return $this->ok([
             'requests' => collect($page->items())

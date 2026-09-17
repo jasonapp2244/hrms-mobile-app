@@ -36,7 +36,7 @@ class RegularisationController extends Controller
                 fn ($q) => $q->pending(),
             )
             ->latest()
-            ->paginate(20)
+            ->paginate($this->perPage('regularisations'))
             ->withQueryString();
 
         $pendingCount = AttendanceRegularisation::forCompany($companyId)->pending()->count();

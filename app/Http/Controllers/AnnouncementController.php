@@ -45,7 +45,7 @@ class AnnouncementController extends Controller
             ->orderByRaw('published_at is null desc')
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->paginate(20);
+            ->paginate($this->perPage('announcements'));
 
         return view('announcements.index', [
             'announcements' => $announcements,

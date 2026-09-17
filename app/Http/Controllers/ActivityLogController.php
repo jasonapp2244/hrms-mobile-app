@@ -36,7 +36,7 @@ class ActivityLogController extends Controller
                 ->where('actor_label', 'like', '%' . $request->q . '%')
                 ->orWhere('ip_address', 'like', '%' . $request->q . '%')))
             ->latest('created_at')
-            ->paginate(30)
+            ->paginate($this->perPage('activity_logs'))
             ->withQueryString();
 
         return view('activity.index', [

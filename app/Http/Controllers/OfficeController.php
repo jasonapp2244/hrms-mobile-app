@@ -10,7 +10,7 @@ class OfficeController extends Controller
     public function index()
     {
         $offices = Office::withCount('employees')
-            ->where('company_id', $this->companyId())->latest()->paginate(15);
+            ->where('company_id', $this->companyId())->latest()->paginate($this->perPage());
 
         return view('offices.index', compact('offices'));
     }

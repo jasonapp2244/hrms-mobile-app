@@ -34,7 +34,7 @@ class TrustedDeviceController extends Controller
             // question this screen answers is "who is bound to what now".
             ->when(! $request->boolean('show_released'), fn ($q) => $q->active())
             ->orderByDesc('last_seen_at')
-            ->paginate(25)
+            ->paginate($this->perPage('trusted_devices'))
             ->withQueryString();
 
         return view('devices.index', [

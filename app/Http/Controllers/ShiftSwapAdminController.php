@@ -28,7 +28,7 @@ class ShiftSwapAdminController extends Controller
             ->where('company_id', $companyId)
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
             ->latest('requester_date')
-            ->paginate(20)
+            ->paginate($this->perPage('shift_swaps'))
             ->withQueryString();
 
         $stats = [

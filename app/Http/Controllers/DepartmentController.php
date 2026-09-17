@@ -13,7 +13,7 @@ class DepartmentController extends Controller
     {
         $departments = Department::withCount('employees')->with('shift')
             ->where('company_id', $this->companyId())
-            ->latest()->paginate(15);
+            ->latest()->paginate($this->perPage());
 
         $shifts = Shift::where('company_id', $this->companyId())->where('is_active', true)->get();
 

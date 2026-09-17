@@ -26,14 +26,11 @@ use Illuminate\Notifications\DatabaseNotification;
  */
 class NotificationController extends ApiController
 {
-    /** A page. Deep history has no readers; the newest few do. */
-    public const PER_PAGE = 25;
-
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        $page = $user->notifications()->paginate(self::PER_PAGE);
+        $page = $user->notifications()->paginate($this->perPage('notifications'));
 
         return $this->ok([
             'notifications' => collect($page->items())

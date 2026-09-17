@@ -38,7 +38,7 @@ class LeaveRequestController extends Controller
             // manager_id — without it every row would fire its own query.
             ->with('leaveType', 'approver', 'employee')
             ->latest('start_date')
-            ->paginate(10);
+            ->paginate($this->perPage('leave_requests'));
 
         // Only types that are still open for new requests appear in the form —
         // an inactive type keeps its history but cannot be booked again.

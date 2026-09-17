@@ -48,6 +48,43 @@ abstract class ApiController extends Controller
     }
 
     /**
+     * The page size this request asked for, bounded.
+     *
+     * pageMeta() has returned `per_page` since the API was written, which told
+     * every client there was a page size worth knowing about — while no
+     * endpoint read one from the request. The number was real and the control
+     * it implied was not.
+     *
+     * **Clamped rather than validated.** Below 1, unparseable or absent takes
+     * the default; above the ceiling takes the ceiling. Refusing the whole
+     * request with a 422 because somebody asked for one row too many fails a
+     * person trying to see their own leave, in order to protect a server that
+     * could have answered. The response reports what was actually used, so a
+     * client that asked for 500 can see that it got 100 and stop asking.
+     *
+     * The ceiling is the part that matters: without one, `?per_page=100000` is
+     * a way to ask the server to build every row it owns into one document.
+     *
+     * $list names the endpoint, and supplies **only the default** — what a
+     * client that sends no per_page receives. Those defaults are the sizes the
+     * endpoints already served, so adding the parameter does not change what
+     * an existing app gets back without asking for anything.
+     */
+    protected function perPage(?string $list = null): int
+    {
+        $default = (int) config('pagination.api.default', 15);
+
+        if ($list !== null) {
+            $default = (int) config("pagination.api.lists.$list", $default);
+        }
+
+        $max   = (int) config('pagination.api.max', 100);
+        $asked = request()->integer('per_page');
+
+        return $asked < 1 ? $default : min($asked, $max);
+    }
+
+    /**
      * The employee record behind the authenticated token.
      *
      * Almost every endpoint is about a person rather than a login, and an

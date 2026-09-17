@@ -17,7 +17,7 @@ class NotificationController extends Controller
     {
         $notifications = $request->user()
             ->notifications()
-            ->paginate(20);
+            ->paginate($this->perPage('notifications'));
 
         return view('notifications.index', [
             'notifications' => $notifications,

@@ -43,7 +43,7 @@ class CrashReportController extends Controller
                     ->where($scope)
                     ->where('fingerprint', $fingerprint)
                     ->latest('occurred_at')
-                    ->paginate(30)
+                    ->paginate($this->perPage('crash_reports'))
                     ->withQueryString(),
             ]);
         }
@@ -56,7 +56,7 @@ class CrashReportController extends Controller
                 . 'MAX(occurred_at) as last_seen, MIN(occurred_at) as first_seen')
             ->groupBy('fingerprint', 'exception')
             ->orderByDesc('last_seen')
-            ->paginate(25)
+            ->paginate($this->perPage('crash_groups'))
             ->withQueryString();
 
         return view('crashes.index', [
