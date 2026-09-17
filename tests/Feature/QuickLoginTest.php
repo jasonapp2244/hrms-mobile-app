@@ -55,10 +55,10 @@ class QuickLoginTest extends TestCase
         QuickLogin::forget();
     }
 
-    private function makeUser(string $email, string $password, string $role = 'admin', bool $active = true): User
+    private function makeUser(string $email, string $password, string $role = 'admin', bool $active = true, ?string $name = null): User
     {
         $user = User::create([
-            'name'       => 'Dana Boss',
+            'name'       => $name ?? 'Dana Boss',
             'email'      => $email,
             'password'   => Hash::make($password),
             'company_id' => $this->company->id,
@@ -218,10 +218,11 @@ class QuickLoginTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // One button per role, in role order
+    // Every account named, grouped by role, strongest role first
     //
-    // The panel is how somebody evaluating the system reaches each area, so it
-    // is four clicks — not however many accounts the env file happens to name.
+    // The panel is how somebody evaluating the system reaches each area. It
+    // used to collapse to one button per role, which hid a bad env file rather
+    // than fixing it; the ordering is what keeps every area reachable now.
     // -------------------------------------------------------------------------
 
     public function test_it_shows_the_roles_in_descending_reach(): void
@@ -241,21 +242,39 @@ class QuickLoginTest extends TestCase
         );
     }
 
-    public function test_a_second_account_for_a_role_it_already_shows_is_dropped(): void
+    public function test_every_account_for_a_role_is_offered(): void
     {
-        // What the live box actually had: two employees and no manager, so the
-        // one area a client most wants to see was unreachable and the one they
-        // had already seen was offered twice.
+        // This asserted the opposite until 2026-09-17: a second employee was
+        // dropped, so the panel showed four buttons at most. The demo company
+        // has five employees who differ in what they have *done* — leave taken,
+        // punches made — not only in the role they hold, and choosing one of
+        // them on the tester's behalf is not the panel's call.
         $this->makeUser('first@acme.test', 'Pw1', 'employee');
         $this->makeUser('second@acme.test', 'Pw2', 'employee');
         $this->enable('first@acme.test:Pw1,second@acme.test:Pw2');
 
         $accounts = QuickLogin::accounts();
 
-        $this->assertCount(1, $accounts);
-        // The env file still decides *which* account represents the role —
-        // the first one named — it no longer decides how many.
-        $this->assertSame('first@acme.test', $accounts->firstOrFail()['email']);
+        $this->assertCount(2, $accounts);
+        $this->assertEqualsCanonicalizing(
+            ['first@acme.test', 'second@acme.test'],
+            $accounts->pluck('email')->all(),
+        );
+    }
+
+    public function test_accounts_sharing_a_role_are_ordered_by_name(): void
+    {
+        // Role alone leaves five employees in whatever order the env file was
+        // typed in, which shifts under anybody who edits it. The name is the
+        // only stable thing on the row, so it decides ties.
+        $this->makeUser('z@acme.test', 'Pw1', 'employee', true, 'Zoe Ash');
+        $this->makeUser('a@acme.test', 'Pw2', 'employee', true, 'Amy Bell');
+        $this->enable('z@acme.test:Pw1,a@acme.test:Pw2');
+
+        $this->assertSame(
+            ['Amy Bell', 'Zoe Ash'],
+            QuickLogin::accounts()->pluck('name')->all(),
+        );
     }
 
     public function test_a_manager_is_offered_as_a_manager_and_not_as_an_employee(): void

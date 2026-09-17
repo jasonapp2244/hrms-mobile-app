@@ -90,16 +90,28 @@ final class QuickLogin
         return $candidates
             ->map(fn (array $pair) => self::row($pair, $users->get($pair['email'])))
             ->filter()
-            // One button per role, in the order the roles screen lists them.
+            // **Every account named, grouped by role, strongest role first.**
             //
-            // The panel exists so somebody evaluating the system can see each
-            // area in one click, and that is four clicks — not "whatever order
-            // the env file happens to be in, with two employees and no
-            // manager", which is what it was showing. `unique` keeps the first
-            // account named for each role, so the env file still decides *which*
-            // account represents a role; it no longer decides how many.
-            ->unique('role_key')
-            ->sortBy(fn (array $row) => array_search($row['role_key'], self::ROLE_ORDER, true))
+            // This used to be `unique('role_key')` — one button per role, four
+            // at most. That was solving a real problem badly: the env file on
+            // the live box named two employees and no manager, so the area a
+            // client most wants to see was unreachable and the one they had
+            // already seen was offered twice. Collapsing to one per role hid
+            // the symptom; the cause was the env file, and the panel could not
+            // fix it by showing less.
+            //
+            // Showing all of them is strictly more information and reintroduces
+            // nothing: a role nobody is listed for is still missing, which is
+            // now visible rather than disguised as a complete set of four. The
+            // ordering does the work the de-duplication was credited with —
+            // admin, HR, manager, employee — so the areas are still reachable
+            // top-down, and a name now distinguishes the five employees the
+            // demo company has from each other.
+            ->sortBy(fn (array $row) => sprintf(
+                '%d %s',
+                array_search($row['role_key'], self::ROLE_ORDER, true),
+                $row['name'],
+            ))
             ->values();
     }
 

@@ -87,13 +87,14 @@
 							data-email="{{ $account['email'] }}"
 							data-password="{{ $account['password'] }}">
 						<span class="d-flex flex-column">
-							<span class="fw-semibold text-gray-9">{{ $account['roles'] }}</span>
+							<span class="fw-semibold text-gray-9">{{ $account['name'] }}</span>
 							<span class="text-muted fs-12">{{ $account['email'] }}</span>
 						</span>
 						<span class="d-flex align-items-center">
 							@if ($account['is_admin'])
 								<span class="badge bg-danger-transparent text-danger me-2">Full access</span>
 							@endif
+							<span class="badge bg-primary-transparent text-primary me-2">{{ $account['roles'] }}</span>
 							<i class="ti ti-arrow-right text-primary"></i>
 						</span>
 					</button>
