@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Laravel\Sanctum\Sanctum;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -491,5 +492,150 @@ class SecurityPolicyTest extends TestCase
             '/\d+(\.\d+)?km|\d+m/',
             $response->json('message'),
         );
+    }
+
+    /**
+     * The app is told about the fence, and told the same thing the punch
+     * endpoint will enforce (B2.5).
+     *
+     * `/attendance/today` carries it so the Clock screen can state the rule
+     * before anybody taps, and check the distance itself rather than spending a
+     * GPS fix and a round trip to be refused. **That is only safe while the
+     * description and the enforcement agree**, which is why both come from
+     * `AttendanceService::geofenceFor`. Two copies of "does the fence apply to
+     * this person" would drift the first time an exemption changed, and the app
+     * would confidently refuse a punch the server would have taken.
+     *
+     * So each case below asserts the pair: what the app is told, and what
+     * happens when it punches anyway.
+     */
+    public function test_the_app_is_told_about_a_fence_that_will_be_enforced(): void
+    {
+        $this->setPolicy(['enforce_geofence' => true]);
+
+        $fence = $this->apiToday()['geofence'];
+
+        $this->assertSame('Head Office', $fence['office']);
+        $this->assertSame(100, $fence['radius']);
+        $this->assertEqualsWithDelta(40.7580, $fence['latitude'], 0.0001);
+
+        $this->punch(51.5074, -0.1278)->assertStatus(422);
+    }
+
+    public function test_the_app_is_told_nothing_while_enforcement_is_off(): void
+    {
+        // Off by default, and the app must say nothing about a rule that is
+        // not being applied — a warning nobody is subject to is noise.
+        $this->assertNull($this->apiToday()['geofence']);
+
+        $this->punch(51.5074, -0.1278)->assertOk();
+    }
+
+    public function test_a_home_worker_is_neither_fenced_nor_warned(): void
+    {
+        $this->setPolicy(['enforce_geofence' => true]);
+        $this->employee->update(['work_mode' => 'wfh']);
+
+        // Fencing somebody to an office they were told not to attend is a bug;
+        // telling them every morning how far from it they are is the same bug
+        // on the one screen they open daily.
+        $this->assertNull($this->apiToday()['geofence']);
+
+        $this->punch(51.5074, -0.1278)->assertOk();
+    }
+
+    public function test_an_office_with_no_coordinates_is_not_described_as_a_fence(): void
+    {
+        $this->setPolicy(['enforce_geofence' => true]);
+        $this->office->update(['latitude' => null, 'longitude' => null]);
+
+        // There is nothing to be outside of. Describing a fence with no centre
+        // would have the app measure everybody's distance from the middle of
+        // the Atlantic.
+        $this->assertNull($this->apiToday()['geofence']);
+
+        $this->punch(51.5074, -0.1278)->assertOk();
+    }
+
+    /** `/attendance/today` as the app sees it, for this fixture's employee. */
+    private function apiToday(): array
+    {
+        Sanctum::actingAs($this->staff);
+
+        return $this->getJson('/api/v1/attendance/today')->assertOk()->json();
+    }
+
+    // -------------------------------------------------------------------------
+    // Self-service changes reach the trail (A1.8)
+    // -------------------------------------------------------------------------
+
+    public function test_changing_your_own_password_on_the_web_is_recorded(): void
+    {
+        $this->actingAs($this->hr)->put(route('profile.password'), [
+            'current_password' => 'password',
+            'password' => 'a-much-longer-one',
+            'password_confirmation' => 'a-much-longer-one',
+        ])->assertRedirect();
+
+        $entry = ActivityLog::where('event', ActivityLog::PASSWORD_CHANGED)->latest('id')->first();
+
+        $this->assertNotNull($entry, 'a password change left no trace in the trail');
+        $this->assertSame($this->hr->id, $entry->user_id);
+        $this->assertStringContainsString('web dashboard', (string) $entry->description);
+    }
+
+    public function test_a_refused_password_change_on_the_web_writes_nothing(): void
+    {
+        $this->actingAs($this->hr)->put(route('profile.password'), [
+            'current_password' => 'wrong',
+            'password' => 'a-much-longer-one',
+            'password_confirmation' => 'a-much-longer-one',
+        ]);
+
+        $this->assertSame(0, ActivityLog::where('event', ActivityLog::PASSWORD_CHANGED)->count());
+    }
+
+    public function test_changing_the_sign_in_address_on_the_web_is_recorded(): void
+    {
+        $this->actingAs($this->hr)->put(route('profile.update'), [
+            'name'  => 'Hana Ruiz',
+            'email' => 'hana.new@acme.test',
+            'phone' => null,
+        ])->assertRedirect();
+
+        $entry = ActivityLog::where('event', ActivityLog::ACCOUNT_CHANGED)->latest('id')->first();
+
+        $this->assertNotNull($entry, 'a sign-in address change left no trace');
+        $this->assertStringContainsString('hana@acme.test', (string) $entry->description);
+        $this->assertStringContainsString('hana.new@acme.test', (string) $entry->description);
+    }
+
+    public function test_an_ordinary_contact_edit_on_the_web_is_not_a_security_event(): void
+    {
+        $this->actingAs($this->hr)->put(route('profile.update'), [
+            'name'  => 'Hana R Ruiz',
+            'email' => 'hana@acme.test',
+            'phone' => '555-0123',
+        ])->assertRedirect();
+
+        $this->assertSame(0, ActivityLog::where('event', ActivityLog::ACCOUNT_CHANGED)->count());
+    }
+
+    public function test_both_doors_describe_themselves_so_the_trail_can_tell_them_apart(): void
+    {
+        // The whole point of the change: an administrator reading this screen
+        // after an incident needs to know whether a phone was involved. Before
+        // this, the app wrote nothing at all and the web said "via web".
+        $this->actingAs($this->hr)->put(route('profile.password'), [
+            'current_password' => 'password',
+            'password' => 'a-much-longer-one',
+            'password_confirmation' => 'a-much-longer-one',
+        ]);
+
+        $descriptions = ActivityLog::where('event', ActivityLog::PASSWORD_CHANGED)
+            ->pluck('description')->implode(' | ');
+
+        $this->assertStringContainsString('web dashboard', $descriptions);
+        $this->assertStringNotContainsString('via web', $descriptions);
     }
 }

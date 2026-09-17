@@ -79,25 +79,54 @@
   <div class="card-header"><h5 class="mb-0">Finish setting up</h5></div>
   <div class="card-body">
     <p>
-      Add the key below to your authenticator app — Google Authenticator, Microsoft
-      Authenticator, Authy, 1Password and the rest all take one. Choose
-      <strong>"Enter a setup key"</strong>, paste it in, then type the code the app
-      shows to confirm.
+      Scan the code with your authenticator app — Google Authenticator, Microsoft
+      Authenticator, Authy, 1Password and the rest all read it. Then type the code
+      the app shows to confirm.
     </p>
 
-    <div class="mb-3">
-      <label class="form-label">Setup key</label>
-      <input type="text" class="form-control font-monospace" readonly value="{{ $secret }}"
-             onclick="this.select()">
-      <div class="form-text">Account: {{ $user->email }} · Issuer: {{ config('app.name') }}</div>
+    <div class="row g-4 mb-3">
+      @if($qr)
+        {{--
+          Inline rather than an <img src="..."> pointing at a route: the only
+          thing in this code is the otpauth:// URI, and that carries the TOTP
+          secret. A second request for it would put the secret in the web
+          server's log and possibly in a proxy cache. Written into the page it
+          inherits the protection the page already has.
+
+          Rendered with {!! !!} because it is an SVG document this application
+          generated from a URI it built itself — nothing user-supplied reaches
+          it. The email inside the URI is the signed-in user's own.
+        --}}
+        <div class="col-auto">
+          <div class="p-2 bg-white border rounded d-inline-block" aria-hidden="true">
+            {!! $qr !!}
+          </div>
+        </div>
+      @endif
+
+      <div class="col">
+        <label class="form-label">Setup key</label>
+        <input type="text" class="form-control font-monospace" readonly value="{{ $secret }}"
+               onclick="this.select()">
+        <div class="form-text">
+          Account: {{ $user->email }} · Issuer: {{ config('app.name') }}
+        </div>
+        <div class="form-text">
+          {{-- Never only the QR. A camera that will not focus, a desktop
+               authenticator, a password manager on the same machine — typing
+               the key in is the path that always works. --}}
+          No camera to hand? Choose <strong>"Enter a setup key"</strong> in your app
+          and paste this instead.
+        </div>
+      </div>
     </div>
 
     <details class="mb-4">
       <summary class="text-muted">Full setup link</summary>
       <code class="d-block mt-2 small text-break">{{ $uri }}</code>
       <div class="form-text">
-        Some password managers accept this link directly. There is no QR image yet —
-        every authenticator supports typing the key in, which is what the field above is for.
+        The same thing the code above encodes. Some password managers accept this
+        link directly.
       </div>
     </details>
 

@@ -60,8 +60,17 @@ class EmployeePortalController extends Controller
 
         $breakState = $this->attendance->breakState($employee, $today);
 
+        // The shift's break policy (A5.7), so the button can say what pressing
+        // it costs. Before this the page asserted flatly that "breaks are not
+        // counted as worked time" — which stopped being true the day a shift
+        // could mark its break paid, and said so to the one person it mattered
+        // to. `shiftOn` rather than the standing shift: a rostered day may put
+        // somebody on a different one, with a different break.
+        $breakShift = $employee->shiftOn($today);
+
         return view('employee.dashboard', compact(
-            'employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday', 'schedule', 'breakState',
+            'employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday', 'schedule',
+            'breakState', 'breakShift',
         ));
     }
 

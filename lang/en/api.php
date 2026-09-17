@@ -44,6 +44,9 @@ return [
 
     // --- Devices ----------------------------------------------------------
     'device_registered'   => 'Device registered for notifications.',
+    // B1.6. Names no accusation: a shared password and a stolen one look
+    // identical from the server, and only HR can tell them apart or fix either.
+    'device_not_trusted'  => 'This account is signed in on a different phone. Ask HR to release it before signing in here.',
     'device_unregistered' => 'Device will no longer receive notifications.',
 
     // --- Profile ----------------------------------------------------------
@@ -57,6 +60,7 @@ return [
 
     // --- Leave ------------------------------------------------------------
     'leave_not_yours'      => 'That leave request is not yours.',
+    'leave_attachment_missing' => 'The file attached to this request is no longer on the server.',
     'leave_own_request'    => 'You cannot decide on your own leave request.',
     'leave_outside_team'   => 'That request belongs to someone outside your team.',
     'leave_auto_approved'  => 'Leave approved — this type does not need sign-off.',

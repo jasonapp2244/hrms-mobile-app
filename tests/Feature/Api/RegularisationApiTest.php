@@ -372,4 +372,33 @@ class RegularisationApiTest extends TestCase
         $this->assertSame('pending', $request->fresh()->status);
         $this->assertSame(0, AttendanceLog::count());
     }
+    // ================= the day the picker may not go past =================
+
+    /**
+     * The list carries the company's today, and the app draws its date picker
+     * from it.
+     *
+     * Without this the picker's upper bound came off the handset, and a phone
+     * even a few hours ahead of the company offered a date this very controller
+     * then refused — an error on a date the app itself had suggested. The
+     * company is put four hours behind UTC and the clock set to an hour where
+     * the two disagree about the date, because with a shared clock a picker
+     * built from the handset passes.
+     */
+    public function test_the_list_names_the_company_s_today_not_the_server_s(): void
+    {
+        $this->company->update(['timezone' => 'America/New_York']);
+
+        // 02:30 UTC on the 15th is 22:30 on the 14th in New York.
+        Carbon::setTestNow('2026-09-15 02:30:00');
+
+        $response = $this->getJson('/api/v1/attendance/regularisations')
+            ->assertOk()
+            ->json();
+
+        $this->assertSame('2026-09-14', $response['today']);
+        $this->assertNotSame(now()->toDateString(), $response['today']);
+
+        Carbon::setTestNow();
+    }
 }

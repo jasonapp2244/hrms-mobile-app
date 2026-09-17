@@ -119,11 +119,35 @@
 						<i class="ti ti-coffee me-1"></i>Start break
 					@endif
 				</button>
+				@php
+					// A5.7 — what this shift's break actually costs. The page used
+					// to assert flatly that breaks are never counted, which stopped
+					// being true the day a shift could mark its break paid.
+					$breakPaid = (bool) ($breakShift?->break_is_paid);
+					$breakMins = (int) ($breakShift?->break_minutes ?? 0);
+				@endphp
+
 				@if($breakState['on_break'] && $breakState['break_started_at'])
-					<div class="small text-warning mt-2">
-						On break since {{ $breakState['break_started_at']->format('h:i A') }} — worked time is paused.
+					<div class="small {{ $breakPaid ? 'text-success' : 'text-warning' }} mt-2">
+						On break since {{ $breakState['break_started_at']->format('h:i A') }}@if($breakPaid) — this break is paid, so your worked time keeps running.@else — worked time is paused.@endif
+					</div>
+				@elseif($breakMins > 0 && $breakPaid)
+					<div class="small text-success mt-2">
+						Your {{ $breakMins }}-minute break is paid — it stays on the clock.
+					</div>
+				@elseif($breakMins > 0 && $breakShift?->break_is_minimum)
+					{{-- Worth saying plainly: under this rule cutting a break short
+						 buys nothing, which changes what people do. --}}
+					<div class="small text-muted mt-2">
+						{{ $breakMins }} minutes comes off your hours, even if you take less.
+					</div>
+				@elseif($breakMins > 0)
+					<div class="small text-muted mt-2">
+						A {{ $breakMins }}-minute break comes off your hours.
 					</div>
 				@else
+					{{-- No break configured on this shift: better to say nothing than
+						 to state a policy that does not exist. --}}
 					<div class="small text-muted mt-2">Breaks are not counted as worked time.</div>
 				@endif
 			</div>

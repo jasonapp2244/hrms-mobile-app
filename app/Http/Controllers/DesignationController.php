@@ -9,11 +9,6 @@ use Illuminate\Http\Request;
 
 class DesignationController extends Controller
 {
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     public function index()
     {
         $companyId = $this->companyId();

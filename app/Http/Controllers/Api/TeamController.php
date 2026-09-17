@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Employee;
+use App\Models\Holiday;
+use App\Models\LeaveRequest;
 use App\Services\AttendanceService;
+use App\Services\LeaveService;
 use App\Services\ManagerScope;
 use App\Services\TeamAttendance;
 use App\Support\Clock;
@@ -31,6 +34,11 @@ class TeamController extends ApiController
         protected AttendanceService $attendance,
         protected ManagerScope $scope,
         protected TeamAttendance $teamAttendance,
+        // The working week and the weekend, from the same service the employee's
+        // own schedule and the web calendar ask. A controller that decided for
+        // itself which days are a weekend would be a second answer to a
+        // question the company has already configured once.
+        protected LeaveService $leave,
     ) {}
 
     /**
@@ -162,6 +170,131 @@ class TeamController extends ApiController
                     'is_rostered' => $day['is_rostered'],
                 ], $row['schedule']),
             ])->values(),
+        ]);
+    }
+
+    /**
+     * Who on the team is off, and when (B4.6).
+     *
+     * The month grid the web dashboard has had since A6.7, for the manager who
+     * is holding a phone rather than sitting at the desk. Same question, same
+     * two statuses, same weekend and holiday rules — computed from
+     * `LeaveService::weekendDays` and `Holiday::namedBetween` rather than from a
+     * second opinion about which Saturdays this company works.
+     *
+     * **Behind the same gate as the rest of this controller, and that is the
+     * whole reason it is here rather than on the employee's Leave tab.** The
+     * directory is explicit that another person's leave is not a
+     * colleague-grade fact; a manager, though, already reads every one of these
+     * requests in their approval inbox, and `clashesFor` already tells them who
+     * else is off over the dates of the one in front of them. This is that same
+     * disclosure arranged by day instead of by request, so nothing new is
+     * revealed to anybody.
+     *
+     * **Pending is drawn alongside approved**, which is the point rather than a
+     * detail: a month showing only what is already granted is a month a manager
+     * can approve a second person onto. Each entry carries its own status so
+     * the two never have to look alike.
+     *
+     * **Direct reports only, and the manager's own leave is not in it.** The
+     * team is whatever `ManagerScope` says it is, identically to
+     * `/team/attendance` and `/team/roster` — one definition of "my team"
+     * across all three, so three screens cannot come to disagree about who is
+     * on it.
+     *
+     * Unlike the attendance board there is **no future cutoff**: leave is
+     * booked ahead, so next month is the most useful month this can answer for.
+     */
+    public function leaveCalendar(Request $request): JsonResponse
+    {
+        $manager = $this->employee();
+
+        $data = $request->validate([
+            'month' => 'nullable|date_format:Y-m',
+        ]);
+
+        $timezone = $this->timezone($manager);
+        $today    = now($timezone)->toDateString();
+
+        $month = Carbon::parse(($data['month'] ?? substr($today, 0, 7)) . '-01')->startOfMonth();
+        $from  = $month->toDateString();
+        $to    = $month->copy()->endOfMonth()->toDateString();
+
+        $team = $this->scope->team($manager);
+
+        // Expanded to one entry per date up front, so the grid below is a
+        // lookup rather than a scan of every request for every one of
+        // thirty-one days — the same shape the web calendar builds.
+        $byDate = [];
+
+        if ($team->isNotEmpty()) {
+            $people = $team->keyBy('id');
+
+            $requests = LeaveRequest::with('leaveType')
+                ->whereIn('employee_id', $people->keys())
+                ->whereIn('status', ['approved', 'pending'])
+                ->overlapping($from, $to)
+                ->orderBy('start_date')
+                ->get();
+
+            foreach ($requests as $leave) {
+                $person = $people->get($leave->employee_id);
+
+                if (! $person) {
+                    continue;
+                }
+
+                // Clipped to the month: a fortnight that starts in August has
+                // only its September half on September's grid.
+                $first = Carbon::parse(max($leave->start_date->toDateString(), $from));
+                $last  = Carbon::parse(min($leave->end_date->toDateString(), $to));
+
+                for ($day = $first; $day->lte($last); $day->addDay()) {
+                    $byDate[$day->toDateString()][] = [
+                        'employee_id'   => $person->id,
+                        'name'          => $person->full_name,
+                        'employee_code' => $person->employee_code,
+                        'leave_type'    => $leave->leaveType?->name,
+                        'status'        => $leave->status,
+                        'is_half_day'   => (bool) $leave->is_half_day,
+                        'half_day_period' => $leave->half_day_period,
+                        // The whole stretch, not the day this entry sits on, so
+                        // a tap can say "Mon–Fri" without a second request.
+                        'start_date' => $leave->start_date->toDateString(),
+                        'end_date'   => $leave->end_date->toDateString(),
+                    ];
+                }
+            }
+        }
+
+        $weekend  = $this->leave->weekendDays($manager->company);
+        $holidays = $manager->company_id
+            ? Holiday::namedBetween($manager->company_id, $from, $to)
+            : [];
+
+        $days = [];
+
+        for ($day = $month->copy(); $day->toDateString() <= $to; $day->addDay()) {
+            $date = $day->toDateString();
+
+            $days[] = [
+                'date'    => $date,
+                'weekend' => in_array($day->dayOfWeek, $weekend, true),
+                'holiday' => $holidays[$date] ?? null,
+                'people'  => $byDate[$date] ?? [],
+            ];
+        }
+
+        return $this->ok([
+            'month'    => $month->format('Y-m'),
+            'from'     => $from,
+            'to'       => $to,
+            'timezone' => $timezone,
+            // The company's today, so the grid can mark it without asking the
+            // handset — which is in whatever zone its owner is standing in.
+            'today'     => $today,
+            'team_size' => $team->count(),
+            'days'      => $days,
         ]);
     }
 

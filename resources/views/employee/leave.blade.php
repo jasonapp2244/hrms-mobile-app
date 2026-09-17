@@ -74,6 +74,12 @@
 								<span class="badge bg-light text-dark ms-1">{{ $r->half_day_period === 'second_half' ? '2nd half' : '1st half' }}</span>
 							@endif
 							@if($r->reason)<div class="text-muted small">{{ Str::limit($r->reason, 60) }}</div>@endif
+							{{-- B4.1. Shown so the person who attached it can see that it
+							     arrived; there is no link because this is their own file
+							     and the two routes that serve it are for whoever decides. --}}
+							@if($r->hasAttachment())
+								<div class="text-muted small"><i class="ti ti-paperclip me-1"></i>{{ Str::limit($r->attachmentDownloadName(), 32) }}</div>
+							@endif
 						</td>
 						<td>
 							{{ $r->start_date->format('M j, Y') }}
@@ -114,7 +120,7 @@
 <div class="modal fade" id="applyModal" tabindex="-1" aria-hidden="true">
 	<div class="modal-dialog">
 		<div class="modal-content">
-			<form action="{{ route('employee.leave.store') }}" method="POST" id="applyForm">
+			<form action="{{ route('employee.leave.store') }}" method="POST" id="applyForm" enctype="multipart/form-data">
 				@csrf
 				<div class="modal-header">
 					<h5 class="modal-title">Apply for Leave</h5>
@@ -161,6 +167,17 @@
 						<label class="form-label">Reason</label>
 						<textarea name="reason" class="form-control" rows="3" maxlength="1000"
 							placeholder="Optional — helps whoever reviews this">{{ old('reason') }}</textarea>
+					</div>
+
+					<div class="mt-3">
+						<label class="form-label">Supporting file</label>
+						<input type="file" name="attachment" class="form-control"
+							accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx">
+						{{-- B4.1. Optional, because most leave needs none — it is the sick
+						     note and the summons that do. Only whoever decides on the
+						     request can open it. --}}
+						<div class="form-text">Optional — a sick note or similar. PDF, image or document, up to 10&nbsp;MB.</div>
+						@error('attachment')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
 					</div>
 
 					<p class="text-muted small mb-0 mt-3">

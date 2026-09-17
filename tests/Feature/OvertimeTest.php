@@ -326,4 +326,234 @@ class OvertimeTest extends TestCase
             ->get(route('reports.overtime'))
             ->assertForbidden();
     }
+
+    // -------------------------------------------------------------------------
+    // The shift's break policy (A5.7)
+    // -------------------------------------------------------------------------
+
+    /** Put this shift on a policy. */
+    private function policy(bool $paid = false, bool $minimum = false): void
+    {
+        $this->shift->update([
+            'break_is_paid'    => $paid,
+            'break_is_minimum' => $minimum,
+        ]);
+    }
+
+    public function test_the_default_policy_is_exactly_what_it_always_was(): void
+    {
+        // Unpaid, and only as long as the break somebody actually punched.
+        // Every shift that existed before A5.7 is on this, and nothing about a
+        // live company's payroll may move until somebody ticks a box.
+        $this->day('2026-08-03', [
+            ['in', '09:00:00'],
+            ['break_start', '12:00:00'],
+            ['break_end', '12:10:00'],
+            ['out', '17:00:00'],
+        ]);
+
+        $result = $this->overtimeOn('2026-08-03');
+
+        // 480 present, 10 taken off: 470 paid against 450 scheduled.
+        $this->assertSame(470, $result['worked']);
+        $this->assertSame(450, $result['scheduled']);
+        $this->assertSame(20, $result['overtime']);
+    }
+
+    public function test_a_paid_break_is_not_taken_off_either_side(): void
+    {
+        $this->policy(paid: true);
+
+        $this->day('2026-08-03', [
+            ['in', '09:00:00'],
+            ['break_start', '12:00:00'],
+            ['break_end', '12:30:00'],
+            ['out', '17:00:00'],
+        ]);
+
+        $result = $this->overtimeOn('2026-08-03');
+
+        // Both sides gain the half hour back, which is the point: taking it out
+        // of one and not the other would hand every employee on this shift half
+        // an hour of overtime a day.
+        $this->assertSame(480, $result['worked']);
+        $this->assertSame(480, $result['scheduled']);
+        $this->assertSame(0, $result['overtime']);
+    }
+
+    public function test_a_paid_break_nobody_punched_changes_nothing(): void
+    {
+        $this->policy(paid: true);
+        $this->day('2026-08-03', [['in', '09:00:00'], ['out', '17:00:00']]);
+
+        $result = $this->overtimeOn('2026-08-03');
+
+        $this->assertSame(480, $result['worked']);
+        $this->assertSame(480, $result['scheduled']);
+        $this->assertSame(0, $result['overtime']);
+    }
+
+    public function test_a_short_break_still_costs_the_full_one_when_it_is_a_minimum(): void
+    {
+        $this->policy(minimum: true);
+
+        $this->day('2026-08-03', [
+            ['in', '09:00:00'],
+            ['break_start', '12:00:00'],
+            ['break_end', '12:10:00'],
+            ['out', '17:00:00'],
+        ]);
+
+        // The whole reason the field exists. Under the default policy the same
+        // day is 470 worked and earns 20 minutes of overtime — so a ten-minute
+        // lunch pays better than the half hour the shift says is unpaid, and
+        // the colleague who never touches the break button does best of all.
+        $this->assertSame(450, $this->overtimeOn('2026-08-03')['worked']);
+        $this->assertSame(0, $this->overtimeOn('2026-08-03')['overtime']);
+    }
+
+    public function test_a_minimum_never_shortens_a_long_break(): void
+    {
+        $this->policy(minimum: true);
+
+        $this->day('2026-08-03', [
+            ['in', '09:00:00'],
+            ['break_start', '12:00:00'],
+            ['break_end', '12:40:00'],
+            ['out', '17:00:00'],
+        ]);
+
+        // Forty minutes away is forty minutes not worked. A floor is a floor,
+        // not a fixed amount.
+        $this->assertSame(440, $this->overtimeOn('2026-08-03')['worked']);
+    }
+
+    public function test_paid_wins_over_minimum_when_both_are_set(): void
+    {
+        $this->policy(paid: true, minimum: true);
+
+        $this->day('2026-08-03', [
+            ['in', '09:00:00'],
+            ['break_start', '12:00:00'],
+            ['break_end', '12:10:00'],
+            ['out', '17:00:00'],
+        ]);
+
+        // Nothing to be a minimum *of*: a paid break costs nothing, so there is
+        // no floor to raise it to. The form says so rather than leaving it to
+        // be discovered in a payslip.
+        $this->assertSame(480, $this->overtimeOn('2026-08-03')['worked']);
+    }
+
+    public function test_a_day_with_no_break_punches_still_loses_the_nominal_break(): void
+    {
+        $this->policy(minimum: true);
+        $this->day('2026-08-03', [['in', '09:00:00'], ['out', '17:00:00']]);
+
+        // Unchanged by the new field, and the rule that was already there:
+        // without it an ordinary day reports 480 against 450 and manufactures
+        // half an hour of overtime for everybody.
+        $this->assertSame(450, $this->overtimeOn('2026-08-03')['worked']);
+    }
+
+    public function test_the_shifts_paid_hours_follow_the_policy(): void
+    {
+        $this->assertSame(450, $this->shift->workingMinutes());
+
+        $this->policy(paid: true);
+        $this->assertSame(480, $this->shift->fresh()->workingMinutes());
+    }
+
+    public function test_the_policy_reads_as_one_phrase(): void
+    {
+        $this->assertSame('30m unpaid', $this->shift->break_policy_label);
+
+        $this->policy(minimum: true);
+        $this->assertSame('30m unpaid (minimum)', $this->shift->fresh()->break_policy_label);
+
+        $this->policy(paid: true);
+        $this->assertSame('30m paid', $this->shift->fresh()->break_policy_label);
+
+        $this->shift->update(['break_minutes' => 0]);
+        $this->assertSame('No break', $this->shift->fresh()->break_policy_label);
+    }
+
+    public function test_the_live_counter_honours_a_paid_break_and_nothing_else(): void
+    {
+        $this->policy(paid: true, minimum: true);
+
+        $logs = $this->day('2026-08-03', [
+            ['in', '09:00:00'],
+            ['break_start', '12:00:00'],
+            ['break_end', '12:10:00'],
+        ]);
+
+        $service = app(AttendanceService::class);
+        $until   = Carbon::parse('2026-08-03 14:00:00');
+
+        // Five hours on the clock, and the ten-minute break is paid so it stays
+        // on it. The *minimum* is not applied here even though it is set: the
+        // nominal break has not been taken yet at two in the afternoon, and a
+        // counter that dropped half an hour the moment somebody came back from
+        // a short lunch would read as a bug.
+        $this->assertSame(300, $service->workedMinutes($logs, $until, $this->shift->fresh()));
+
+        // Unpaid, and it comes off as taken — still not topped up to 30.
+        $this->policy(minimum: true);
+        $this->assertSame(290, $service->workedMinutes($logs, $until, $this->shift->fresh()));
+    }
+
+    public function test_hr_can_set_the_policy_and_unset_it_again(): void
+    {
+        $this->actingAs($this->hr)->put(route('shifts.update', $this->shift), [
+            'name' => 'Day', 'start_time' => '09:00', 'end_time' => '17:00',
+            'break_minutes' => 30, 'late_grace_minutes' => 15, 'is_active' => 1,
+            'break_is_paid' => 1, 'break_is_minimum' => 1,
+        ])->assertRedirect();
+
+        $this->assertTrue($this->shift->fresh()->break_is_paid);
+        $this->assertTrue($this->shift->fresh()->break_is_minimum);
+
+        // An unticked checkbox sends nothing at all. Without normalising that
+        // to false the keys would simply be absent and the old values would
+        // survive — a policy that could be switched on and never off again.
+        $this->actingAs($this->hr)->put(route('shifts.update', $this->shift), [
+            'name' => 'Day', 'start_time' => '09:00', 'end_time' => '17:00',
+            'break_minutes' => 30, 'late_grace_minutes' => 15, 'is_active' => 1,
+        ])->assertRedirect();
+
+        $this->assertFalse($this->shift->fresh()->break_is_paid);
+        $this->assertFalse($this->shift->fresh()->break_is_minimum);
+    }
+
+    public function test_the_shifts_page_states_the_policy_and_offers_the_controls(): void
+    {
+        // Nothing rendered this page before, so a mistake in the Blade — a
+        // mistyped accessor, a stray directive — would have reached the browser
+        // with only the redirect tests above still passing.
+        $this->policy(minimum: true);
+
+        $this->actingAs($this->hr)->get(route('shifts.index'))
+            ->assertOk()
+            ->assertSee('30m unpaid (minimum)')
+            ->assertSee('Break is paid')
+            ->assertSee('Deduct at least this much')
+            // Both forms carry both boxes: the one that edits this shift and
+            // the one that creates the next.
+            ->assertSee('name="break_is_paid"', false)
+            ->assertSee('name="break_is_minimum"', false);
+    }
+
+    public function test_a_new_shift_starts_on_the_old_behaviour(): void
+    {
+        $this->actingAs($this->hr)->post(route('shifts.store'), [
+            'name' => 'Late', 'start_time' => '14:00', 'end_time' => '22:00',
+            'break_minutes' => 30, 'late_grace_minutes' => 10, 'is_active' => 1,
+        ])->assertRedirect();
+
+        $created = Shift::where('name', 'Late')->firstOrFail();
+
+        $this->assertFalse($created->break_is_paid);
+        $this->assertFalse($created->break_is_minimum);
+    }
 }

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\Preflight;
 use App\Models\Company;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
@@ -388,5 +389,113 @@ class PreflightCommandTest extends TestCase
         $this->queueJobWaiting(480);
 
         $this->artisan('emp:preflight')->assertExitCode(1);
+    }
+
+    // ================= dependency advisories =================
+
+    /**
+     * The dependency register carried "no automated check exists for security
+     * advisories" as an open finding for months. The first manual run of
+     * `composer audit` found three, one of them a high-severity path traversal
+     * in a package this application was actively feeding caller-controlled
+     * filenames to. These cover the verdicts a passing machine cannot produce.
+     */
+    private function advisory(string $severity, string $package = 'acme/thing'): array
+    {
+        return [
+            'advisoryId'  => 'PKSA-0000-0000-0000',
+            'packageName' => $package,
+            'title'       => 'Something bad happens when given a hostile input',
+            'severity'    => $severity,
+        ];
+    }
+
+    public function test_a_clean_audit_passes(): void
+    {
+        [$level, , $ok] = Preflight::advisoryVerdict(['advisories' => [], 'abandoned' => []]);
+
+        $this->assertSame(Preflight::PASS, $level);
+        $this->assertSame('none', $ok);
+    }
+
+    public function test_abandoned_packages_are_named_but_do_not_fail_anything(): void
+    {
+        [$level, , $ok] = Preflight::advisoryVerdict([
+            'advisories' => [],
+            'abandoned'  => ['old/thing' => null, 'older/thing' => null],
+        ]);
+
+        // Not a vulnerability, so it fails nothing — but a package nobody
+        // maintains is where the next advisory comes from.
+        $this->assertSame(Preflight::PASS, $level);
+        $this->assertSame('none (2 abandoned package(s))', $ok);
+    }
+
+    public function test_a_high_severity_advisory_fails_the_deploy(): void
+    {
+        [$level, $detail] = Preflight::advisoryVerdict([
+            'advisories' => ['acme/thing' => [$this->advisory('high')]],
+        ]);
+
+        // Shipping a known remote-exploitable hole is not a judgement call.
+        $this->assertSame(Preflight::FAIL, $level);
+        $this->assertStringContainsString('acme/thing', $detail);
+        $this->assertStringContainsString('1 high', $detail);
+    }
+
+    public function test_a_critical_advisory_fails_the_deploy(): void
+    {
+        [$level] = Preflight::advisoryVerdict([
+            'advisories' => ['acme/thing' => [$this->advisory('critical')]],
+        ]);
+
+        $this->assertSame(Preflight::FAIL, $level);
+    }
+
+    public function test_a_medium_advisory_warns_rather_than_blocking(): void
+    {
+        [$level, $detail] = Preflight::advisoryVerdict([
+            'advisories' => ['acme/thing' => [$this->advisory('medium')]],
+        ]);
+
+        // Blocking an urgent fix on a low-severity advisory in a dev-only
+        // package teaches everybody to ignore the output.
+        $this->assertSame(Preflight::WARN, $level);
+        $this->assertStringContainsString('1 medium', $detail);
+    }
+
+    public function test_the_line_names_the_worst_advisory_not_the_first(): void
+    {
+        [$level, $detail] = Preflight::advisoryVerdict([
+            'advisories' => [
+                'quiet/one' => [$this->advisory('low', 'quiet/one')],
+                'loud/one'  => [$this->advisory('critical', 'loud/one')],
+            ],
+        ]);
+
+        // Whoever reads one line of this needs the one that matters.
+        $this->assertSame(Preflight::FAIL, $level);
+        $this->assertStringContainsString('loud/one', $detail);
+        $this->assertStringNotContainsString('e.g. quiet/one', $detail);
+    }
+
+    public function test_being_unable_to_check_warns_rather_than_blocking(): void
+    {
+        [$level, $detail] = Preflight::advisoryVerdict(null);
+
+        // The advisory database is fetched over the network and plenty of
+        // production boxes have none. A check that turned "I could not look"
+        // into "you may not deploy" would be deleted within a week.
+        $this->assertSame(Preflight::WARN, $level);
+        $this->assertStringContainsString('could not be checked', $detail);
+    }
+
+    public function test_the_real_check_runs_and_reports(): void
+    {
+        $this->passingConfig();
+
+        // End to end against whatever composer says here, so the wiring is
+        // exercised and not only the verdict logic.
+        $this->artisan('emp:preflight')->expectsOutputToContain('Dependency advisories');
     }
 }

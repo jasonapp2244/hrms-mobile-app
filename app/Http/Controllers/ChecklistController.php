@@ -20,11 +20,6 @@ use Illuminate\Validation\Rule;
  */
 class ChecklistController extends Controller
 {
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     // -------------------------------------------------------------------------
     // The company's standard steps
     // -------------------------------------------------------------------------

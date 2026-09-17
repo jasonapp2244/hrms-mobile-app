@@ -7,11 +7,6 @@ use Illuminate\Http\Request;
 
 class OfficeController extends Controller
 {
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     public function index()
     {
         $offices = Office::withCount('employees')

@@ -45,9 +45,9 @@ class Preflight extends Command
      */
     protected bool $databaseUp = false;
 
-    private const PASS = 'pass';
-    private const WARN = 'warn';
-    private const FAIL = 'fail';
+    public const PASS = 'pass';
+    public const WARN = 'warn';
+    public const FAIL = 'fail';
 
     public function handle(): int
     {
@@ -68,6 +68,7 @@ class Preflight extends Command
         $this->checkPush();
         $this->checkMobileGate();
         $this->checkDefaultCredentials();
+        $this->checkDependencyAdvisories();
 
         return $this->report();
     }
@@ -160,7 +161,12 @@ class Preflight extends Command
         // Behind nginx this is what keeps the per-punch IP meaningful. Left
         // unset, every attendance row records the proxy's address instead of the
         // employee's and the column quietly becomes worthless.
-        $proxies = env('TRUSTED_PROXIES');
+        //
+        // Read through config rather than `env()`. A deploy runs `config:cache`,
+        // and once it has, .env is not loaded at all — so an `env()` here would
+        // report "unset" on exactly the box that had just set it correctly, and
+        // the one check that can catch this would be the thing crying wolf.
+        $proxies = config('trustedproxy.proxies');
         $this->assert(
             'TRUSTED_PROXIES',
             $proxies ? self::PASS : self::WARN,
@@ -630,6 +636,130 @@ class Preflight extends Command
      * Record a check, and print it as it happens so a slow run still shows
      * progress rather than sitting silent and then dumping everything.
      */
+    /**
+     * Known security advisories against the installed packages.
+     *
+     * The dependency register carried this as an open finding for months — "no
+     * automated check exists" — and the first time anybody ran `composer audit`
+     * by hand it found three, one of them a high-severity path traversal in
+     * `maatwebsite/excel` that this application was actively feeding
+     * caller-controlled filenames to. Fixing what one manual run turned up is
+     * not the same as having a check; this is the check.
+     *
+     * **Severity decides the verdict.** Critical and high fail the deploy,
+     * because shipping a known remote-exploitable hole is not a judgement call.
+     * Medium and low warn: they are worth reading before release, but blocking
+     * an urgent fix on a low-severity advisory in a dev-only package would
+     * teach everybody to pass `--strict=false` and stop reading the output.
+     *
+     * **It never fails on its own inability to run.** The advisory database is
+     * fetched over the network, and plenty of production boxes have no outbound
+     * access at all — a check that turned "I could not look" into "you may not
+     * deploy" would be the fastest way to get itself deleted. Composer missing,
+     * the network down, a timeout: all of it warns and says which.
+     */
+    protected function checkDependencyAdvisories(): void
+    {
+        if (! $this->binaryExists('composer')) {
+            $this->assert(
+                'Dependency advisories',
+                self::WARN,
+                'composer is not on PATH here, so advisories could not be checked — run `composer audit` where it is',
+            );
+
+            return;
+        }
+
+        [$level, $detail, $ok] = self::advisoryVerdict($this->runComposerAudit());
+
+        $this->assert('Dependency advisories', $level, $detail, $ok);
+    }
+
+    /**
+     * Turn a decoded `composer audit` report into a verdict.
+     *
+     * Pure, and separate from running composer, because the cases worth testing
+     * are the ones a passing machine cannot produce: a high-severity advisory,
+     * a medium-only one, and a run that could not happen at all. A check whose
+     * failure path has never been executed is a check nobody should trust.
+     *
+     * @param  array<string, mixed>|null  $report  null when composer could not answer
+     * @return array{0: string, 1: string, 2: string}  [level, detail, ok text]
+     */
+    public static function advisoryVerdict(?array $report): array
+    {
+        if ($report === null) {
+            return [
+                self::WARN,
+                'could not be checked — composer audit did not answer (no network, or it timed out)',
+                '',
+            ];
+        }
+
+        // Keyed by package when populated, a bare empty array when not — so it
+        // is flattened rather than assumed to be either shape.
+        $advisories = collect($report['advisories'] ?? [])->flatten(1);
+
+        if ($advisories->isEmpty()) {
+            // `abandoned` is not a vulnerability and fails nothing, but a
+            // package nobody maintains is where the next advisory comes from.
+            $abandoned = count($report['abandoned'] ?? []);
+
+            return [
+                self::PASS,
+                '',
+                $abandoned > 0 ? "none ({$abandoned} abandoned package(s))" : 'none',
+            ];
+        }
+
+        // Grouped by severity so the line names the worst thing, not just a count.
+        $bySeverity = $advisories->groupBy(fn ($a) => strtolower($a['severity'] ?? 'unknown'));
+        $serious    = $bySeverity->only(['critical', 'high'])->flatten(1);
+
+        $summary = $bySeverity
+            ->map(fn ($group, $severity) => count($group) . ' ' . $severity)
+            ->implode(', ');
+
+        $worst = $serious->isNotEmpty() ? $serious->first() : $advisories->first();
+
+        $detail = sprintf(
+            '%s — e.g. %s: %s. Run `composer audit` for the list',
+            $summary,
+            $worst['packageName'] ?? 'a package',
+            Str::limit((string) ($worst['title'] ?? 'see the advisory'), 90),
+        );
+
+        return [$serious->isNotEmpty() ? self::FAIL : self::WARN, $detail, ''];
+    }
+
+    /**
+     * `composer audit --format=json`, decoded — or null if it could not run.
+     *
+     * Composer exits non-zero when it *finds* advisories, so the exit code says
+     * nothing useful here and the JSON is the answer. A run that produces no
+     * decodable JSON is the failure case, whatever it exited with.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function runComposerAudit(): ?array
+    {
+        $command = sprintf(
+            'composer audit --format=json --no-interaction --working-dir=%s 2>%s',
+            escapeshellarg(base_path()),
+            stripos(PHP_OS_FAMILY, 'win') === 0 ? 'NUL' : '/dev/null',
+        );
+
+        $output = @shell_exec($command);
+
+        if (! is_string($output) || trim($output) === '') {
+            return null;
+        }
+
+        $report = json_decode($output, true);
+
+        return is_array($report) ? $report : null;
+    }
+
     protected function assert(string $name, string $level, string $detail = '', string $ok = 'ok'): void
     {
         $this->results[] = compact('level', 'name', 'detail');

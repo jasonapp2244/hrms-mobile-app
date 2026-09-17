@@ -15,11 +15,6 @@ use Illuminate\Http\Request;
  */
 class HolidayController extends Controller
 {
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     public function index(Request $request)
     {
         $companyId = $this->companyId();

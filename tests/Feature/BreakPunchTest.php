@@ -330,4 +330,78 @@ class BreakPunchTest extends TestCase
 
         $this->assertSame(0, $result['overtime']);
     }
+
+    // -------------------------------------------------------------------------
+    // What the portal tells the person taking the break (A5.7)
+    // -------------------------------------------------------------------------
+
+    /** On the clock, so the break button and its note are on the page. */
+    private function onTheClock(): void
+    {
+        app(AttendanceService::class)->record($this->employee, $this->office);
+    }
+
+    private function shift(): Shift
+    {
+        return $this->employee->shift;
+    }
+
+    public function test_the_portal_says_an_unpaid_break_comes_off_your_hours(): void
+    {
+        $this->onTheClock();
+
+        $this->actingAs($this->user)->get(route('employee.dashboard'))
+            ->assertOk()
+            ->assertSee('A 30-minute break comes off your hours.');
+    }
+
+    public function test_the_portal_no_longer_claims_a_paid_break_is_unpaid(): void
+    {
+        $this->shift()->update(['break_is_paid' => true]);
+        $this->onTheClock();
+
+        $response = $this->actingAs($this->user)->get(route('employee.dashboard'))->assertOk();
+
+        // The defect this closes: the page asserted flatly that "breaks are not
+        // counted as worked time", which stopped being true the day a shift
+        // could mark its break paid — and said so to the one person it mattered
+        // to, on the screen where they decide whether to take one.
+        $response->assertSee('Your 30-minute break is paid — it stays on the clock.', false);
+        $response->assertDontSee('Breaks are not counted as worked time.');
+    }
+
+    public function test_the_portal_says_when_a_shorter_break_buys_nothing(): void
+    {
+        $this->shift()->update(['break_is_minimum' => true]);
+        $this->onTheClock();
+
+        $this->actingAs($this->user)->get(route('employee.dashboard'))
+            ->assertOk()
+            ->assertSee('30 minutes comes off your hours, even if you take less.');
+    }
+
+    public function test_a_paid_break_in_progress_says_the_clock_is_still_running(): void
+    {
+        $this->shift()->update(['break_is_paid' => true]);
+        $this->onTheClock();
+        app(AttendanceService::class)->recordBreak($this->employee, $this->office);
+
+        $response = $this->actingAs($this->user)->get(route('employee.dashboard'))->assertOk();
+
+        // "Worked time is paused" would be wrong here, and wrong in the most
+        // alarming direction — somebody watching their hours stop.
+        $response->assertSee('this break is paid, so your worked time keeps running.', false);
+        $response->assertDontSee('worked time is paused.');
+    }
+
+    public function test_a_shift_with_no_break_says_nothing_about_one(): void
+    {
+        $this->shift()->update(['break_minutes' => 0]);
+        $this->onTheClock();
+
+        // Better than naming a policy that does not exist.
+        $this->actingAs($this->user)->get(route('employee.dashboard'))
+            ->assertOk()
+            ->assertDontSee('comes off your hours');
+    }
 }

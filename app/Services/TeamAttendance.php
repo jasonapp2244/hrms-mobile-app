@@ -79,6 +79,11 @@ class TeamAttendance
 
             $onLeave = in_array($date, $leaveByEmployee[$employee->id] ?? [], true);
 
+            // shiftOn rather than the raw override: roster-aware, so this is
+            // the shift the roster actually put them on that day and not the
+            // one they usually work.
+            $shift = $employee->shiftOn($date);
+
             return [
                 'employee' => $employee,
                 'status'   => $this->attendance->dayStatus(
@@ -95,11 +100,11 @@ class TeamAttendance
                 // walking the floor is actually asking. A break counts as in:
                 // they are at work, just not at the mop.
                 'is_clocked_in'  => (bool) ($last && in_array($last->type, ['in', 'break_start', 'break_end'], true)),
-                'worked_minutes' => $this->attendance->workedMinutes($dayLogs),
-                // shiftOn rather than the raw override: roster-aware, so this is
-                // the shift the roster actually put them on that day and not the
-                // one they usually work.
-                'shift' => $employee->shiftOn($date),
+                // With the shift, so a paid break (A5.7) is not deducted from
+                // somebody's hours on the manager's board while it is on the
+                // clock everywhere else.
+                'worked_minutes' => $this->attendance->workedMinutes($dayLogs, null, $shift),
+                'shift' => $shift,
             ];
         })->values();
     }

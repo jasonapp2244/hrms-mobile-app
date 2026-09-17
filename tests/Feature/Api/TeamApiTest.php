@@ -4,6 +4,7 @@ namespace Tests\Feature\Api;
 
 use App\Models\Company;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use App\Models\Office;
@@ -406,5 +407,239 @@ class TeamApiTest extends TestCase
         $this->asManager();
 
         $this->getJson('/api/v1/team/roster?days=90')->assertStatus(422);
+    }
+
+    // ================= the team leave calendar (B4.6) =================
+
+    /** A booked stretch of leave for one of the manager's own reports. */
+    protected function booked(
+        Employee $employee,
+        string $from,
+        string $to,
+        string $status = 'approved',
+        string $type = 'Annual',
+    ): LeaveRequest {
+        $leaveType = LeaveType::firstOrCreate(
+            ['company_id' => $this->company->id, 'name' => $type],
+            ['days_per_year' => 20],
+        );
+
+        return LeaveRequest::create([
+            'company_id'    => $this->company->id,
+            'employee_id'   => $employee->id,
+            'leave_type_id' => $leaveType->id,
+            'start_date'    => $from,
+            'end_date'      => $to,
+            'days'          => Carbon::parse($from)->diffInDays(Carbon::parse($to)) + 1,
+            'status'        => $status,
+        ]);
+    }
+
+    /** The `people` on one date of the grid, whatever the rest of it says. */
+    protected function peopleOn(array $days, string $date): array
+    {
+        return collect($days)->firstWhere('date', $date)['people'] ?? [];
+    }
+
+    public function test_an_ordinary_employee_cannot_see_the_team_calendar(): void
+    {
+        [, $user] = $this->staff('Ann', 'E1');
+        Sanctum::actingAs($user);
+
+        $this->getJson('/api/v1/team/leave-calendar')->assertForbidden();
+    }
+
+    public function test_the_calendar_needs_a_token(): void
+    {
+        $this->getJson('/api/v1/team/leave-calendar')->assertUnauthorized();
+    }
+
+    public function test_it_opens_on_the_companys_current_month(): void
+    {
+        $this->asManager();
+
+        $response = $this->getJson('/api/v1/team/leave-calendar')->assertOk();
+
+        // 2026-08-03 in setUp. The month is the server's, and it says so —
+        // the handset is in whatever zone its owner is standing in.
+        $response->assertJsonPath('month', '2026-08')
+            ->assertJsonPath('from', '2026-08-01')
+            ->assertJsonPath('to', '2026-08-31')
+            ->assertJsonPath('today', '2026-08-03');
+
+        $this->assertCount(31, $response->json('days'));
+    }
+
+    public function test_a_booked_stretch_appears_on_every_day_it_covers(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->booked($ann, '2026-08-10', '2026-08-12');
+
+        $this->asManager();
+        $days = $this->getJson('/api/v1/team/leave-calendar')->assertOk()->json('days');
+
+        // The grid is a lookup, so the stretch has to be expanded into it —
+        // a client that had to scan every request for every cell would be
+        // re-deriving on the phone what the server already knows.
+        foreach (['2026-08-10', '2026-08-11', '2026-08-12'] as $date) {
+            $this->assertCount(1, $this->peopleOn($days, $date), "nobody off on {$date}");
+        }
+
+        $this->assertSame([], $this->peopleOn($days, '2026-08-09'));
+        $this->assertSame([], $this->peopleOn($days, '2026-08-13'));
+
+        $entry = $this->peopleOn($days, '2026-08-11')[0];
+
+        $this->assertSame('Ann', $entry['name']);
+        $this->assertSame('Annual', $entry['leave_type']);
+        $this->assertSame('approved', $entry['status']);
+        // The whole stretch travels with each day of it, so a tap can say
+        // "10–12 Aug" without a second request.
+        $this->assertSame('2026-08-10', $entry['start_date']);
+        $this->assertSame('2026-08-12', $entry['end_date']);
+    }
+
+    public function test_pending_is_drawn_alongside_approved_and_says_which(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        [$bob] = $this->staff('Bob', 'E2', 'employee', $this->manager);
+
+        $this->booked($ann, '2026-08-10', '2026-08-10');
+        $this->booked($bob, '2026-08-10', '2026-08-10', 'pending');
+
+        $this->asManager();
+        $days = $this->getJson('/api/v1/team/leave-calendar')->assertOk()->json('days');
+
+        // The point of the screen: a month showing only what is already granted
+        // is a month a manager can approve a second person onto.
+        $statuses = collect($this->peopleOn($days, '2026-08-10'))
+            ->pluck('status')->sort()->values()->all();
+
+        $this->assertSame(['approved', 'pending'], $statuses);
+    }
+
+    public function test_a_settled_request_is_not_on_the_grid(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->booked($ann, '2026-08-10', '2026-08-10', 'rejected');
+        $this->booked($ann, '2026-08-11', '2026-08-11', 'cancelled');
+
+        $this->asManager();
+        $days = $this->getJson('/api/v1/team/leave-calendar')->assertOk()->json('days');
+
+        // Neither is cover anybody has to plan around.
+        $this->assertSame([], $this->peopleOn($days, '2026-08-10'));
+        $this->assertSame([], $this->peopleOn($days, '2026-08-11'));
+    }
+
+    public function test_leave_running_across_the_month_boundary_is_clipped(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->booked($ann, '2026-07-29', '2026-08-03');
+
+        $this->asManager();
+        $response = $this->getJson('/api/v1/team/leave-calendar?month=2026-08')->assertOk();
+        $days = $response->json('days');
+
+        // August's half only, and every one of August's days present —
+        // a grid that ran from 29 July would not draw on a month.
+        $this->assertSame('2026-08-01', $days[0]['date']);
+        $this->assertCount(1, $this->peopleOn($days, '2026-08-01'));
+        $this->assertCount(1, $this->peopleOn($days, '2026-08-03'));
+        $this->assertSame([], $this->peopleOn($days, '2026-08-04'));
+
+        // The request still names its real dates, which is what a manager
+        // needs to understand why somebody is already away on the 1st.
+        $this->assertSame('2026-07-29', $this->peopleOn($days, '2026-08-01')[0]['start_date']);
+    }
+
+    public function test_somebody_elses_report_is_not_on_my_calendar(): void
+    {
+        [$otherBoss] = $this->staff('Otto', 'M2', 'manager');
+        [$theirs] = $this->staff('Theirs', 'E9', 'employee', $otherBoss);
+        [$mine] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+
+        $this->booked($theirs, '2026-08-10', '2026-08-10');
+        $this->booked($mine, '2026-08-10', '2026-08-10');
+
+        $this->asManager();
+        $days = $this->getJson('/api/v1/team/leave-calendar')->assertOk()->json('days');
+
+        $names = collect($this->peopleOn($days, '2026-08-10'))->pluck('name')->all();
+
+        $this->assertSame(['Ann'], $names);
+    }
+
+    public function test_the_managers_own_leave_is_not_on_it(): void
+    {
+        // Deliberate: the team is exactly what ManagerScope says it is, the
+        // same definition /team/attendance and /team/roster use. A calendar
+        // that quietly added one more person would be a fourth opinion about
+        // who is on this team.
+        $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->booked($this->manager, '2026-08-10', '2026-08-10');
+
+        $this->asManager();
+        $days = $this->getJson('/api/v1/team/leave-calendar')->assertOk()->json('days');
+
+        $this->assertSame([], $this->peopleOn($days, '2026-08-10'));
+    }
+
+    public function test_a_manager_with_no_reports_gets_an_empty_month_not_a_failure(): void
+    {
+        $this->asManager();
+
+        $response = $this->getJson('/api/v1/team/leave-calendar')->assertOk();
+
+        $this->assertSame(0, $response->json('team_size'));
+        $this->assertCount(31, $response->json('days'));
+        $this->assertSame(
+            [],
+            collect($response->json('days'))->pluck('people')->flatten(1)->all(),
+        );
+    }
+
+    public function test_the_grid_marks_weekends_and_names_holidays(): void
+    {
+        Holiday::create([
+            'company_id' => $this->company->id,
+            'name'       => 'Summer Bank Holiday',
+            'date'       => '2026-08-31',
+        ]);
+
+        $this->asManager();
+        $days = $this->getJson('/api/v1/team/leave-calendar')->assertOk()->json('days');
+
+        $byDate = collect($days)->keyBy('date');
+
+        // 2026-08-01 is a Saturday, the 3rd a Monday.
+        $this->assertTrue($byDate['2026-08-01']['weekend']);
+        $this->assertFalse($byDate['2026-08-03']['weekend']);
+        $this->assertSame('Summer Bank Holiday', $byDate['2026-08-31']['holiday']);
+        $this->assertNull($byDate['2026-08-03']['holiday']);
+    }
+
+    public function test_a_future_month_is_answerable_because_that_is_the_point(): void
+    {
+        [$ann] = $this->staff('Ann', 'E1', 'employee', $this->manager);
+        $this->booked($ann, '2026-12-24', '2026-12-26');
+
+        $this->asManager();
+        $response = $this->getJson('/api/v1/team/leave-calendar?month=2026-12')->assertOk();
+
+        // Unlike the attendance board, which refuses a day that has not
+        // happened: leave is booked ahead, so next month is the most useful
+        // month this can answer for.
+        $response->assertJsonPath('month', '2026-12');
+        $this->assertCount(1, $this->peopleOn($response->json('days'), '2026-12-25'));
+    }
+
+    public function test_a_month_that_is_not_a_month_is_refused(): void
+    {
+        $this->asManager();
+
+        $this->getJson('/api/v1/team/leave-calendar?month=2026-13')->assertStatus(422);
+        $this->getJson('/api/v1/team/leave-calendar?month=August')->assertStatus(422);
+        $this->getJson('/api/v1/team/leave-calendar?month=2026-08-03')->assertStatus(422);
     }
 }

@@ -16,11 +16,6 @@ class ReportController extends Controller
 {
     public function __construct(protected ReportService $reports) {}
 
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     public function late(Request $request)
     {
         return $this->handle($request, 'late');
@@ -66,8 +61,21 @@ class ReportController extends Controller
     protected function handle(Request $request, string $type)
     {
         $companyId = $this->companyId();
-        $from = $request->input('from', now()->startOfMonth()->toDateString());
-        $to = $request->input('to', now()->toDateString());
+
+        // Validated, and not only because a bad date makes a nonsense report:
+        // both ends are concatenated into `$slug` below, which becomes the
+        // **download filename** of the Excel and PDF exports. A filename is a
+        // path, and a library that takes the caller's word for it will write
+        // outside the disk it was configured with — maatwebsite/excel did
+        // exactly that through 3.1.69 (CVE-2026-84374). The dependency is
+        // current again; this is the half that stays true after the next one.
+        $dates = $request->validate([
+            'from' => 'nullable|date_format:Y-m-d',
+            'to'   => 'nullable|date_format:Y-m-d',
+        ]);
+
+        $from = $dates['from'] ?? now()->startOfMonth()->toDateString();
+        $to   = $dates['to'] ?? now()->toDateString();
         $officeId = $request->filled('office_id') ? (int) $request->office_id : null;
 
         $report = $type === 'custom'

@@ -44,4 +44,11 @@ return [
         'break_end'   => 'Back from break',
     ],
 
+
+    // B2.7. Short enough to sit in a badge. Each one is a fact the handset
+    // reported about itself, not an accusation — see AttendanceLog::looksTampered.
+    'flag_mocked'   => 'Mock location',
+    'flag_rooted'   => 'Rooted device',
+    'flag_emulator' => 'Emulator',
+
 ];

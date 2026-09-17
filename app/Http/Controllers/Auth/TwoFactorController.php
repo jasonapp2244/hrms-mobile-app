@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
+use App\Support\QrCode;
 use App\Support\Totp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -30,16 +31,22 @@ class TwoFactorController extends Controller
     {
         $user = $request->user();
 
+        $uri = $user->two_factor_secret
+            ? Totp::provisioningUri(
+                config('app.name'),
+                $user->email,
+                $user->two_factor_secret,
+            )
+            : null;
+
         return view('profile.two-factor', [
             'user'      => $user,
             'secret'    => $user->two_factor_secret,
-            'uri'       => $user->two_factor_secret
-                ? Totp::provisioningUri(
-                    config('app.name'),
-                    $user->email,
-                    $user->two_factor_secret,
-                )
-                : null,
+            'uri'       => $uri,
+            // Inline SVG, and null when it cannot be drawn — the typed setup
+            // key is the instruction that always works, so a QR that failed to
+            // encode costs the page nothing. See App\Support\QrCode.
+            'qr'        => $uri ? QrCode::svg($uri) : null,
             // Shown once, on the redirect straight after they are generated.
             // Held in the session rather than re-read from the user so that
             // reloading the page does not put them back on screen.

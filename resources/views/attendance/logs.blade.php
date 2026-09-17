@@ -74,6 +74,14 @@
 							onchange="this.form.submit()" {{ request()->boolean('show_voided') ? 'checked' : '' }}>
 						Voided
 					</label>
+					{{-- B2.7. The whole point of the columns: finding the handful of
+					     rows worth reading, rather than scrolling a day of them. --}}
+					<input type="hidden" name="flagged" value="0">
+					<label class="btn btn-light me-2 mb-0" title="Punches the handset flagged — mock location, rooted device or emulator">
+						<input type="checkbox" name="flagged" value="1" class="form-check-input me-1"
+							onchange="this.form.submit()" {{ request()->boolean('flagged') ? 'checked' : '' }}>
+						Flagged
+					</label>
 				<a href="{{ route('attendance.logs') }}" class="btn btn-light">Clear</a>
 			</div>
 		</form>
@@ -129,6 +137,19 @@
 								</a>
 							@else
 								<span class="badge bg-light text-muted" title="Location not shared by the employee's device">—</span>
+							@endif
+							{{-- B2.7. Beside the pin rather than in a column of its own,
+							     because it qualifies the pin: a mocked fix is a map link
+							     that means nothing. Never blocks the punch — it marks the
+							     rows a person should look at, and one flagged punch is
+							     usually nothing. A pattern is the thing. --}}
+							@if($log->looksTampered())
+								<div class="mt-1">
+									<span class="badge bg-warning-transparent text-warning"
+										title="Reported by the handset when this punch was made. Not proof of anything on its own.">
+										<i class="ti ti-alert-triangle me-1"></i>{{ implode(' · ', $log->tamperReasons()) }}
+									</span>
+								</div>
 							@endif
 						</td>
 						<td><small class="text-muted">{{ $log->ip_address ?? '—' }}</small></td>

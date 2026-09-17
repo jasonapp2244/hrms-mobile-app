@@ -13,12 +13,18 @@ class AttendanceLog extends Model
     protected $fillable = [
         'company_id', 'employee_id', 'office_id', 'type', 'scanned_at', 'work_date',
         'status', 'source', 'latitude', 'longitude', 'ip_address', 'notes',
+        'location_mocked', 'device_rooted', 'device_emulator',
     ];
 
     protected $casts = [
         'scanned_at' => 'datetime',
         'work_date' => 'date',
         'voided_at' => 'datetime',
+        // Nullable on purpose — see the migration. `null` is "the client said
+        // nothing", which is not the same claim as `false`.
+        'location_mocked'  => 'boolean',
+        'device_rooted'    => 'boolean',
+        'device_emulator'  => 'boolean',
     ];
 
     /**
@@ -139,6 +145,42 @@ class AttendanceLog extends Model
     public function isVoided(): bool
     {
         return $this->voided_at !== null;
+    }
+
+    /**
+     * Whether the handset reported anything about itself worth a second look
+     * (B2.7).
+     *
+     * **Not "this punch is fraudulent."** A rooted phone is a phone somebody
+     * tinkered with, an emulator is how this app is developed, and none of the
+     * three stops anybody clocking in — the punch is recorded either way. What
+     * this answers is which rows a person should look at, and the answer to a
+     * single flagged punch is usually nothing at all. A pattern is the thing.
+     *
+     * Strict `=== true`, because these columns are nullable and `null` means
+     * the client never said. A loose check would quietly promote silence — a
+     * punch from the web portal, or from a build older than this feature — into
+     * a clean bill of health it never claimed.
+     */
+    public function looksTampered(): bool
+    {
+        return $this->location_mocked === true
+            || $this->device_rooted === true
+            || $this->device_emulator === true;
+    }
+
+    /**
+     * The short reasons [looksTampered] is true, for a badge or a tooltip.
+     *
+     * @return list<string>
+     */
+    public function tamperReasons(): array
+    {
+        return array_values(array_filter([
+            $this->location_mocked === true ? __('attendance.flag_mocked') : null,
+            $this->device_rooted === true ? __('attendance.flag_rooted') : null,
+            $this->device_emulator === true ? __('attendance.flag_emulator') : null,
+        ]));
     }
 
     /**

@@ -61,6 +61,11 @@ class AttendanceService
             'latitude'    => $meta['latitude'] ?? null,
             'longitude'   => $meta['longitude'] ?? null,
             'ip_address'  => $meta['ip_address'] ?? null,
+            // B2.7. Null when the caller said nothing — which every web-portal
+            // and kiosk punch does, and which is not the same claim as false.
+            'location_mocked' => $meta['location_mocked'] ?? null,
+            'device_rooted'   => $meta['device_rooted'] ?? null,
+            'device_emulator' => $meta['device_emulator'] ?? null,
         ]);
 
         return ['log' => $log, 'type' => $type, 'status' => $status];
@@ -91,15 +96,9 @@ class AttendanceService
      */
     protected function assertInsideGeofence(Employee $employee, Office $office, array $meta): void
     {
-        if (! $office->company?->policy('enforce_geofence')) {
-            return;
-        }
+        $fence = $this->geofenceFor($employee, $office);
 
-        if (in_array($employee->work_mode, ['wfh', 'hybrid'], true)) {
-            return;
-        }
-
-        if ($office->latitude === null || $office->longitude === null) {
+        if ($fence === null) {
             return;
         }
 
@@ -110,18 +109,82 @@ class AttendanceService
             return;
         }
 
-        $radius = (int) ($office->geofence_radius ?: 100);
-        $distance = $this->metresBetween((float) $lat, (float) $lng, (float) $office->latitude, (float) $office->longitude);
+        $distance = $this->metresBetween(
+            (float) $lat,
+            (float) $lng,
+            $fence['latitude'],
+            $fence['longitude'],
+        );
 
-        if ($distance > $radius) {
+        if ($distance > $fence['radius']) {
             throw new \RuntimeException(__('attendance.outside_geofence', [
-                'distance' => $distance >= 1000
-                    ? round($distance / 1000, 1) . 'km'
-                    : round($distance) . 'm',
-                'office' => $office->name,
-                'radius' => $radius,
+                'distance' => self::formatDistance($distance),
+                'office'   => $fence['office'],
+                'radius'   => $fence['radius'],
             ]));
         }
+    }
+
+    /**
+     * The fence this employee is actually judged against, or null when none
+     * applies (B2.5).
+     *
+     * **Extracted so the rule has one definition.** The API hands this to the
+     * app so the Clock screen can say what is required *before* somebody taps,
+     * and check the distance itself rather than spending a round trip to be
+     * told. That is only safe while the description and the enforcement agree
+     * exactly — two copies of "does the fence apply to this person" would drift
+     * the first time an exemption changed, and the app would confidently refuse
+     * a punch the server would have taken.
+     *
+     * The three exemptions are the ones documented on [assertInsideGeofence],
+     * and returning null for each is what keeps the app quiet about a rule that
+     * does not apply to the person reading it: a home worker told they are two
+     * kilometres from an office they were instructed not to attend is exactly
+     * the bug that comment warns about.
+     *
+     * @return array{office: string, latitude: float, longitude: float, radius: int}|null
+     */
+    public function geofenceFor(Employee $employee, ?Office $office): ?array
+    {
+        if ($office === null || ! $office->company?->policy('enforce_geofence')) {
+            return null;
+        }
+
+        if (in_array($employee->work_mode, ['wfh', 'hybrid'], true)) {
+            return null;
+        }
+
+        if ($office->latitude === null || $office->longitude === null) {
+            return null;
+        }
+
+        return [
+            'office'    => (string) $office->name,
+            'latitude'  => (float) $office->latitude,
+            'longitude' => (float) $office->longitude,
+            'radius'    => (int) ($office->geofence_radius ?: 100),
+        ];
+    }
+
+    /**
+     * "80m", "2.3km", "11688km" — the same rounding the app uses, because the
+     * two can show the same distance minutes apart and must not disagree.
+     *
+     * **Three bands, not two.** A tenth of a kilometre is useful at 2.3km and
+     * absurd at 11688.3km, which is what a plain `round(…, 1)` produced the
+     * first time somebody tested from the other side of the world. Precision
+     * that outruns the question it answers reads as a broken number.
+     */
+    public static function formatDistance(float $metres): string
+    {
+        if ($metres < 1000) {
+            return round($metres) . 'm';
+        }
+
+        $km = $metres / 1000;
+
+        return ($km < 10 ? round($km, 1) : round($km)) . 'km';
     }
 
     /**
@@ -249,6 +312,11 @@ class AttendanceService
             'latitude'    => $meta['latitude'] ?? null,
             'longitude'   => $meta['longitude'] ?? null,
             'ip_address'  => $meta['ip_address'] ?? null,
+            // Recorded per punch, not per sync: a queue can hold one fix taken
+            // with a spoofer running and the next taken without it (B2.7).
+            'location_mocked' => $meta['location_mocked'] ?? null,
+            'device_rooted'   => $meta['device_rooted'] ?? null,
+            'device_emulator' => $meta['device_emulator'] ?? null,
             'notes'       => sprintf(
                 'Recorded offline at %s, delivered %s (%s later).',
                 $at->format('H:i'),
@@ -315,6 +383,11 @@ class AttendanceService
             'latitude'    => $meta['latitude'] ?? null,
             'longitude'   => $meta['longitude'] ?? null,
             'ip_address'  => $meta['ip_address'] ?? null,
+            // A break is a punch like any other, and a spoofed one is worth the
+            // same second look (B2.7).
+            'location_mocked' => $meta['location_mocked'] ?? null,
+            'device_rooted'   => $meta['device_rooted'] ?? null,
+            'device_emulator' => $meta['device_emulator'] ?? null,
         ]);
 
         return ['log' => $log, 'type' => $type];
@@ -561,27 +634,44 @@ class AttendanceService
      *
      * @param  iterable<int, AttendanceLog>  $logs
      */
-    public function workedMinutes(iterable $logs, ?Carbon $openUntil = null): int
+    public function workedMinutes(
+        iterable $logs,
+        ?Carbon $openUntil = null,
+        ?Shift $shift = null,
+    ): int {
+        $logs = collect($logs);
+
+        $present = $this->presentMinutes($logs, $openUntil);
+        $punched = $this->punchedBreakMinutes($logs, $openUntil);
+
+        // Without a shift there is no policy to read, so the break comes off as
+        // taken — which is what every caller got before A5.7 and what a shift
+        // with the default policy still gets.
+        return (int) max(0, $present - ($shift
+            ? $shift->actualBreakDeduction($punched)
+            : $punched));
+    }
+
+    /**
+     * Minutes between checking in and checking out, breaks ignored.
+     *
+     * Present time rather than paid time: what comes off it for breaks is the
+     * shift's business (A5.7), and computing the two together is what made the
+     * policy impossible to express.
+     *
+     * @param  iterable<int, AttendanceLog>  $logs
+     */
+    public function presentMinutes(iterable $logs, ?Carbon $openUntil = null): int
     {
         $minutes = 0;
         $openedAt = null;
-        $breakStartedAt = null;
 
         foreach ($logs as $log) {
-            // Breaks (A4.15) are deducted from the stretch they sit inside
-            // rather than closing it: somebody on their lunch has not clocked
-            // out, and treating it as a check-out would make the afternoon look
-            // like a second attendance for the day.
-            if ($log->type === 'break_start') {
-                $breakStartedAt ??= $log->scanned_at;
-                continue;
-            }
-
-            if ($log->type === 'break_end') {
-                if ($breakStartedAt) {
-                    $minutes -= max(0, $breakStartedAt->diffInMinutes($log->scanned_at));
-                    $breakStartedAt = null;
-                }
+            // Breaks (A4.15) sit inside the stretch rather than closing it:
+            // somebody on their lunch has not clocked out, and treating it as a
+            // check-out would make the afternoon look like a second attendance
+            // for the day.
+            if ($log->type === 'break_start' || $log->type === 'break_end') {
                 continue;
             }
 
@@ -595,22 +685,61 @@ class AttendanceService
             if ($openedAt) {
                 $minutes += max(0, $openedAt->diffInMinutes($log->scanned_at));
                 $openedAt = null;
-
-                // A break left open when the day was closed out is discarded
-                // rather than deducted to the check-out: its length is unknown,
-                // and guessing it long would silently cut somebody's hours.
-                $breakStartedAt = null;
             }
         }
 
         if ($openedAt && $openUntil) {
             $minutes += max(0, $openedAt->diffInMinutes($openUntil));
+        }
 
-            // Still on a break right now — deduct what has elapsed so "worked
-            // today" does not tick upward while somebody is at lunch.
-            if ($breakStartedAt) {
-                $minutes -= max(0, $breakStartedAt->diffInMinutes($openUntil));
+        return (int) max(0, $minutes);
+    }
+
+    /**
+     * How long the breaks somebody actually punched lasted.
+     *
+     * @param  iterable<int, AttendanceLog>  $logs
+     */
+    public function punchedBreakMinutes(iterable $logs, ?Carbon $openUntil = null): int
+    {
+        $minutes = 0;
+        $openedAt = null;
+        $breakStartedAt = null;
+
+        foreach ($logs as $log) {
+            if ($log->type === 'break_start') {
+                // Two starts in a row: the first is the break that is running.
+                $breakStartedAt ??= $log->scanned_at;
+                continue;
             }
+
+            if ($log->type === 'break_end') {
+                if ($breakStartedAt) {
+                    $minutes += max(0, $breakStartedAt->diffInMinutes($log->scanned_at));
+                    $breakStartedAt = null;
+                }
+                continue;
+            }
+
+            if ($log->type === 'in') {
+                $openedAt ??= $log->scanned_at;
+                continue;
+            }
+
+            if ($openedAt) {
+                $openedAt = null;
+
+                // A break left open when the day was closed out is discarded
+                // rather than run to the check-out: its length is unknown, and
+                // guessing it long would silently cut somebody's hours.
+                $breakStartedAt = null;
+            }
+        }
+
+        // Still on a break right now — count what has elapsed, so "worked
+        // today" does not tick upward while somebody is at lunch.
+        if ($openedAt && $openUntil && $breakStartedAt) {
+            $minutes += max(0, $breakStartedAt->diffInMinutes($openUntil));
         }
 
         return (int) max(0, $minutes);
@@ -655,7 +784,13 @@ class AttendanceService
             $end->addDay();
         }
 
-        return max(0, (int) $start->diffInMinutes($end) - (int) ($shift->break_minutes ?? 0));
+        // A **paid** break (A5.7) stays in the scheduled figure, because it
+        // stays in the worked one. Taking it out of only one of the two would
+        // put them on different footings and manufacture a break's worth of
+        // overtime on every such shift, every day.
+        $unpaid = $shift->break_is_paid ? 0 : (int) ($shift->break_minutes ?? 0);
+
+        return max(0, (int) $start->diffInMinutes($end) - $unpaid);
     }
 
     /**
@@ -682,27 +817,26 @@ class AttendanceService
     public function overtimeFor(Employee $employee, string $workDate, iterable $logs): array
     {
         $logs      = collect($logs);
-        $worked    = $this->workedMinutes($logs);
         $scheduled = $this->scheduledMinutesFor($employee, $workDate);
         $rostered  = $scheduled !== null;
 
+        $shift   = $employee->shiftOn($workDate);
+        $present = $this->presentMinutes($logs);
+        $punched = $this->punchedBreakMinutes($logs);
+
         // Compare like with like. `scheduled` already excludes the unpaid
-        // break, so `worked` has to as well.
+        // break, so `worked` has to as well — and what "the unpaid break" means
+        // is the shift's to say (A5.7), read in exactly one place.
         //
-        // Where the day has break punches, workedMinutes has taken the real
-        // break out already. Where it has none — every day before A4.15, and
-        // every day since where nobody pressed the button — the shift's nominal
-        // break is deducted instead.
-        //
-        // Without this an ordinary 09:00–17:00 day reports 480 worked against
-        // 450 scheduled and manufactures 30 minutes of overtime for everybody,
-        // every day. It would also mean the staff who diligently punch their
-        // breaks earn less overtime than the ones who do not, which is exactly
-        // the wrong incentive to build into a payroll figure.
-        if ($rostered && ! $this->hasBreakPunches($logs)) {
-            $shift = $employee->shiftOn($workDate);
-            $worked = max(0, $worked - (int) ($shift->break_minutes ?? 0));
-        }
+        // No shift is the same fact as not rostered — `scheduledMinutesFor`
+        // returns null exactly when `shiftOn` does — and it is the one case
+        // with no policy to read, so the break comes off as taken.
+        $worked = $shift === null
+            ? max(0, $present - $punched)
+            : max(
+                0,
+                $present - $shift->settledBreakDeduction($punched, $this->hasBreakPunches($logs)),
+            );
 
         $threshold = (int) config('attendance.overtime.threshold_minutes', 15);
         $cap       = config('attendance.overtime.daily_cap_minutes');

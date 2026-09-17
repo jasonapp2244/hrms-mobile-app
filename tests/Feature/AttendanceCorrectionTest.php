@@ -84,7 +84,14 @@ class AttendanceCorrectionTest extends TestCase
         $this->hr->assignRole('hr');
     }
 
-    private function punch(string $type, string $at): AttendanceLog
+    /**
+     * [$extra] exists for B2.7's integrity columns, and it has to be here
+     * rather than applied afterwards: this table is deliberately immutable, so
+     * a flag that is not written at creation cannot be written at all. Which is
+     * the right shape for it — a record of what the handset claimed at the
+     * moment of the punch is not something anybody should be able to revise.
+     */
+    private function punch(string $type, string $at, array $extra = []): AttendanceLog
     {
         $moment = Carbon::parse($at);
 
@@ -97,7 +104,7 @@ class AttendanceCorrectionTest extends TestCase
             'work_date'   => $moment->toDateString(),
             'status'      => 'ontime',
             'source'      => 'pwa',
-        ]);
+        ] + $extra);
     }
 
     // -------------------------------------------------------------------------
@@ -356,5 +363,57 @@ class AttendanceCorrectionTest extends TestCase
             ->get(route('attendance.logs', ['show_voided' => 1]))
             ->assertOk()
             ->assertSee('zzmarkerzz');
+    }    // ================= what the handset reported (B2.7) =================
+
+    /**
+     * The register marks a punch the handset flagged, and offers a way to find
+     * the handful of them in a day of rows.
+     *
+     * That filter is the whole reason the columns exist. A flag nobody can
+     * search for is a flag nobody reads, and scrolling a day of punches looking
+     * for a badge is not a workflow.
+     */
+    public function test_the_register_marks_and_filters_a_flagged_punch(): void
+    {
+        // Written at creation, because this table refuses to be edited — which
+        // is exactly right for a claim made by a handset at a moment in time.
+        // The clean one *said* it was clean, which is a real statement and not
+        // a flag.
+        $clean   = $this->punch('in', '2026-08-03 09:00:00', ['location_mocked' => false]);
+        $flagged = $this->punch('out', '2026-08-03 17:00:00', ['location_mocked' => true]);
+
+        $page = $this->actingAs($this->hr)->get(route('attendance.logs'))->assertOk();
+
+        // Named, not just marked: "mock location" and "rooted device" are two
+        // different conversations to have with somebody.
+        $page->assertSee('Mock location');
+
+        $filtered = $this->actingAs($this->hr)
+            ->get(route('attendance.logs', ['flagged' => 1]))
+            ->assertOk();
+
+        $filtered->assertSee($flagged->scanned_at->format('h:i A'));
+        $filtered->assertDontSee($clean->scanned_at->format('h:i A'));
+    }
+
+    /**
+     * A punch that said nothing is not swept into the filter.
+     *
+     * Every punch made on the web portal, at a kiosk, or from an app build
+     * older than this feature has three nulls against it. Treating null as
+     * suspicious would fill the filter with the entire history of the company
+     * and make it useless on its first use.
+     */
+    public function test_a_punch_that_reported_nothing_is_not_flagged(): void
+    {
+        $silent = $this->punch('in', '2026-08-03 09:00:00');
+
+        $this->assertNull($silent->location_mocked);
+        $this->assertFalse($silent->looksTampered());
+
+        $this->actingAs($this->hr)
+            ->get(route('attendance.logs', ['flagged' => 1]))
+            ->assertOk()
+            ->assertDontSee($silent->scanned_at->format('h:i A'));
     }
 }

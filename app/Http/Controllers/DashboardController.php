@@ -34,7 +34,7 @@ class DashboardController extends Controller
     public function index()
     {
         $user = auth()->user();
-        $companyId = $user->company_id ?? Office::value('company_id');
+        $companyId = $this->companyId();
 
         $widgets = DashboardWidgets::forUser($user);
         $show = fn (string $key) => in_array($key, $widgets, true);

@@ -77,6 +77,15 @@ class Company extends Model
         // office-only attendance turns this on knowing what it costs.
         'enforce_geofence' => false,
 
+        // Bind an account to the first handset it signs in from (B1.6). Off by
+        // default, like everything else that can refuse somebody: this one can
+        // refuse a *sign-in*, which is the sharpest thing on this list, and the
+        // company that wants it should switch it on knowing that a lost or
+        // wiped phone then becomes an HR call. Turning it on locks nobody out
+        // on the day — each account claims its own handset at its next sign-in,
+        // and the control bites from the second one.
+        'enforce_device_binding' => false,
+
         // Show colleagues' email and phone in the app's directory (B3.8). Off
         // by default, and this one matters more than it looks: `employees.phone`
         // is the only phone column on the record, and for a workforce with no

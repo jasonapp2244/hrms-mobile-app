@@ -7,6 +7,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -25,23 +26,22 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // In production the app sits behind nginx, so every request arrives from
-        // the proxy rather than from the person making it. Without this, two
-        // things break quietly: attendance records the proxy's address as the
-        // punch location instead of the employee's, and generated URLs come out
-        // http:// because Laravel cannot see that TLS terminated upstream.
+        // Trusted proxies are configured in `config/trustedproxy.php`, not
+        // here, and that is a correctness fix rather than a tidy-up.
         //
-        // Configured rather than hardcoded because the correct value depends on
-        // the deployment. A proxy on the same host is '127.0.0.1'; behind a load
-        // balancer or Cloudflare it is that network's ranges. '*' trusts any
-        // proxy — right only when nothing but the proxy can reach the app port,
-        // since a reachable app would otherwise let a caller forge its own IP by
-        // sending an X-Forwarded-For header.
-        if ($proxies = env('TRUSTED_PROXIES')) {
-            $middleware->trustProxies(
-                at: $proxies === '*' ? '*' : array_map('trim', explode(',', $proxies)),
-            );
-        }
+        // This closure runs on `afterResolving(HttpKernel::class)`, which
+        // `Application::handleRequest` triggers *before* `$kernel->handle()` —
+        // and `handle()` is what runs `LoadEnvironmentVariables`. An `env()`
+        // call here is therefore read before .env exists and answers null
+        // every time, with or without a cached config. There was an
+        // `if ($proxies = env('TRUSTED_PROXIES'))` on this spot for the life
+        // of the file; the guard was never once true, so TrustProxies was
+        // never configured and every punch behind the proxy recorded the
+        // proxy's address. Nothing failed, which is why it survived.
+        //
+        // The framework's own middleware reads `config('trustedproxy.proxies')`
+        // at request time, by which point config is loaded — and a config file
+        // is the only place `env()` survives `config:cache`.
 
         // Every API route sits under the 'api' limiter defined in
         // AppServiceProvider. Laravel does not apply one by default, so without
@@ -86,6 +86,16 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(function (Throwable $e, Request $request) {
             if (! $request->is('api/*')) {
                 return null;   // web routes keep Laravel's own handling
+            }
+
+            // A response somebody deliberately built, thrown to short-circuit
+            // out of wherever they were. It is already the answer — replacing
+            // it with a generic 500 here would discard the very thing it was
+            // raised to deliver. This is how a rate limiter's own `response()`
+            // callback reaches the client, and it silently became a 500 for
+            // every such case until the login limiter needed one.
+            if ($e instanceof HttpResponseException) {
+                return $e->getResponse();
             }
 
             // A plain abort(403) throws a generic HttpException, while a policy

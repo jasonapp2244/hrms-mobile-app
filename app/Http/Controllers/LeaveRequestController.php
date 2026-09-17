@@ -59,15 +59,25 @@ class LeaveRequestController extends Controller
             'end_date'      => 'required|date|after_or_equal:start_date|before_or_equal:' . now()->addYears(2)->toDateString(),
             'half_day_period' => 'nullable|in:first_half,second_half',
             'reason'        => 'nullable|string|max:1000',
+            // B4.1, and offered here as well as in the app: an employee who
+            // books leave at their desk should not have to pick up a phone to
+            // attach the note that supports it.
+            'attachment' => 'nullable|' . LeaveRequest::ATTACHMENT_RULES,
         ], [
             'end_date.before_or_equal' => 'Leave cannot be booked more than two years ahead.',
         ]);
 
         $data['is_half_day'] = $request->boolean('is_half_day');
+        unset($data['attachment']);
 
         // Business rules (overlap, balance, working days) throw ValidationException
-        // from the service and land back on the form with the offending field.
-        $leaveRequest = $this->leave->submit($employee, $data);
+        // from the service and land back on the form with the offending field —
+        // and take any uploaded file with them rather than leaving it on disk.
+        $leaveRequest = $this->leave->submitWithAttachment(
+            $employee,
+            $data,
+            $request->file('attachment'),
+        );
 
         return redirect()->route('employee.leave.index')->with('success',
             $leaveRequest->status === 'approved'

@@ -406,4 +406,112 @@ class RosterPlannerTest extends TestCase
         $this->assertSame(1, $response->viewData('plannedCount'));
         $this->assertSame(1, $response->viewData('unpublishedCount'));
     }
+
+    // -------------------------------------------------------------------------
+    // Drag-and-drop (A5.8)
+    // -------------------------------------------------------------------------
+
+    private function plannerPage(): \Illuminate\Testing\TestResponse
+    {
+        return $this->actingAs($this->staff('hr'))
+            ->get('/shifts/roster?week=' . self::WEEK . '&plan=1');
+    }
+
+    public function test_the_planner_offers_a_shift_to_drag_for_every_shift(): void
+    {
+        $page = $this->plannerPage()->assertOk();
+
+        $page->assertSee('Drag onto a day:')
+            // One chip per active shift, plus Day off and Clear.
+            ->assertSee('draggable="true"', false)
+            ->assertSee('data-value="off"', false)
+            ->assertSee('Day off')
+            ->assertSee('Clear');
+
+        // The palette names the shifts by the same short label the grid uses,
+        // so a chip and the cell it lands in read as the same thing.
+        $page->assertSee($this->night->code ?? $this->night->name);
+    }
+
+    public function test_every_planner_cell_is_a_drop_target(): void
+    {
+        $page = $this->plannerPage()->assertOk();
+
+        // Seven days for the one employee in this fixture. A cell that is not
+        // a target is a cell a drag silently does nothing over, which reads as
+        // a broken feature rather than an unsupported one.
+        //
+        // Counted with the attribute that follows it: the bare name also
+        // appears in the script's own selector further down the page.
+        $this->assertSame(7, substr_count($page->getContent(), 'data-roster-cell title="'));
+    }
+
+    public function test_the_selects_are_still_there_and_still_the_value(): void
+    {
+        $page = $this->plannerPage()->assertOk();
+
+        // The whole design: drag writes into these. HTML5 drag events do not
+        // fire on a touch screen at all, so a planner that replaced the selects
+        // would have quietly excluded anybody holding a tablet — and there
+        // would be no keyboard path either.
+        $page->assertSee('name="roster[' . $this->employee->id . '][' . self::WEEK . ']"', false)
+            ->assertSee('Follow standing shift');
+
+        // Each option carries what the chip is drawn from, so the picture and
+        // the value can never disagree. A shift with no colour of its own still
+        // carries the attribute — the script falls back rather than drawing a
+        // chip with `undefined` in its background.
+        $page->assertSee('data-short="' . ($this->night->code ?? $this->night->name) . '"', false)
+            ->assertSee('data-color="#6c757d"', false);
+    }
+
+    public function test_the_palette_is_hidden_until_the_script_runs(): void
+    {
+        $page = $this->plannerPage()->assertOk();
+
+        // An instruction to drag something is worse than no instruction at all
+        // on a browser that cannot honour it.
+        $this->assertStringContainsString('id="rosterPalette" hidden', $page->getContent());
+    }
+
+    public function test_none_of_it_appears_on_the_read_only_roster(): void
+    {
+        $page = $this->actingAs($this->staff('hr'))
+            ->get('/shifts/roster?week=' . self::WEEK)
+            ->assertOk();
+
+        // Viewing is not planning. Drop targets on a screen with no Save button
+        // would accept work and then lose it.
+        $page->assertDontSee('data-roster-cell', false)
+            ->assertDontSee('Drag onto a day:');
+    }
+
+    public function test_a_dragged_day_saves_through_the_form_that_was_already_there(): void
+    {
+        // Drag-and-drop adds no endpoint: whatever it writes into the selects
+        // is posted by the same form, so this is the contract it relies on.
+        $this->actingAs($this->staff('hr'))
+            ->post('/shifts/roster', [
+                'week'   => self::WEEK,
+                'roster' => [
+                    $this->employee->id => [
+                        '2026-08-04' => (string) $this->night->id,
+                        // The source of a move, cleared by the drop.
+                        '2026-08-05' => '',
+                    ],
+                ],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(
+            $this->night->id,
+            ShiftAssignment::where('employee_id', $this->employee->id)
+                ->whereDate('date', '2026-08-04')->value('shift_id'),
+        );
+
+        $this->assertDatabaseMissing('shift_assignments', [
+            'employee_id' => $this->employee->id,
+            'date'        => '2026-08-05',
+        ]);
+    }
 }

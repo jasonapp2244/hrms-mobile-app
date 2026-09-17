@@ -40,6 +40,7 @@ use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSwapAdminController;
 use App\Http\Controllers\ShiftSwapController;
+use App\Http\Controllers\TrustedDeviceController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Guest / Auth ----
@@ -168,6 +169,10 @@ Route::middleware(['auth', 'role:employee|manager'])->prefix('employee')->name('
     // to anyone else's request.
     Route::middleware('permission:approve-leave')->prefix('approvals')->name('approvals.')->group(function () {
         Route::get('/', [LeaveApprovalController::class, 'index'])->name('index');
+        // The supporting file (B4.1) — a manager's own route rather than HR's,
+        // which sits behind manage-leave inside the admin|hr group where a
+        // manager holds neither.
+        Route::get('{leaveRequest}/attachment', [LeaveApprovalController::class, 'attachment'])->name('attachment');
         Route::post('{leaveRequest}/approve', [LeaveApprovalController::class, 'approve'])->name('approve');
         Route::post('{leaveRequest}/reject', [LeaveApprovalController::class, 'reject'])->name('reject');
     });
@@ -304,6 +309,14 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::post('employees/{employee}/checklist', [ChecklistController::class, 'generate'])->name('checklists.generate');
         Route::post('employees/{employee}/checklist/{item}/toggle', [ChecklistController::class, 'toggle'])->name('checklists.toggle');
         Route::delete('employees/{employee}/checklist/{item}', [ChecklistController::class, 'destroyItem'])->name('checklists.items.destroy');
+
+        // The phones staff are bound to, and the release that unsticks one
+        // (B1.6). Here rather than under manage-settings on purpose: whoever
+        // creates somebody's sign-in account is the person who answers "I have
+        // a new phone", and making them ask an administrator for it is how the
+        // whole policy ends up switched off.
+        Route::get('devices', [TrustedDeviceController::class, 'index'])->name('devices.index');
+        Route::post('devices/{trustedDevice}/release', [TrustedDeviceController::class, 'release'])->name('devices.release');
     });
     // The document vault (A3.8). Downloads stream through the controller rather
     // than sitting under public/ — these are contracts and passport scans.
@@ -339,6 +352,11 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     // flagged on the request itself, in the portal, which is where they work.
     Route::get('leave/calendar', [LeaveController::class, 'calendar'])
         ->middleware('permission:manage-leave')->name('leave.calendar');
+    // The supporting file (B4.1). Same permission as the register it is read
+    // from, and company-scoped in the controller because the route takes a
+    // bound model.
+    Route::get('leave/{leaveRequest}/attachment', [LeaveController::class, 'attachment'])
+        ->middleware('permission:manage-leave')->name('leave.attachment');
     Route::middleware('permission:approve-leave')->group(function () {
         Route::post('leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
         Route::post('leave/{leaveRequest}/reject', [LeaveController::class, 'reject'])->name('leave.reject');

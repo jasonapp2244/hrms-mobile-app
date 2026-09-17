@@ -1,5 +1,31 @@
 @extends('layouts.app')
 @section('title','Weekly Roster')
+
+@push('styles')
+<style>
+  /* A5.8 — the planner's drag-and-drop. Colours are set inline per shift, the
+     same tint the scheduled chip in the grid uses. */
+  .roster-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border: 1px solid transparent; border-radius: 999px;
+    font-size: 11px; line-height: 1.5; font-weight: 600;
+    cursor: grab; user-select: none; white-space: nowrap;
+  }
+  .roster-chip:active { cursor: grabbing; }
+  .roster-chip--clear { background: #f3f4f6; border-color: #d5d8dd; color: #566069; }
+  .roster-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+  /* The drop target. Dashed rather than filled: it has to read as "this is
+     where it would land" without hiding what is already in the cell. */
+  .roster-cell.is-over { outline: 2px dashed #033C93; outline-offset: -2px; }
+  .roster-cell.is-source { opacity: .45; }
+
+  /* Changed since the page loaded and not saved yet. The Draft badge means
+     something else — planned but not published — so this cannot reuse it. */
+  .roster-cell.is-dirty { box-shadow: inset 3px 0 0 #7E5709; }
+</style>
+@endpush
+
 @section('content')
 <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
   <div class="my-auto mb-2"><h2 class="mb-1">Weekly Roster</h2>
@@ -71,6 +97,43 @@
   </div>
 </div>
 
+@if($planning)
+  {{--
+    A5.8 — the drag-and-drop half of the planner.
+
+    Hidden until the script runs, and unhidden by it: an instruction to drag
+    something is worse than no instruction at all on a browser that cannot.
+    Nothing here is the only way to do anything — every cell keeps its select,
+    so the planner stays fully usable by keyboard, by screen reader, and on a
+    touch device, where HTML5 drag events do not fire at all.
+  --}}
+  <div class="card mb-3" id="rosterPalette" hidden>
+    <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
+      <span class="text-muted small me-1"><i class="ti ti-drag-drop me-1"></i>Drag onto a day:</span>
+      @foreach($shifts as $s)
+        {{-- Same tint the scheduled chip in the grid below uses, so a shift
+             looks like itself whichever half of the screen it is on. --}}
+        <span class="roster-chip" draggable="true" data-value="{{ $s->id }}"
+              style="background:{{ $s->color }}1a;border-color:{{ $s->color }}55"
+              title="{{ $s->name }} {{ $s->timing }}">
+          <span class="roster-dot" style="background:{{ $s->color }}"></span>{{ $s->code ?? $s->name }}
+        </span>
+      @endforeach
+      <span class="roster-chip" draggable="true" data-value="off"
+            style="background:#6c757d1a;border-color:#6c757d55">
+        <span class="roster-dot" style="background:#6c757d"></span>Day off
+      </span>
+      <span class="roster-chip roster-chip--clear" draggable="true" data-value=""
+            title="Leave the day to their own shift or their department's">
+        <i class="ti ti-eraser"></i>Clear
+      </span>
+      <span class="text-muted ms-auto" style="font-size:11px">
+        Dragging a day onto another <strong>moves</strong> it. Nothing is saved until you press Save Roster.
+      </span>
+    </div>
+  </div>
+@endif
+
 {{-- Legend --}}
 <div class="d-flex flex-wrap gap-3 mb-3 small text-muted">
   <span><span class="badge bg-success">&nbsp;</span> Present</span>
@@ -130,13 +193,19 @@
                 $isOnLeave = ($onLeave[$emp->id] ?? collect())->has($dateStr);
                 $rosteredOff = $assignment?->is_day_off;
               @endphp
-              <td class="{{ $isToday ? 'table-active' : '' }}" style="min-width:100px">
+              <td class="{{ $isToday ? 'table-active' : '' }} {{ $planning ? 'roster-cell' : '' }}" style="min-width:100px"
+                  @if($planning) data-roster-cell title="{{ $emp->full_name }} — {{ $day->format('D j M') }}" @endif>
                 @if($planning)
-                  <select name="roster[{{ $emp->id }}][{{ $dateStr }}]" class="form-select form-select-sm mb-1" style="font-size:11px">
+                  {{-- Filled in by the script from the select below, so with no
+                       script there is simply nothing here and the select is the
+                       whole control, exactly as it was. --}}
+                  <div data-chip></div>
+                  <select name="roster[{{ $emp->id }}][{{ $dateStr }}]" class="form-select form-select-sm mb-1 roster-select" style="font-size:11px">
                     <option value="">Follow standing shift</option>
-                    <option value="off" @selected($rosteredOff)>Day off</option>
+                    <option value="off" data-color="#6c757d" @selected($rosteredOff)>Day off</option>
                     @foreach($shifts as $s)
-                      <option value="{{ $s->id }}" @selected($assignment && ! $assignment->is_day_off && $assignment->shift_id === $s->id)>
+                      <option value="{{ $s->id }}" data-color="{{ $s->color }}" data-short="{{ $s->code ?? $s->name }}"
+                              @selected($assignment && ! $assignment->is_day_off && $assignment->shift_id === $s->id)>
                         {{ $s->code ?? $s->name }} {{ $s->timing }}
                       </option>
                     @endforeach
@@ -274,5 +343,188 @@
     </div>
   </div>
 </div>
+
+<script>
+/**
+ * A5.8 — drag a shift onto a day.
+ *
+ * Everything here writes into the selects that were already on the page and
+ * posts through the form that was already there. No new endpoint, no new
+ * validation surface, and no second idea of what the roster says: the select
+ * is the value, the chip is a picture of it.
+ *
+ * That is also what makes this safe to bolt on. Turn the script off and the
+ * planner is exactly what it was — which matters more than usual here, because
+ * HTML5 drag events do not fire on a touch screen at all, and a planner that
+ * only worked with a mouse would have quietly excluded anybody on a tablet.
+ */
+(function () {
+  var palette = document.getElementById('rosterPalette');
+  var cells = Array.prototype.slice.call(document.querySelectorAll('[data-roster-cell]'));
+
+  if (!palette || !cells.length) return;
+
+  // Nothing above this line touched the page. The instruction to drag only
+  // appears once there is something able to honour it.
+  palette.hidden = false;
+
+  // Same-document drag, so the payload is held here rather than in
+  // dataTransfer: Firefox will not let you read dataTransfer during dragover,
+  // which is exactly when the drop target has to decide whether to accept.
+  var carried = null;
+
+  function selectIn(cell) { return cell.querySelector('.roster-select'); }
+
+  /** Redraw a cell's chip from whatever its select currently says. */
+  function paint(cell) {
+    var select = selectIn(cell);
+    var box = cell.querySelector('[data-chip]');
+    if (!select || !box) return;
+
+    var option = select.options[select.selectedIndex];
+    box.innerHTML = '';
+
+    // "Follow standing shift" is the absence of a plan, and drawing a chip for
+    // it would make an unplanned day look planned.
+    if (!option || option.value === '') return;
+
+    var color = option.getAttribute('data-color') || '#6c757d';
+    var chip = document.createElement('span');
+
+    chip.className = 'roster-chip mb-1';
+    chip.setAttribute('draggable', 'true');
+    chip.style.background = color + '1a';
+    chip.style.borderColor = color + '55';
+
+    var dot = document.createElement('span');
+    dot.className = 'roster-dot';
+    dot.style.background = color;
+    chip.appendChild(dot);
+    chip.appendChild(document.createTextNode(
+      option.getAttribute('data-short') || option.text
+    ));
+
+    box.appendChild(chip);
+  }
+
+  function apply(cell, value) {
+    var select = selectIn(cell);
+    if (!select) return;
+
+    select.value = value;
+    // Dispatched rather than assumed: anything else listening to this form —
+    // now or later — hears a drag exactly as it hears a click.
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function markDirty(cell) { cell.classList.add('is-dirty'); }
+
+  function clearHighlights() {
+    cells.forEach(function (cell) {
+      cell.classList.remove('is-over', 'is-source');
+    });
+  }
+
+  // ---- dragging out of the palette -------------------------------------
+
+  palette.addEventListener('dragstart', function (event) {
+    var chip = event.target.closest('.roster-chip');
+    if (!chip) return;
+
+    carried = { value: chip.getAttribute('data-value'), from: null };
+    event.dataTransfer.effectAllowed = 'copy';
+    // Set for form's sake: some browsers refuse to start a drag with no data.
+    event.dataTransfer.setData('text/plain', carried.value);
+  });
+
+  // ---- dragging a day onto another day ---------------------------------
+
+  cells.forEach(function (cell) {
+    paint(cell);
+
+    // A manual change through the select repaints the chip too, so the two can
+    // never disagree about what the day says.
+    cell.addEventListener('change', function () {
+      paint(cell);
+      markDirty(cell);
+    });
+
+    cell.addEventListener('dragstart', function (event) {
+      var chip = event.target.closest('.roster-chip');
+      if (!chip) return;
+
+      carried = { value: selectIn(cell).value, from: cell };
+      cell.classList.add('is-source');
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', carried.value);
+    });
+
+    cell.addEventListener('dragover', function (event) {
+      if (!carried || carried.from === cell) return;
+
+      // Without this the browser refuses the drop, silently.
+      event.preventDefault();
+      event.dataTransfer.dropEffect = carried.from ? 'move' : 'copy';
+      cell.classList.add('is-over');
+    });
+
+    cell.addEventListener('dragleave', function () {
+      cell.classList.remove('is-over');
+    });
+
+    cell.addEventListener('drop', function (event) {
+      if (!carried || carried.from === cell) return;
+
+      event.preventDefault();
+
+      // Cleared here and not left to dragend, because the drop below repaints
+      // the source cell and destroys the chip the drag started from — and a
+      // `dragend` on a detached node never reaches the listener on document.
+      // Without this the cell somebody just moved a shift *out of* stays at
+      // 45% opacity for the rest of the session, looking disabled.
+      clearHighlights();
+
+      // Repainting and marking dirty is the change handler's job — apply()
+      // dispatches one, so doing it again here would be a second place that
+      // has to remember.
+      apply(cell, carried.value);
+
+      // Moved, not copied: a day dragged onto another leaves where it was.
+      // Copying instead would silently double a shift every time somebody
+      // fixed a mistake, which is the more expensive way to be wrong.
+      if (carried.from) apply(carried.from, '');
+
+      carried = null;
+    });
+  });
+
+  // The net for a drag that ends somewhere other than a cell — dropped on the
+  // page, or abandoned with Escape. A drag that *did* land has already tidied
+  // up in the drop handler, for the reason noted there.
+  document.addEventListener('dragend', function () {
+    carried = null;
+    clearHighlights();
+  });
+
+  // Leaving with changes that were never posted loses them, and the Draft
+  // badges on screen make it look as though something was kept.
+  window.addEventListener('beforeunload', function (event) {
+    if (!document.querySelector('.roster-cell.is-dirty')) return;
+    event.preventDefault();
+    event.returnValue = '';
+  });
+
+  // The planner's own form, found through a cell rather than by its action:
+  // three forms on this page post to a /shifts/roster* URL, and matching on
+  // the path would eventually pick the wrong one.
+  var form = cells[0].closest('form');
+
+  if (form) {
+    form.addEventListener('submit', function () {
+      cells.forEach(function (cell) { cell.classList.remove('is-dirty'); });
+    });
+  }
+}());
+</script>
 @endif
 @endsection

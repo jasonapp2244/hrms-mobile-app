@@ -108,7 +108,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(function (Login $event) {
             ActivityLog::record(
                 event: ActivityLog::LOGIN,
-                description: 'Signed in via ' . $event->guard,
+                description: 'Signed in from ' . self::doorName($event->guard),
                 actor: $event->user,
             );
         });
@@ -161,6 +161,22 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
+     * Which door somebody came through, in words an administrator can act on.
+     *
+     * The guard name is an implementation detail — "signed in via sanctum"
+     * means nothing to the person reading the security trail after a lost
+     * phone, and "web" vs "app" is the first thing they need to know.
+     */
+    protected static function doorName(string $guard): string
+    {
+        return match ($guard) {
+            'sanctum', 'api' => 'the mobile app',
+            'web'            => 'the web dashboard',
+            default          => "the {$guard} guard",
+        };
+    }
+
+    /**
      * Rate limits for the mobile API.
      *
      * Keyed by user rather than by IP wherever there is a token: a whole office
@@ -178,8 +194,28 @@ class AppServiceProvider extends ServiceProvider
         // Guessing is the attack on login, and it is reachable without a token.
         // Keyed by address *and* IP together: on the address alone, anyone could
         // lock a colleague out of the app by failing their login five times.
+        //
+        // The refusal raises `Lockout` so it lands in the security trail, the
+        // same way the web form's does. Without this the API simply answered
+        // 429 and said nothing: somebody working through a password list
+        // against the app produced a run of failed attempts that stopped dead
+        // at five, with no line explaining why they stopped — which reads like
+        // the attacker gave up rather than like the fence doing its job.
         RateLimiter::for('login', fn (Request $request) => Limit::perMinute(5)
-            ->by(Str::lower((string) $request->input('email')) . '|' . $request->ip()));
+            ->by(Str::lower((string) $request->input('email')) . '|' . $request->ip())
+            ->response(function (Request $request, array $headers) {
+                event(new Lockout($request));
+
+                // The API's one error shape, which the handler in
+                // bootstrap/app.php produces everywhere else. Stated again here
+                // because supplying a response bypasses that handler — and
+                // pinned by a test, so the two cannot drift apart quietly.
+                return response()->json([
+                    'ok'      => false,
+                    'error'   => 'too_many_requests',
+                    'message' => __('api.too_many_requests'),
+                ], 429, $headers);
+            }));
 
         // A punch is one deliberate tap. The service's own cooldown stops a
         // double tap; this stops a loop.

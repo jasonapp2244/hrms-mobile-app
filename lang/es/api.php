@@ -37,6 +37,7 @@ return [
 
     // --- Dispositivos ------------------------------------------------------
     'device_registered'   => 'Dispositivo registrado para recibir notificaciones.',
+    'device_not_trusted'  => 'Esta cuenta está vinculada a otro teléfono. Pide a RR. HH. que la libere antes de iniciar sesión aquí.',
     'device_unregistered' => 'Este dispositivo dejará de recibir notificaciones.',
 
     // --- Perfil ------------------------------------------------------------
@@ -50,6 +51,7 @@ return [
 
     // --- Permisos ----------------------------------------------------------
     'leave_not_yours'     => 'Esa solicitud de permiso no es tuya.',
+    'leave_attachment_missing' => 'El archivo adjunto a esta solicitud ya no está en el servidor.',
     'leave_own_request'   => 'No puedes decidir sobre tu propia solicitud de permiso.',
     'leave_outside_team'   => 'Esa solicitud es de alguien que no está en tu equipo.',
     'leave_auto_approved' => 'Permiso aprobado: este tipo no necesita autorización.',

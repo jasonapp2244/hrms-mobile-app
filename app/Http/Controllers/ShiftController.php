@@ -19,11 +19,6 @@ class ShiftController extends Controller
         protected RosterService $roster,
     ) {}
 
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     public function index()
     {
         $shifts = Shift::withCount(['departments', 'employees'])
@@ -225,15 +220,26 @@ class ShiftController extends Controller
 
     protected function validateShift(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'name'               => 'required|string|max:100',
             'code'               => 'nullable|string|max:30',
             'start_time'         => 'required|date_format:H:i',
             'end_time'           => 'required|date_format:H:i',
             'break_minutes'      => 'required|integer|min:0|max:480',
+            // A5.7 — what that number means for paid time.
+            'break_is_paid'      => 'nullable|boolean',
+            'break_is_minimum'   => 'nullable|boolean',
             'late_grace_minutes' => 'required|integer|min:0|max:120',
             'color'              => 'nullable|string|max:20',
             'is_active'          => 'nullable|boolean',
         ]);
+
+        // An unticked checkbox sends nothing at all, so the key would simply be
+        // absent and `update` would leave the old value — a break policy that
+        // could be switched on and then never switched off again.
+        $data['break_is_paid']    = $request->boolean('break_is_paid');
+        $data['break_is_minimum'] = $request->boolean('break_is_minimum');
+
+        return $data;
     }
 }

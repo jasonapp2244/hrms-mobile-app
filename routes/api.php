@@ -134,6 +134,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('leave/requests', [LeaveController::class, 'store'])
         ->middleware('throttle:write')->name('api.leave.store');
     Route::get('leave/requests/{leaveRequest}', [LeaveController::class, 'show'])->name('api.leave.show');
+    // The supporting file (B4.1). Reachable by the person who attached it and
+    // by their line manager — the controller checks which, because the route
+    // takes a bound model and route-model binding is the leak.
+    Route::get('leave/requests/{leaveRequest}/attachment', [LeaveController::class, 'attachment'])
+        ->name('api.leave.attachment');
     Route::post('leave/requests/{leaveRequest}/cancel', [LeaveController::class, 'cancel'])
         ->middleware('throttle:write')->name('api.leave.cancel');
 
@@ -156,6 +161,13 @@ Route::middleware('auth:sanctum')->group(function () {
         // staff cannot.
         Route::get('team/roster', [TeamController::class, 'roster'])
             ->name('api.team.roster');
+
+        // Who on my team is off, and when (B4.6) — the month grid the web
+        // dashboard has had since A6.7. Same gate and same team again: a
+        // manager already reads each of these in the approval inbox above, so
+        // this arranges what they can see by day rather than widening it.
+        Route::get('team/leave-calendar', [TeamController::class, 'leaveCalendar'])
+            ->name('api.team.leave-calendar');
     });
 
     // The employee's own documents (B3.7). No employee id in either route —
@@ -175,6 +187,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('profile', [ProfileController::class, 'show'])->name('api.profile.show');
     Route::put('profile', [ProfileController::class, 'update'])
         ->middleware('throttle:write')->name('api.profile.update');
+    // The employee record rather than the account (B3.2): where they live and
+    // who to call. A separate route because it is a separate table, and an
+    // account with no employee row has nothing here to write.
+    Route::put('profile/details', [ProfileController::class, 'updateDetails'])
+        ->middleware('throttle:write')->name('api.profile.details');
     Route::put('profile/password', [ProfileController::class, 'updatePassword'])
         ->middleware('throttle:write')->name('api.profile.password');
 });

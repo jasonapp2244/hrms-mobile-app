@@ -73,6 +73,11 @@ class RegularisationController extends ApiController
             ->get();
 
         return $this->ok([
+            // The day the *company* is on. A correction cannot be raised for a
+            // time that has not happened, and this endpoint is what tells the
+            // app where that line is — a handset a few hours ahead of the
+            // company otherwise offered a date this controller then refused.
+            'today'    => now($timezone)->toDateString(),
             'requests' => collect($page->items())
                 ->map(fn (AttendanceRegularisation $r) => $this->payload($r, $timezone))
                 ->values(),

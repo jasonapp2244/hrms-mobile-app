@@ -17,11 +17,6 @@ class AttendanceController extends Controller
         protected LeaveService $leave,
     ) {}
 
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     /** Attendance overview with today's summary tiles + recent feed. */
     public function index()
     {
@@ -75,6 +70,13 @@ class AttendanceController extends Controller
             ->when($request->filled('office_id'), fn ($q) => $q->where('office_id', $request->office_id))
             ->when($request->filled('type'), fn ($q) => $q->where('type', $request->type))
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            // B2.7. The reason the columns exist: "which punches want a second
+            // look", asked across a day. `=== true` in SQL terms — a null is a
+            // client that said nothing and must not be swept in.
+            ->when($request->boolean('flagged'), fn ($q) => $q->where(fn ($w) => $w
+                ->where('location_mocked', true)
+                ->orWhere('device_rooted', true)
+                ->orWhere('device_emulator', true)))
             ->latest('scanned_at')
             ->paginate(25)
             ->withQueryString();
@@ -154,8 +156,23 @@ class AttendanceController extends Controller
     protected function reportData(Request $request): array
     {
         $companyId = $this->companyId();
-        $from = $request->input('from', now()->startOfMonth()->toDateString());
-        $to = $request->input('to', now()->toDateString());
+
+        // Validated, and not only because a bad date makes a nonsense report.
+        // These two are concatenated into the **download filename** of the
+        // Excel and PDF exports below, and a filename is a path: a library that
+        // takes the caller's word for it will happily write outside the disk it
+        // was configured with. maatwebsite/excel had exactly that bug through
+        // 3.1.69 (CVE-2026-84374). The dependency is current again, but a
+        // controller that hands unfiltered request input to a file writer is
+        // one upgrade away from the same hole, so the input is narrowed here
+        // rather than trusted to stay harmless downstream.
+        $dates = $request->validate([
+            'from' => 'nullable|date_format:Y-m-d',
+            'to'   => 'nullable|date_format:Y-m-d',
+        ]);
+
+        $from = $dates['from'] ?? now()->startOfMonth()->toDateString();
+        $to   = $dates['to'] ?? now()->toDateString();
 
         $logs = AttendanceLog::with(['employee', 'office'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))

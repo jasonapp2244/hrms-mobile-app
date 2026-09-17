@@ -11,11 +11,17 @@ namespace App\Support;
  * dependency and one less thing to keep patched. It is also completely testable
  * against the published vectors, which is done in TwoFactorTest.
  *
- * What is deliberately *not* here is a QR encoder. That is several hundred
- * lines of Reed-Solomon for a convenience, and every authenticator accepts a
- * setup key typed in by hand. The setup screen shows the key and the
- * `otpauth://` URI; when a QR library can be installed, rendering the URI as an
- * image is the only change needed.
+ * What is deliberately *not* here is a QR encoder — and that is a different
+ * judgement from the one above, not the same one twice. HMAC, a truncation and
+ * a modulus are forty lines of obvious arithmetic; Reed-Solomon over a Galois
+ * field is not, and getting it subtly wrong shows up as "my phone will not scan
+ * this" rather than as a failing test. So the QR comes from a package and lives
+ * in [\App\Support\QrCode], which this class does not reference: the algorithm
+ * stays free of any vendor, and the picture of it is presentation.
+ *
+ * The setup screen draws both, and the **typed setup key is never the fallback
+ * that got dropped** — a camera that will not focus, a desktop authenticator or
+ * a password manager on the same machine all need it.
  */
 class Totp
 {

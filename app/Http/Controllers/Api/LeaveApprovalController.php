@@ -48,6 +48,12 @@ class LeaveApprovalController extends ApiController
                 'is_half_day'  => (bool) $r->is_half_day,
                 'reason'       => $r->reason,
                 'submitted_at' => $r->created_at?->toIso8601String(),
+                // B4.1. A sick note is no use to an approver who cannot see
+                // that it exists; the file itself comes from
+                // `GET /leave/requests/{id}/attachment`, which lets this
+                // manager through for their own team and nobody else.
+                'has_attachment'  => $r->hasAttachment(),
+                'attachment_name' => $r->attachment_name,
                 // Who else on the team is already off over the same dates. A
                 // manager approving cover has to know that before saying yes,
                 // not after.

@@ -54,7 +54,10 @@
               @endif
               <div class="text-muted small">{{ $s->working_hours }} paid</div>
             </td>
-            <td>{{ $s->break_minutes }} min</td>
+            <td>
+              {{ $s->break_minutes }} min
+              <div class="text-muted small">{{ $s->break_policy_label }}</div>
+            </td>
             <td>{{ $s->late_grace_minutes }} min</td>
             <td><span class="badge bg-light text-dark">{{ $s->departments_count }}</span></td>
             <td><span class="badge bg-light text-dark">{{ $s->employees_count }}</span></td>
@@ -119,6 +122,25 @@
                       <div class="col-md-6">
                         <label class="form-label">Late Grace (minutes) <span class="text-danger">*</span></label>
                         <input type="number" name="late_grace_minutes" class="form-control" value="{{ old('late_grace_minutes', $s->late_grace_minutes) }}" required>
+                      </div>
+                    </div>
+                    {{-- A5.7 — what that number means for paid time. Both off is
+                         the old behaviour: unpaid, and only as long as the break
+                         somebody actually punched. --}}
+                    <div class="mt-3">
+                      <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="breakPaid{{ $s->id }}" name="break_is_paid" value="1" {{ old('break_is_paid', $s->break_is_paid) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="breakPaid{{ $s->id }}">
+                          Break is paid
+                          <span class="text-muted small d-block">Nothing comes off the day, and the shift's paid hours include it.</span>
+                        </label>
+                      </div>
+                      <div class="form-check mt-2">
+                        <input type="checkbox" class="form-check-input" id="breakMin{{ $s->id }}" name="break_is_minimum" value="1" {{ old('break_is_minimum', $s->break_is_minimum) ? 'checked' : '' }}>
+                        <label class="form-check-label" for="breakMin{{ $s->id }}">
+                          Deduct at least this much
+                          <span class="text-muted small d-block">A shorter break still costs the full break. Ignored when the break is paid.</span>
+                        </label>
                       </div>
                     </div>
                     <div class="mb-3 mt-3">
@@ -190,6 +212,23 @@
             <div class="col-md-6">
               <label class="form-label">Late Grace (minutes) <span class="text-danger">*</span></label>
               <input type="number" name="late_grace_minutes" class="form-control" value="{{ old('late_grace_minutes', 15) }}" required>
+            </div>
+          </div>
+          {{-- A5.7 — see the note in the edit form above. --}}
+          <div class="mt-3">
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="breakPaidNew" name="break_is_paid" value="1" {{ old('break_is_paid') ? 'checked' : '' }}>
+              <label class="form-check-label" for="breakPaidNew">
+                Break is paid
+                <span class="text-muted small d-block">Nothing comes off the day, and the shift's paid hours include it.</span>
+              </label>
+            </div>
+            <div class="form-check mt-2">
+              <input type="checkbox" class="form-check-input" id="breakMinNew" name="break_is_minimum" value="1" {{ old('break_is_minimum') ? 'checked' : '' }}>
+              <label class="form-check-label" for="breakMinNew">
+                Deduct at least this much
+                <span class="text-muted small d-block">A shorter break still costs the full break. Ignored when the break is paid.</span>
+              </label>
             </div>
           </div>
         </div>

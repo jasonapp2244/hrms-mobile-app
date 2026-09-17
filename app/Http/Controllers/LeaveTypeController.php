@@ -9,11 +9,6 @@ use Illuminate\Validation\Rule;
 
 class LeaveTypeController extends Controller
 {
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     public function index()
     {
         $leaveTypes = LeaveType::withCount(['requests', 'balances'])

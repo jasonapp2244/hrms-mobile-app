@@ -39,4 +39,9 @@ return [
         'break_end'   => 'Vuelta del descanso',
     ],
 
+
+    'flag_mocked'   => 'Ubicación simulada',
+    'flag_rooted'   => 'Dispositivo rooteado',
+    'flag_emulator' => 'Emulador',
+
 ];

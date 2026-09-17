@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\LeaveRequest;
 use App\Services\LeaveService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * A line manager's leave inbox, inside the self-service portal.
@@ -85,6 +86,28 @@ class LeaveApprovalController extends Controller
             : 'layouts.employee';
 
         return view('employee.approvals', compact('manager', 'pending', 'clashes', 'decided', 'swaps', 'layout'));
+    }
+
+    /**
+     * The file attached to a request this manager has to decide on (B4.1).
+     *
+     * A second route to the same file as `leave.attachment`, and deliberately
+     * so: that one sits inside the `role:admin|hr` group behind `manage-leave`,
+     * which a manager holds neither of. The alternative was widening HR's route
+     * to admit managers, which would have meant one route serving two
+     * completely different authorisation rules — and the wrong one applying is
+     * how a manager ends up reading another team's sick notes.
+     *
+     * Scoped to this manager's own direct reports, exactly like approving is.
+     */
+    public function attachment(LeaveRequest $leaveRequest)
+    {
+        $this->authoriseTeamMember($leaveRequest);
+
+        abort_unless($leaveRequest->hasAttachment(), 404);
+
+        return Storage::disk(LeaveRequest::ATTACHMENT_DISK)
+            ->download($leaveRequest->attachment, $leaveRequest->attachmentDownloadName());
     }
 
     public function approve(Request $request, LeaveRequest $leaveRequest)

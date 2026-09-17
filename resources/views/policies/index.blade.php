@@ -88,6 +88,25 @@
           </div>
         </div>
         <div class="col-md-4">
+          <label class="form-label">Phones</label>
+          <div class="form-check mt-2">
+            <input type="hidden" name="enforce_device_binding" value="0">
+            <input class="form-check-input" type="checkbox" name="enforce_device_binding" value="1" id="deviceBinding"
+                   @checked(old('enforce_device_binding', $company->policy('enforce_device_binding')))>
+            <label class="form-check-label" for="deviceBinding">Tie each account to one phone</label>
+          </div>
+          <div class="form-text">
+            {{-- B1.6. The two things somebody needs to know before ticking it:
+                 nobody is locked out today, and somebody will ring you when they
+                 change phones. --}}
+            Closes the oldest gap in attendance — lending a colleague your password so they
+            can clock you in. Nobody is locked out when you switch this on: each account
+            claims its own phone at its next sign-in, and a <em>second</em> phone is refused
+            from then. A new or wiped phone needs releasing on the
+            <a href="{{ route('devices.index') }}">trusted phones</a> list.
+          </div>
+        </div>
+        <div class="col-md-4">
           <label class="form-label">Staff directory</label>
           <div class="form-check mt-2">
             <input type="hidden" name="directory_show_contact_details" value="0">

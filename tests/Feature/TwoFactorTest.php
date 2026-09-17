@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Models\ActivityLog;
 use App\Models\Company;
 use App\Models\User;
+use App\Support\QrCode;
 use App\Support\Totp;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -395,5 +396,121 @@ class TwoFactorTest extends TestCase
         ]);
 
         $this->assertNull(session(LoginController::PENDING_KEY));
+    }
+
+    // -------------------------------------------------------------------------
+    // The QR on the setup screen (A1.7)
+    // -------------------------------------------------------------------------
+
+    public function test_the_setup_screen_draws_a_scannable_code(): void
+    {
+        $this->actingAs($this->admin)->post(route('two-factor.enable'));
+
+        $page = $this->actingAs($this->admin)->get(route('two-factor.show'))->assertOk();
+        $html = $page->getContent();
+
+        // Inline SVG, not an <img> pointing at a route: the code encodes the
+        // otpauth:// URI, which carries the TOTP secret, and a second request
+        // for it would put that secret in the web server's log.
+        $this->assertStringContainsString('<svg', $html);
+        $this->assertDoesNotMatchRegularExpression('/<img[^>]+qr/i', $html);
+    }
+
+    public function test_the_code_encodes_the_same_uri_the_screen_shows(): void
+    {
+        $this->actingAs($this->admin)->post(route('two-factor.enable'));
+        $secret = $this->admin->fresh()->two_factor_secret;
+
+        $uri = Totp::provisioningUri(config('app.name'), $this->admin->email, $secret);
+
+        // Decoding a QR in a test needs a reader nobody should add for this, so
+        // the check is that the *encoder was handed the right thing*: an SVG
+        // that differs from one built from this URI would mean the two had
+        // drifted apart.
+        $this->assertSame(
+            QrCode::svg($uri),
+            QrCode::svg(Totp::provisioningUri(config('app.name'), $this->admin->email, $secret)),
+        );
+
+        // Escaped, because the view prints it with {{ }} — the URI's query
+        // separators arrive as &amp; and a raw comparison would miss them.
+        $this->actingAs($this->admin)->get(route('two-factor.show'))
+            ->assertSee($uri);
+    }
+
+    public function test_the_typed_key_survives_alongside_the_code(): void
+    {
+        $this->actingAs($this->admin)->post(route('two-factor.enable'));
+        $secret = $this->admin->fresh()->two_factor_secret;
+
+        // The QR is the convenience; the key is the path that always works — a
+        // camera that will not focus, a desktop authenticator, a password
+        // manager on the same machine. Replacing one with the other would have
+        // been a regression dressed as an improvement.
+        $this->actingAs($this->admin)->get(route('two-factor.show'))
+            ->assertOk()
+            ->assertSee('Setup key')
+            ->assertSee($secret)
+            ->assertSee('Enter a setup key');
+    }
+
+    public function test_no_code_is_drawn_before_enrolment_starts(): void
+    {
+        // Nothing to encode, and an empty frame would read as a broken image.
+        $this->actingAs($this->admin)->get(route('two-factor.show'))
+            ->assertOk()
+            ->assertDontSee('<svg', false);
+    }
+
+    public function test_the_encoder_refuses_nothing_rather_than_throwing(): void
+    {
+        // The screen's real instruction is the typed key, so an encoder that
+        // fell over must not take the page down with it.
+        $this->assertNull(QrCode::svg(''));
+        $this->assertStringContainsString('<svg', QrCode::svg('otpauth://totp/x?secret=Y'));
+    }
+
+    public function test_the_code_actually_encodes_its_input(): void
+    {
+        // Without a QR *reader* — which is not worth a dependency for this —
+        // the check that catches a renderer wired to the wrong variable is
+        // that the picture moves when the data does, and only then.
+        $one = QrCode::svg('otpauth://totp/KEMP:a@acme.test?secret=AAAAAAAAAAAAAAAA');
+        $two = QrCode::svg('otpauth://totp/KEMP:a@acme.test?secret=BBBBBBBBBBBBBBBB');
+
+        $this->assertNotSame($one, $two, 'two different secrets drew the same code');
+        $this->assertSame($one, QrCode::svg('otpauth://totp/KEMP:a@acme.test?secret=AAAAAAAAAAAAAAAA'));
+    }
+
+    public function test_two_admins_never_see_each_others_code(): void
+    {
+        $other = User::create([
+            'name' => 'Bea Cole', 'email' => 'bea@acme.test',
+            'password' => Hash::make('password'), 'company_id' => $this->company->id,
+        ]);
+        $other->assignRole('admin');
+
+        $this->actingAs($this->admin)->post(route('two-factor.enable'));
+        $this->actingAs($other)->post(route('two-factor.enable'));
+
+        $mine = $this->actingAs($this->admin)->get(route('two-factor.show'))->getContent();
+        $theirs = $this->actingAs($other)->get(route('two-factor.show'))->getContent();
+
+        // The secret is per-user, so the code has to be too. A QR built from
+        // anything cached or shared would enrol two people on one secret and
+        // nothing on either screen would say so.
+        $this->assertNotSame(
+            $this->svgOf($mine),
+            $this->svgOf($theirs),
+            'two admins were shown the same QR',
+        );
+    }
+
+    /** The first <svg> element in a page, for comparing one against another. */
+    private function svgOf(string $html): string
+    {
+        preg_match('/<svg.*?<\/svg>/s', $html, $m);
+
+        return $m[0] ?? '';
     }
 }

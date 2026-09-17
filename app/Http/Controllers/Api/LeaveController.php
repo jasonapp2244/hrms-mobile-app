@@ -6,6 +6,8 @@ use App\Models\LeaveRequest;
 use App\Services\LeaveService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * The employee's own leave: what they have left, what they have asked for, and
@@ -30,10 +32,19 @@ class LeaveController extends ApiController
     public function balances(Request $request): JsonResponse
     {
         $employee = $this->employee()->load('company');
-        $year     = (int) ($request->query('year') ?: date('Y'));
+        $timezone = $this->timezone($employee);
+        // The company's year, not the server's. They are the same for all but
+        // a few hours around New Year, and those are the hours in which a
+        // balance for the wrong year is least likely to be questioned.
+        $year     = (int) ($request->query('year') ?: now($timezone)->year);
 
         return $this->ok([
             'year'     => $year,
+            // The day the *company* is on, so the date picker in the app can
+            // open on it. A handset is wherever its owner is: on this data the
+            // phone was a day ahead, and the picker ringed a tomorrow that the
+            // rest of the app — correctly — had not reached yet.
+            'today'    => now($timezone)->toDateString(),
             'balances' => $this->leave->balanceSummary($employee, $year)
                 ->map(fn (array $row) => [
                     'leave_type_id'     => $row['type']->id,
@@ -120,15 +131,25 @@ class LeaveController extends ApiController
                 . now()->addYears(2)->toDateString(),
             'half_day_period' => 'nullable|in:first_half,second_half',
             'reason'          => 'nullable|string|max:1000',
+            // B4.1. Optional, because most leave needs no evidence — it is the
+            // sick note and the summons that do.
+            'attachment' => 'nullable|' . LeaveRequest::ATTACHMENT_RULES,
         ], [
             'end_date.before_or_equal' => 'Leave cannot be booked more than two years ahead.',
         ]);
 
         $data['is_half_day'] = $request->boolean('is_half_day');
+        unset($data['attachment']);
 
         // Business-rule failures come back as ValidationException, so they reach
-        // the client in the same per-field shape as a bad date would.
-        $leaveRequest = $this->leave->submit($employee, $data);
+        // the client in the same per-field shape as a bad date would — and the
+        // file goes with them rather than being left behind. See
+        // LeaveService::submitWithAttachment.
+        $leaveRequest = $this->leave->submitWithAttachment(
+            $employee,
+            $data,
+            $request->file('attachment'),
+        );
 
         return $this->ok([
             'request' => $this->requestPayload($leaveRequest->load('leaveType', 'employee')),
@@ -152,6 +173,30 @@ class LeaveController extends ApiController
     }
 
     /**
+     * The supporting file, streamed (B4.1).
+     *
+     * **Two readers, one route.** The person who attached it, and the line
+     * manager who has to decide on it — a sick note is no use to an approver
+     * they cannot open. Nobody else: not a colleague, not another manager, not
+     * a manager of a different team. HR decide on the web and reach it there,
+     * through the portal's own session.
+     *
+     * The file is named from `attachment_name` but read from `attachment`, so
+     * the uploaded name never touches the filesystem.
+     */
+    public function attachment(LeaveRequest $leaveRequest): StreamedResponse|JsonResponse
+    {
+        $this->authoriseOwnerOrManager($leaveRequest);
+
+        if (! $leaveRequest->hasAttachment()) {
+            return $this->fail('not_found', __('api.leave_attachment_missing'), 404);
+        }
+
+        return Storage::disk(LeaveRequest::ATTACHMENT_DISK)
+            ->download($leaveRequest->attachment, $leaveRequest->attachmentDownloadName());
+    }
+
+    /**
      * Ownership, not just authentication.
      *
      * Every employee can reach this route, so the record has to be checked
@@ -162,6 +207,30 @@ class LeaveController extends ApiController
     {
         abort_unless(
             $leaveRequest->employee_id === $this->employee()->id,
+            403,
+            __('api.leave_not_yours'),
+        );
+    }
+
+    /**
+     * The owner, or the line manager of the person who wrote it.
+     *
+     * Deliberately **not** "anyone with approve-leave": that permission gets a
+     * manager through the door and grants nothing on its own, which is the same
+     * rule `LeaveApprovalController` applies to deciding. A manager who cannot
+     * approve this request has no reason to read the doctor's note attached
+     * to it.
+     */
+    protected function authoriseOwnerOrManager(LeaveRequest $leaveRequest): void
+    {
+        $caller = $this->employee();
+
+        if ($leaveRequest->employee_id === $caller->id) {
+            return;
+        }
+
+        abort_unless(
+            $leaveRequest->employee?->manager_id === $caller->id,
             403,
             __('api.leave_not_yours'),
         );
@@ -183,6 +252,11 @@ class LeaveController extends ApiController
             'stage'         => $r->stage_label,
             'can_cancel'    => $r->isCancellable(),
             'submitted_at'  => $r->created_at?->toIso8601String(),
+            // In the list rather than only the detail: the list is what both
+            // the app and the manager inbox draw, and "is there evidence
+            // attached" is a property of the row, not of opening it.
+            'has_attachment'  => $r->hasAttachment(),
+            'attachment_name' => $r->attachment_name,
         ];
 
         if (! $detailed) {

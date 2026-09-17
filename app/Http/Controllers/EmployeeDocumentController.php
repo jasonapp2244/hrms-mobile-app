@@ -26,11 +26,6 @@ use Illuminate\Validation\Rule;
  */
 class EmployeeDocumentController extends Controller
 {
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     protected function authorizeEmployee(Employee $employee): void
     {
         abort_unless($employee->company_id === $this->companyId(), 403);

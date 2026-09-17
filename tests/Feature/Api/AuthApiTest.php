@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\ActivityLog;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
@@ -313,5 +314,145 @@ class AuthApiTest extends TestCase
             ->assertOk();
 
         $this->assertNull($response->json('user.employee'));
+    }
+
+    // -------------------------------------------------------------------------
+    // The security trail (A1.8) — the app is a door like any other
+    // -------------------------------------------------------------------------
+
+    /**
+     * `AppServiceProvider::recordAuthenticationEvents` hangs the trail off the
+     * framework's auth events precisely so that every door is covered, and its
+     * own comment names "the mobile API's token endpoint" as one of them. These
+     * are the tests that hold it to that — an admin reading the Activity Log
+     * after a suspected compromise must not see a clean sheet while the account
+     * was being used from a phone.
+     */
+    public function test_a_sign_in_from_the_app_reaches_the_security_trail(): void
+    {
+        $this->postJson('/api/v1/auth/login', $this->credentials())->assertOk();
+
+        $entry = ActivityLog::where('event', ActivityLog::LOGIN)->latest('id')->first();
+
+        $this->assertNotNull($entry, 'a sign-in from the app left no trace in the trail');
+        $this->assertSame($this->user->id, $entry->user_id);
+        // Which door it was: the trail is read by somebody who needs to know a
+        // phone was involved, and a user-agent string is not an answer.
+        $this->assertStringContainsString('app', strtolower((string) $entry->description));
+    }
+
+    public function test_a_failed_sign_in_from_the_app_is_recorded(): void
+    {
+        $this->postJson('/api/v1/auth/login', $this->credentials(['password' => 'wrong']))
+            ->assertStatus(401);
+
+        $entry = ActivityLog::where('event', ActivityLog::LOGIN_FAILED)->latest('id')->first();
+
+        $this->assertNotNull($entry, 'a failed app sign-in left no trace');
+        // Attributed to the account so "everything about this user" includes
+        // attempts on them, with the address that was actually typed.
+        $this->assertSame($this->user->id, $entry->user_id);
+        $this->assertSame('ann@acme.test', $entry->actor_label);
+    }
+
+    public function test_an_attempt_on_an_unknown_address_is_recorded_without_a_user(): void
+    {
+        $this->postJson('/api/v1/auth/login', $this->credentials(['email' => 'ghost@acme.test']))
+            ->assertStatus(401);
+
+        $entry = ActivityLog::where('event', ActivityLog::LOGIN_FAILED)->latest('id')->first();
+
+        $this->assertNotNull($entry);
+        // The pattern of addresses being tried is what an investigator reads.
+        $this->assertNull($entry->user_id);
+        $this->assertSame('ghost@acme.test', $entry->actor_label);
+    }
+
+    public function test_a_disabled_account_turned_away_is_recorded(): void
+    {
+        $this->user->forceFill(['is_active' => false])->save();
+
+        $this->postJson('/api/v1/auth/login', $this->credentials())->assertStatus(403);
+
+        $entry = ActivityLog::where('event', ActivityLog::LOGIN_FAILED)->latest('id')->first();
+
+        // The password was right. Somebody holding working credentials for a
+        // switched-off account is the single most interesting line on this
+        // screen, and it was previously not written at all.
+        $this->assertNotNull($entry, 'a correct password on a disabled account left no trace');
+        $this->assertStringContainsString('disabled', strtolower((string) $entry->description));
+    }
+
+    public function test_signing_out_one_handset_is_recorded(): void
+    {
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/auth/logout')->assertOk();
+
+        $this->assertDatabaseHas('activity_logs', [
+            'event'   => ActivityLog::LOGOUT,
+            'user_id' => $this->user->id,
+        ]);
+    }
+
+    public function test_signing_out_everywhere_says_how_much_it_revoked(): void
+    {
+        $this->user->createToken('Ann\'s Pixel');
+        $this->user->createToken('Ann\'s iPad');
+        Sanctum::actingAs($this->user);
+
+        $this->postJson('/api/v1/auth/logout-all')->assertOk();
+
+        $entry = ActivityLog::where('event', ActivityLog::LOGOUT)
+            ->where('user_id', $this->user->id)->latest('id')->first();
+
+        $this->assertNotNull($entry);
+        // This is the lost-phone endpoint. An administrator reviewing an
+        // incident needs to see that it was used, and how wide it reached —
+        // not infer it from tokens that are simply no longer there.
+        $this->assertStringContainsString('every', strtolower((string) $entry->description));
+    }
+
+    public function test_being_throttled_reaches_the_trail(): void
+    {
+        foreach (range(1, 6) as $attempt) {
+            $this->postJson('/api/v1/auth/login', $this->credentials(['password' => 'nope']));
+        }
+
+        $entry = ActivityLog::where('event', ActivityLog::LOCKOUT)->latest('id')->first();
+
+        // Without this, somebody working through a password list against the
+        // app produced a run of failed attempts that stopped dead at five with
+        // nothing explaining why — which reads like the attacker gave up rather
+        // than like the fence doing its job.
+        $this->assertNotNull($entry, 'being throttled left no trace in the trail');
+        $this->assertSame('ann@acme.test', $entry->actor_label);
+    }
+
+    public function test_the_throttled_refusal_keeps_the_api_error_shape(): void
+    {
+        foreach (range(1, 6) as $attempt) {
+            $this->postJson('/api/v1/auth/login', $this->credentials(['password' => 'nope']));
+        }
+
+        // The limiter supplies this response itself, which bypasses the handler
+        // that shapes every other error. This is the pin that stops the two
+        // drifting apart quietly.
+        $this->postJson('/api/v1/auth/login', $this->credentials(['password' => 'nope']))
+            ->assertStatus(429)
+            ->assertJsonStructure(['ok', 'error', 'message'])
+            ->assertJson(['ok' => false, 'error' => 'too_many_requests']);
+    }
+
+    public function test_the_trail_records_the_address_the_request_came_from(): void
+    {
+        $this->postJson('/api/v1/auth/login', $this->credentials())->assertOk();
+
+        $entry = ActivityLog::where('event', ActivityLog::LOGIN)->latest('id')->first();
+
+        // Meaningless behind a proxy until TRUSTED_PROXIES is set on the box —
+        // which is a deployment setting, not a code one — but the column has to
+        // be populated for that setting to have anything to correct.
+        $this->assertNotNull($entry->ip_address);
     }
 }

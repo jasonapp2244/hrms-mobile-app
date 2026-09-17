@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Storage;
 
 class LeaveRequest extends Model
 {
@@ -11,7 +12,7 @@ class LeaveRequest extends Model
         'company_id', 'employee_id', 'leave_type_id',
         'start_date', 'end_date', 'days',
         'is_half_day', 'half_day_period',
-        'reason', 'attachment', 'status',
+        'reason', 'attachment', 'attachment_name', 'status',
         'manager_approved_by', 'manager_approved_at', 'manager_note',
         'approved_by', 'approved_at', 'decision_note',
     ];
@@ -58,6 +59,58 @@ class LeaveRequest extends Model
         'rejected'  => 'danger',
         'cancelled' => 'secondary',
     ];
+
+    /**
+     * The disk supporting evidence lives on (B4.1). Private, like the document
+     * vault: a sick note is medical information about a named person, and it
+     * must not be reachable by guessing a URL.
+     */
+    public const ATTACHMENT_DISK = 'local';
+
+    /** What may be attached, and how large. Matches the document vault. */
+    public const ATTACHMENT_RULES = 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx';
+
+    /**
+     * The file is deleted with the row.
+     *
+     * Here rather than in a controller because a request can go through a
+     * cascade — deleting an employee takes their leave with it — and a sick
+     * note left on disk after the record that explained it is gone is exactly
+     * the file nobody will ever find again to remove.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (self $request) {
+            if ($request->attachment) {
+                Storage::disk(self::ATTACHMENT_DISK)->delete($request->attachment);
+            }
+        });
+    }
+
+    /** Whether there is a file, and it is still where the row says it is. */
+    public function hasAttachment(): bool
+    {
+        return $this->attachment !== null
+            && Storage::disk(self::ATTACHMENT_DISK)->exists($this->attachment);
+    }
+
+    /**
+     * What to call the file on the way out.
+     *
+     * The uploaded name when there is one, and something honest built from the
+     * path when there is not — a download that arrives called `bin` helps
+     * nobody open it.
+     */
+    public function attachmentDownloadName(): string
+    {
+        if ($this->attachment_name) {
+            return $this->attachment_name;
+        }
+
+        $extension = pathinfo((string) $this->attachment, PATHINFO_EXTENSION);
+
+        return 'leave-request-' . $this->id . ($extension ? '.' . $extension : '');
+    }
 
     public function company(): BelongsTo
     {

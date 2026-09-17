@@ -148,7 +148,19 @@
 							<div class="text-muted small">submitted {{ $r->created_at?->format('M j, Y') }}</div>
 						</td>
 						<td>{{ rtrim(rtrim(number_format($r->days, 1), '0'), '.') }}</td>
-						<td>{{ $r->reason ? Str::limit($r->reason, 40) : '—' }}</td>
+						<td>
+							{{ $r->reason ? Str::limit($r->reason, 40) : '—' }}
+							{{-- B4.1. Next to the reason because that is what it supports;
+							     the name is shown because "sick-note.pdf" and "IMG_2831.jpg"
+							     tell an approver what they are about to open. --}}
+							@if($r->hasAttachment())
+								<div class="small mt-1">
+									<a href="{{ route('leave.attachment', $r) }}" class="text-decoration-none">
+										<i class="ti ti-paperclip me-1"></i>{{ Str::limit($r->attachmentDownloadName(), 28) }}
+									</a>
+								</div>
+							@endif
+						</td>
 						<td>
 							@if($r->status === 'pending')
 								<span class="badge bg-{{ $r->isAwaitingManager() ? 'secondary' : 'warning' }}">{{ $r->stage_label }}</span>

@@ -685,6 +685,29 @@ class AttendanceApiTest extends TestCase
             ->assertJsonPath('shift.crosses_midnight', false);
     }
 
+    public function test_today_says_what_a_break_costs(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 08:00:00'));
+
+        // The server has known this since A5.7 shipped and never said — which
+        // left the one screen with a break button unable to answer the only
+        // question somebody has before pressing it.
+        $this->getJson('/api/v1/attendance/today')
+            ->assertJsonPath('shift.break_minutes', 30)
+            ->assertJsonPath('shift.break_is_paid', false)
+            ->assertJsonPath('shift.break_is_minimum', false);
+    }
+
+    public function test_today_reports_a_paid_break_as_paid(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-03 08:00:00'));
+        $this->employee->shift->update(['break_is_paid' => true, 'break_is_minimum' => true]);
+
+        $this->getJson('/api/v1/attendance/today')
+            ->assertJsonPath('shift.break_is_paid', true)
+            ->assertJsonPath('shift.break_is_minimum', true);
+    }
+
     public function test_today_shows_the_rostered_shift_over_the_standing_one(): void
     {
         $night = Shift::create([
@@ -1014,5 +1037,138 @@ class AttendanceApiTest extends TestCase
             'leave_type_id' => $type->id, 'start_date' => $from, 'end_date' => $to,
             'days' => 1, 'status' => 'approved',
         ]);
+    }    // ================= what the handset says about itself (B2.7) =================
+
+    /**
+     * The three flags are stored against the punch, and the punch is recorded
+     * either way.
+     *
+     * **Recorded, never enforced.** A mocked fix is a reason for somebody to
+     * look at a row, not a reason to refuse a clock-in: office, remote and
+     * hybrid staff punch from wherever they are, and a false positive that
+     * stops somebody being paid is a worse failure than a true positive nobody
+     * acted on for a day.
+     */
+    public function test_a_punch_carries_what_the_handset_reported(): void
+    {
+        $this->postJson('/api/v1/attendance/check', [
+            'latitude'        => 40.7128,
+            'longitude'       => -74.006,
+            'location_mocked' => true,
+            'device_rooted'   => true,
+            'device_emulator' => false,
+        ])->assertOk();
+
+        $log = AttendanceLog::latest('id')->first();
+
+        $this->assertTrue($log->location_mocked);
+        $this->assertTrue($log->device_rooted);
+        $this->assertFalse($log->device_emulator);
+
+        // The punch happened. That is the point.
+        $this->assertSame('in', $log->type);
+        $this->assertTrue($log->looksTampered());
+    }
+
+    /**
+     * Silence is stored as silence.
+     *
+     * A punch from the web portal, from the kiosk, or from an app build older
+     * than this feature says nothing about the device. `null` carries that;
+     * `false` would be a clean bill of health nobody issued, and an integrity
+     * column that cannot tell silence from a denial is not one.
+     */
+    public function test_a_client_that_says_nothing_is_recorded_as_having_said_nothing(): void
+    {
+        $this->postJson('/api/v1/attendance/check', [
+            'latitude'  => 40.7128,
+            'longitude' => -74.006,
+        ])->assertOk();
+
+        $log = AttendanceLog::latest('id')->first();
+
+        $this->assertNull($log->location_mocked);
+        $this->assertNull($log->device_rooted);
+        $this->assertNull($log->device_emulator);
+
+        // And it is not swept into the register's "flagged" filter.
+        $this->assertFalse($log->looksTampered());
+    }
+
+    public function test_a_clean_report_is_not_a_flag(): void
+    {
+        $this->postJson('/api/v1/attendance/check', [
+            'location_mocked' => false,
+            'device_rooted'   => false,
+            'device_emulator' => false,
+        ])->assertOk();
+
+        $log = AttendanceLog::latest('id')->first();
+
+        // Explicitly false, which is a real statement — and not a flag.
+        $this->assertFalse($log->location_mocked);
+        $this->assertFalse($log->looksTampered());
+    }
+
+    /**
+     * A queued punch carries what was true when it was tapped.
+     *
+     * Per punch and not per batch: a queue can hold one fix taken with a
+     * spoofer running and the next taken without it, and collapsing them to one
+     * verdict for the sync would lose exactly the row worth looking at.
+     */
+    public function test_synced_punches_each_keep_their_own_flags(): void
+    {
+        // After both, so neither is dated in the future — a punch that has not
+        // happened yet is refused, which is the whole reason the queue stamps
+        // the moment of the tap rather than the moment of delivery.
+        $this->travelTo(Carbon::parse('2026-08-03 18:00:00'));
+
+        $this->postJson('/api/v1/attendance/sync', [
+            'punches' => [
+                [
+                    'occurred_at'     => '2026-08-03 08:00:00',
+                    'location_mocked' => true,
+                ],
+                [
+                    'occurred_at'     => '2026-08-03 17:00:00',
+                    'location_mocked' => false,
+                ],
+            ],
+        ])->assertOk()->assertJsonPath('accepted', 2);
+
+        $logs = AttendanceLog::orderBy('scanned_at')->get();
+
+        $this->assertTrue($logs[0]->location_mocked);
+        $this->assertFalse($logs[1]->location_mocked);
+    }
+
+    public function test_a_break_is_a_punch_like_any_other(): void
+    {
+        // travelTo before the punch, not after: the duplicate cooldown measures
+        // created_at. See test_a_break_starts_when_on_the_clock.
+        $this->travelTo(Carbon::parse('2026-08-03 09:00:00'));
+        $this->punch('in', '2026-08-03 09:00:00');
+        $this->travelTo(Carbon::parse('2026-08-03 13:00:00'));
+
+        $this->postJson('/api/v1/attendance/break', [
+            'location_mocked' => true,
+        ])->assertOk();
+
+        $break = AttendanceLog::where('type', 'break_start')->latest('id')->first();
+
+        $this->assertTrue($break->location_mocked);
+    }
+
+    public function test_a_flag_that_is_not_a_boolean_is_refused(): void
+    {
+        // The column is a three-state: true, false, or nothing. A string would
+        // cast to one of the two states silently, which is how "maybe" becomes
+        // a verdict.
+        $this->postJson('/api/v1/attendance/check', [
+            'location_mocked' => 'probably',
+        ])->assertStatus(422)->assertJsonValidationErrors('location_mocked');
+
+        $this->assertSame(0, AttendanceLog::count());
     }
 }

@@ -341,4 +341,69 @@ class CustomReportTest extends TestCase
         $response->assertOk();
         $this->assertStringContainsString('spreadsheetml', $response->headers->get('content-type'));
     }
+
+    // -------------------------------------------------------------------------
+    // The report window is also the download filename
+    // -------------------------------------------------------------------------
+
+    /**
+     * `from` and `to` are concatenated into the export's filename, and a
+     * filename is a path. maatwebsite/excel wrote outside the configured disk
+     * when handed a caller-controlled one through 3.1.69 (CVE-2026-84374); the
+     * dependency is current again, and this is the half of the fix that stays
+     * true after the next upgrade.
+     */
+    public function test_a_report_window_that_is_not_a_date_is_refused(): void
+    {
+        foreach ([
+            '../../../../etc/passwd',
+            '..\\..\\windows\\system32',
+            '2026-08-01/../../x',
+            'not-a-date',
+            // Real date, wrong shape: the slug is built by concatenation, so
+            // anything that is not exactly Y-m-d is a surprise in a filename.
+            '01/08/2026',
+        ] as $hostile) {
+            $this->actingAs($this->hr)
+                ->get(route('reports.custom', ['from' => $hostile, 'export' => 'excel']))
+                ->assertSessionHasErrors('from');
+        }
+    }
+
+    public function test_the_same_holds_for_the_far_end_of_the_window(): void
+    {
+        $this->actingAs($this->hr)
+            ->get(route('reports.custom', ['to' => '../../secret', 'export' => 'excel']))
+            ->assertSessionHasErrors('to');
+    }
+
+    public function test_an_ordinary_window_still_exports(): void
+    {
+        // The guard must not cost the feature: a plain window is untouched, and
+        // omitting the dates altogether still falls back to this month.
+        $this->actingAs($this->hr)
+            ->get(route('reports.custom', ['from' => '2026-08-01', 'to' => '2026-08-31', 'export' => 'excel']))
+            ->assertOk();
+
+        $this->actingAs($this->hr)
+            ->get(route('reports.custom', ['export' => 'excel']))
+            ->assertOk();
+    }
+
+    public function test_the_attendance_report_export_is_guarded_too(): void
+    {
+        // A second controller builds a filename the same way, and a fix in one
+        // of two places is the kind that gets found by the half nobody patched.
+        $this->actingAs($this->hr)
+            ->get(route('attendance.report', ['from' => '../../../etc/passwd']))
+            ->assertSessionHasErrors('from');
+
+        $this->actingAs($this->hr)
+            ->get(route('attendance.report.excel', ['from' => '../../../etc/passwd']))
+            ->assertSessionHasErrors('from');
+
+        $this->actingAs($this->hr)
+            ->get(route('attendance.report.excel', ['from' => '2026-08-01', 'to' => '2026-08-31']))
+            ->assertOk();
+    }
 }

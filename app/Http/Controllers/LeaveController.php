@@ -11,6 +11,7 @@ use App\Models\Office;
 use App\Services\LeaveService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * The company-wide leave register for Admin and HR, and the final step of the
@@ -22,11 +23,6 @@ class LeaveController extends Controller
     public function __construct(
         protected LeaveService $leave,
     ) {}
-
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
 
     public function index(Request $request)
     {
@@ -95,7 +91,7 @@ class LeaveController extends Controller
      */
     public function calendar(Request $request)
     {
-        $companyId = auth()->user()->company_id ?? Office::value('company_id');
+        $companyId = $this->companyId();
 
         $month = Carbon::parse($request->input('month', now()->format('Y-m')) . '-01')->startOfMonth();
         $start = $month->copy()->startOfMonth();
@@ -136,6 +132,25 @@ class LeaveController extends Controller
             'departments' => Department::where('company_id', $companyId)->orderBy('name')->get(),
             'total'       => $requests->count(),
         ]);
+    }
+
+    /**
+     * The file the employee attached to support the request (B4.1).
+     *
+     * Company-scoped like everything else on this controller, and behind
+     * `manage-leave` at the route: whoever is deciding needs to open the sick
+     * note, and nobody else in the building does. Streamed from the private
+     * disk — these never sit under `public/`, for the same reason the document
+     * vault does not.
+     */
+    public function attachment(LeaveRequest $leaveRequest)
+    {
+        $this->authoriseCompany($leaveRequest);
+
+        abort_unless($leaveRequest->hasAttachment(), 404);
+
+        return Storage::disk(LeaveRequest::ATTACHMENT_DISK)
+            ->download($leaveRequest->attachment, $leaveRequest->attachmentDownloadName());
     }
 
     /**

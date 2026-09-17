@@ -10,7 +10,7 @@ class CompanyController extends Controller
 {
     protected function company(): Company
     {
-        $id = auth()->user()->company_id ?? Office::value('company_id');
+        $id = $this->companyId();
         return Company::findOrFail($id);
     }
 

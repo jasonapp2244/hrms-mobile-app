@@ -12,8 +12,10 @@ use App\Models\LeaveType;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -516,5 +518,199 @@ class LeaveApiTest extends TestCase
             'leave_type_id' => $this->annual->id, 'start_date' => $from,
             'end_date' => $to, 'days' => 3, 'status' => $status,
         ]);
+    }
+    // ================= the day the picker opens on =================
+
+    /**
+     * Balances carry the company's today, and the app's date picker rings it.
+     *
+     * The picker used to ring `DateTime.now()` from the handset. On a phone a
+     * few hours ahead of the company that ring sat on tomorrow, while the
+     * Clock, History and Schedule tabs all correctly showed the day before —
+     * so somebody booking "from today" booked the wrong day, and the app
+     * disagreed with itself on screen. The company is put four hours behind
+     * UTC at an hour where the two dates differ, because with a shared clock a
+     * picker built from the handset passes.
+     */
+    public function test_balances_name_the_company_s_today_not_the_server_s(): void
+    {
+        $this->company->update(['timezone' => 'America/New_York']);
+
+        // 01:00 UTC on New Year's Day is 20:00 on New Year's Eve in New York,
+        // so the server and the company disagree about the day *and* the year.
+        Carbon::setTestNow('2027-01-01 01:00:00');
+
+        $body = $this->getJson('/api/v1/leave/balances')->assertOk()->json();
+
+        $this->assertSame('2026-12-31', $body['today']);
+        $this->assertNotSame(now()->toDateString(), $body['today']);
+
+        // And the year defaults from that same date rather than the server's,
+        // which is the same bug with a twelve-month blast radius: on the last
+        // evening of December the app asked for next year's balances and would
+        // have shown a full untouched entitlement to somebody who had spent it.
+        //
+        // Note it is compared against `now()->year` and not against PHP's
+        // `date('Y')`, which is what the controller used to call: `date()`
+        // reads the machine clock and ignores `Carbon::setTestNow` entirely,
+        // so that version of this line could not be made to fail no matter
+        // what the company's timezone was. An unfreezable clock is its own
+        // reason not to ask one the time.
+        $this->assertSame(2026, $body['year']);
+        $this->assertNotSame(now()->year, $body['year']);
+
+        Carbon::setTestNow();
+    }    // ================= the supporting file (B4.1) =================
+
+    /** Applying with a file attached, the way the app and the web form both do. */
+    protected function applyWith(UploadedFile $file, array $overrides = []): \Illuminate\Testing\TestResponse
+    {
+        return $this->post('/api/v1/leave/requests', array_merge([
+            'leave_type_id' => $this->annual->id,
+            'start_date'    => '2026-08-10',
+            'end_date'      => '2026-08-12',
+            'attachment'    => $file,
+        ], $overrides));
+    }
+
+    /**
+     * The file goes up with the request, and comes back to the person who
+     * attached it.
+     *
+     * `leave_requests.attachment` had existed since the table was created and
+     * had never been written to by anything: there was no way to attach a sick
+     * note from the app or from the web, which is what left B4.1 amber.
+     */
+    public function test_a_request_can_carry_a_supporting_file(): void
+    {
+        Storage::fake(LeaveRequest::ATTACHMENT_DISK);
+
+        $response = $this->applyWith(
+            UploadedFile::fake()->create('sick-note.pdf', 120, 'application/pdf'),
+        )->assertCreated();
+
+        $this->assertTrue($response->json('request.has_attachment'));
+        $this->assertSame('sick-note.pdf', $response->json('request.attachment_name'));
+
+        $request = LeaveRequest::latest('id')->first();
+
+        // The stored path is **not** built from the uploaded name: a path made
+        // of user-supplied text is a traversal waiting to happen, and two
+        // people attaching `scan.pdf` on the same day must not collide.
+        $this->assertNotNull($request->attachment);
+        $this->assertStringNotContainsString('sick-note', $request->attachment);
+        Storage::disk(LeaveRequest::ATTACHMENT_DISK)->assertExists($request->attachment);
+
+        // And it downloads under the name it was uploaded with, which is the
+        // only reason that column exists.
+        $download = $this->get("/api/v1/leave/requests/{$request->id}/attachment")->assertOk();
+        $this->assertStringContainsString(
+            'sick-note.pdf',
+            (string) $download->headers->get('content-disposition'),
+        );
+    }
+
+    public function test_a_refused_request_leaves_no_file_behind(): void
+    {
+        Storage::fake(LeaveRequest::ATTACHMENT_DISK);
+
+        // Booked twice over the same dates: the second is refused by the overlap
+        // rule, *after* its file has already been stored.
+        $this->apply()->assertCreated();
+
+        $this->applyWith(UploadedFile::fake()->create('note.pdf', 10, 'application/pdf'))
+            ->assertStatus(422);
+
+        // Nothing on disk. An orphan here is a medical document belonging to a
+        // request that does not exist, which nobody will ever find to delete.
+        $this->assertSame(
+            [],
+            Storage::disk(LeaveRequest::ATTACHMENT_DISK)->allFiles('leave-attachments'),
+        );
+    }
+
+    public function test_the_line_manager_can_open_it_and_sees_that_it_is_there(): void
+    {
+        Storage::fake(LeaveRequest::ATTACHMENT_DISK);
+
+        [$manager] = $this->team();
+        $this->employee->update(['manager_id' => $manager->id]);
+
+        $this->applyWith(UploadedFile::fake()->create('sick-note.pdf', 10, 'application/pdf'))
+            ->assertCreated();
+
+        $request = LeaveRequest::latest('id')->first();
+
+        Sanctum::actingAs($manager->user);
+
+        // A sick note is no use to an approver who cannot see that it exists.
+        $this->getJson('/api/v1/leave/approvals')
+            ->assertOk()
+            ->assertJsonPath('pending.0.has_attachment', true)
+            ->assertJsonPath('pending.0.attachment_name', 'sick-note.pdf');
+
+        $this->get("/api/v1/leave/requests/{$request->id}/attachment")->assertOk();
+    }
+
+    public function test_a_colleague_and_another_teams_manager_are_both_refused(): void
+    {
+        Storage::fake(LeaveRequest::ATTACHMENT_DISK);
+
+        $this->applyWith(UploadedFile::fake()->create('sick-note.pdf', 10, 'application/pdf'))
+            ->assertCreated();
+
+        $request = LeaveRequest::latest('id')->first();
+
+        // An ordinary colleague in the same company and department.
+        Sanctum::actingAs($this->colleague('Zoe', 'Park', 'E7')->user);
+        $this->get("/api/v1/leave/requests/{$request->id}/attachment")->assertStatus(403);
+
+        // And a manager who holds approve-leave, but not over this person. The
+        // permission gets them through the door and grants nothing on its own —
+        // a manager who cannot decide on the request has no business reading the
+        // doctor's note attached to it.
+        [$manager] = $this->team();
+        Sanctum::actingAs($manager->user);
+        $this->get("/api/v1/leave/requests/{$request->id}/attachment")->assertStatus(403);
+    }
+
+    public function test_an_oversized_or_unwelcome_file_is_refused(): void
+    {
+        Storage::fake(LeaveRequest::ATTACHMENT_DISK);
+
+        // 12 MB, over the 10 MB ceiling.
+        $this->applyWith(UploadedFile::fake()->create('huge.pdf', 12288, 'application/pdf'))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('attachment');
+
+        // An executable wearing a document's clothes.
+        $this->applyWith(UploadedFile::fake()->create('payload.exe', 10, 'application/octet-stream'))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('attachment');
+
+        // Refused before anything is created or written, both times.
+        $this->assertSame(0, LeaveRequest::count());
+        $this->assertSame(
+            [],
+            Storage::disk(LeaveRequest::ATTACHMENT_DISK)->allFiles('leave-attachments'),
+        );
+    }
+
+    public function test_deleting_the_request_deletes_the_file(): void
+    {
+        Storage::fake(LeaveRequest::ATTACHMENT_DISK);
+
+        $this->applyWith(UploadedFile::fake()->create('sick-note.pdf', 10, 'application/pdf'))
+            ->assertCreated();
+
+        $request = LeaveRequest::latest('id')->first();
+        $path    = $request->attachment;
+
+        $request->delete();
+
+        // Leave can go through a cascade — deleting an employee takes it with
+        // them — so the file is removed by the model rather than by whoever
+        // happened to call delete.
+        Storage::disk(LeaveRequest::ATTACHMENT_DISK)->assertMissing($path);
     }
 }

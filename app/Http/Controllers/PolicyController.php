@@ -42,7 +42,7 @@ class PolicyController extends Controller
 
     protected function company(): Company
     {
-        $id = auth()->user()->company_id ?? Office::value('company_id');
+        $id = $this->companyId();
 
         return Company::findOrFail($id);
     }
@@ -74,6 +74,7 @@ class PolicyController extends Controller
             'auto_close_after_minutes'      => 'required|integer|min:0|max:1440',
             'session_idle_timeout_minutes'  => 'required|integer|min:0|max:1440',
             'enforce_geofence'              => 'nullable|boolean',
+            'enforce_device_binding'        => 'nullable|boolean',
             'require_two_factor_for_staff'  => 'nullable|boolean',
             'directory_show_contact_details' => 'nullable|boolean',
         ], [
@@ -104,6 +105,7 @@ class PolicyController extends Controller
             'auto_close_after_minutes'        => (int) $data['auto_close_after_minutes'],
             'session_idle_timeout_minutes'    => (int) $data['session_idle_timeout_minutes'],
             'enforce_geofence'                => $request->boolean('enforce_geofence'),
+            'enforce_device_binding'          => $request->boolean('enforce_device_binding'),
             'require_two_factor_for_staff'    => $request->boolean('require_two_factor_for_staff'),
             'directory_show_contact_details'  => $request->boolean('directory_show_contact_details'),
         ])]);

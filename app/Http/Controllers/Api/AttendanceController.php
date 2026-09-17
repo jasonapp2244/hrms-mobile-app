@@ -26,6 +26,20 @@ class AttendanceController extends ApiController
     /** The furthest back one history call will reach. */
     public const MAX_HISTORY_DAYS = 92;
 
+    /**
+     * What the handset may say about itself when it punches (B2.7).
+     *
+     * All three optional, and **nullable rather than defaulted**: a client that
+     * says nothing has said nothing, which is not the same as reporting a clean
+     * device. `validate()` drops an absent nullable key entirely, which is what
+     * keeps that distinction — see [integrityMeta].
+     */
+    protected const INTEGRITY_RULES = [
+        'location_mocked' => 'nullable|boolean',
+        'device_rooted'   => 'nullable|boolean',
+        'device_emulator' => 'nullable|boolean',
+    ];
+
     public function __construct(
         protected AttendanceService $attendance,
         protected LeaveService $leave,
@@ -41,7 +55,7 @@ class AttendanceController extends ApiController
         $data = $request->validate([
             'latitude'  => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
-        ]);
+        ] + self::INTEGRITY_RULES);
 
         $employee = $this->employee();
 
@@ -55,8 +69,7 @@ class AttendanceController extends ApiController
 
         // Tag the punch against the employee's own office, falling back to the
         // company's first — remote staff may not sit at a fixed one.
-        $office = $employee->office
-            ?? Office::where('company_id', $employee->company_id)->orderBy('id')->first();
+        $office = $this->punchOffice($employee);
 
         if (! $office) {
             return $this->fail(
@@ -72,7 +85,7 @@ class AttendanceController extends ApiController
                 'latitude'   => $data['latitude'] ?? null,
                 'longitude'  => $data['longitude'] ?? null,
                 'ip_address' => $request->ip(),
-            ]);
+            ] + $this->integrityMeta($data));
         } catch (\RuntimeException $e) {
             // Geofence enforcement (A4.16). Given its own error code rather than
             // a generic refusal so the app can say "move closer" instead of
@@ -119,6 +132,11 @@ class AttendanceController extends ApiController
             'punches.*.occurred_at'  => 'required|date',
             'punches.*.latitude'     => 'nullable|numeric|between:-90,90',
             'punches.*.longitude'    => 'nullable|numeric|between:-180,180',
+            // B2.7, per punch rather than per batch: a queue can hold one fix
+            // taken with a spoofer running and the next taken without.
+            'punches.*.location_mocked' => 'nullable|boolean',
+            'punches.*.device_rooted'   => 'nullable|boolean',
+            'punches.*.device_emulator' => 'nullable|boolean',
         ], [
             'punches.max' => 'Send at most ' . self::MAX_SYNC_PUNCHES . ' punches at a time.',
         ]);
@@ -126,8 +144,7 @@ class AttendanceController extends ApiController
         $employee = $this->employee();
         $timezone = $this->timezone($employee);
 
-        $office = $employee->office
-            ?? Office::where('company_id', $employee->company_id)->orderBy('id')->first();
+        $office = $this->punchOffice($employee);
 
         if (! $office) {
             return $this->fail(
@@ -153,7 +170,7 @@ class AttendanceController extends ApiController
                     'latitude'   => $punch['latitude'] ?? null,
                     'longitude'  => $punch['longitude'] ?? null,
                     'ip_address' => $request->ip(),
-                ]);
+                ] + $this->integrityMeta($punch));
 
                 $results[] = [
                     'occurred_at' => $punch['occurred_at'],
@@ -202,7 +219,7 @@ class AttendanceController extends ApiController
         $data = $request->validate([
             'latitude'  => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
-        ]);
+        ] + self::INTEGRITY_RULES);
 
         $employee = $this->employee();
 
@@ -214,8 +231,7 @@ class AttendanceController extends ApiController
             );
         }
 
-        $office = $employee->office
-            ?? Office::where('company_id', $employee->company_id)->orderBy('id')->first();
+        $office = $this->punchOffice($employee);
 
         if (! $office) {
             return $this->fail(
@@ -231,7 +247,7 @@ class AttendanceController extends ApiController
                 'latitude'   => $data['latitude'] ?? null,
                 'longitude'  => $data['longitude'] ?? null,
                 'ip_address' => $request->ip(),
-            ]);
+            ] + $this->integrityMeta($data));
         } catch (\RuntimeException $e) {
             // Its own code, not the geofence's: this one means "you are not
             // clocked in", which the app answers by refreshing the day rather
@@ -302,13 +318,28 @@ class AttendanceController extends ApiController
             'punches' => $logs->map(fn ($log) => $this->punchPayload($log, $timezone))->values(),
             // The comparison point has to be stated in the same frame the
             // punches are stored in, or the tz offset is counted as hours worked.
+            // The shift goes with it so a **paid** break (A5.7) does not come
+            // off the running total. Nothing else about the policy belongs in a
+            // live number: the nominal break has not been taken yet at five
+            // past nine, and whether a short break is topped up to the shift's
+            // minimum cannot be judged until it is over.
             'worked_minutes' => $this->attendance->workedMinutes(
-                $logs, $this->attendance->wallClock($now),
+                $logs,
+                $this->attendance->wallClock($now),
+                $employee->shiftOn($date),
             ),
             // Open means the clock is still running on the number above. True
             // through a break as well: the person has not gone home, and
             // workedMinutes has already subtracted the break itself.
             'is_clocked_in' => $state['clocked_in'],
+            // B2.5. Null unless a fence actually applies to *this* employee —
+            // the service resolves the policy, the work-mode exemptions and the
+            // missing-coordinates case in one place, so the app never has to
+            // reimplement a rule it could get wrong. Given to the app so the
+            // Clock screen can state the requirement before anybody taps, and
+            // check the distance itself instead of spending a round trip to be
+            // refused.
+            'geofence' => $this->attendance->geofenceFor($employee, $this->punchOffice($employee)),
         ] + $this->dayContext($employee, $date));
     }
 
@@ -391,7 +422,13 @@ class AttendanceController extends ApiController
                 'late'           => $firstIn?->status === 'late',
                 'first_in'       => $firstIn ? $this->attendance->wallClock($firstIn->scanned_at, $timezone)->toIso8601String() : null,
                 'last_out'       => $lastOut ? $this->attendance->wallClock($lastOut->scanned_at, $timezone)->toIso8601String() : null,
-                'worked_minutes' => $this->attendance->workedMinutes($dayLogs),
+                // With that day's shift, so a paid break (A5.7) stays on the
+                // clock here as well. The rest of the policy is not applied to
+                // a history row: this number is "how long I was at work", and
+                // the payroll figure it feeds is computed by overtimeFor.
+                'worked_minutes' => $this->attendance->workedMinutes(
+                    $dayLogs, null, $employee->shiftOn($date),
+                ),
                 'punches'        => $dayLogs->count(),
                 'holiday'        => $holidays[$date] ?? null,
             ];
@@ -437,6 +474,13 @@ class AttendanceController extends ApiController
                 'end_time'           => $shift->end_time,
                 'late_grace_minutes' => (int) $shift->late_grace_minutes,
                 'crosses_midnight'   => $shift->crossesMidnight(),
+                // A5.7. The server has known whether a break is paid since the
+                // policy shipped and never told the person taking one, which
+                // left the only screen with a break button unable to say
+                // whether pressing it costs them half an hour.
+                'break_minutes'      => (int) $shift->break_minutes,
+                'break_is_paid'      => (bool) $shift->break_is_paid,
+                'break_is_minimum'   => (bool) $shift->break_is_minimum,
             ] : null,
             'is_day_off' => $employee->isRosteredOff($date),
             'holiday'    => $holidays[$date] ?? null,
@@ -458,6 +502,44 @@ class AttendanceController extends ApiController
             ->whereDate('work_date', $date)
             ->orderBy('scanned_at')
             ->get();
+    }
+
+    /**
+     * The office a punch is tagged against.
+     *
+     * The employee's own, falling back to the company's first — remote staff
+     * may not sit at a fixed one. **One definition on purpose**: it decides
+     * which fence applies as well as which office the row names, so `today`
+     * describing one office while `check` enforces another would have the app
+     * confidently quoting a distance to the wrong building.
+     */
+    protected function punchOffice(Employee $employee): ?Office
+    {
+        return $employee->office
+            ?? Office::where('company_id', $employee->company_id)->orderBy('id')->first();
+    }
+
+    /**
+     * The three integrity flags out of a validated payload, ready for the meta
+     * array `AttendanceService` writes from (B2.7).
+     *
+     * **Absent stays null, and null is stored.** `validate()` drops a nullable
+     * key the caller never sent, so `?? null` here is what carries "the client
+     * said nothing" all the way to the column. Defaulting to `false` would
+     * write a clean bill of health on behalf of a client that never issued one
+     * — and every punch made from the web portal, the kiosk, or an app build
+     * older than this feature would carry it.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, bool|null>
+     */
+    protected function integrityMeta(array $data): array
+    {
+        return [
+            'location_mocked' => $data['location_mocked'] ?? null,
+            'device_rooted'   => $data['device_rooted'] ?? null,
+            'device_emulator' => $data['device_emulator'] ?? null,
+        ];
     }
 
     protected function punchPayload(AttendanceLog $log, string $timezone): array

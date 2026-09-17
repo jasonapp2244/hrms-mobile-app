@@ -48,6 +48,17 @@
 						@if($r->reason)
 							<div class="mt-2 small"><span class="text-muted">Reason:</span> {{ $r->reason }}</div>
 						@endif
+						{{-- B4.1. Under the reason because it is what supports it, and
+						     named rather than labelled "attachment": a sick note and a
+						     photo of a car park are both files, and only one of them
+						     needs opening before deciding. --}}
+						@if($r->hasAttachment())
+							<div class="mt-2 small">
+								<a href="{{ route('employee.approvals.attachment', $r) }}" class="text-decoration-none">
+									<i class="ti ti-paperclip me-1"></i>{{ $r->attachmentDownloadName() }}
+								</a>
+							</div>
+						@endif
 					</div>
 					<div class="text-end">
 						<button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#approve{{ $r->id }}">

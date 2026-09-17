@@ -27,11 +27,6 @@ use Illuminate\Validation\Rule;
  */
 class AnnouncementController extends Controller
 {
-    protected function companyId(): int
-    {
-        return auth()->user()->company_id ?? Office::value('company_id');
-    }
-
     protected function scoped(Announcement $announcement): Announcement
     {
         abort_unless($announcement->company_id === $this->companyId(), 403);

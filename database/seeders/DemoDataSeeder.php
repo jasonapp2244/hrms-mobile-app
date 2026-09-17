@@ -158,6 +158,38 @@ class DemoDataSeeder extends Seeder
             );
         }
 
+        // HR is an employee too, and without this the demo cannot show it.
+        //
+        // `hr@emp.test` had a user and a role but no employee record, so on the
+        // phone it landed on "this account has no employee record, so there is
+        // nothing to clock" — the admin empty state — on all four employee
+        // screens. That contradicts the documented intent: HR is **desk-only
+        // for HR work**, but HR staff clock in and book their own leave like
+        // anybody else, which is exactly what the app is for. Two of the four
+        // roles were undemonstrable on a handset because of it.
+        //
+        // **Admin deliberately does not get one.** An administrator is an
+        // operator of the system rather than a member of staff — `emp:install`
+        // creates one with no employee record on purpose, and the empty state
+        // it produces is a designed, tested screen. Giving admin a record here
+        // would hide it.
+        $hrEmployee = Employee::firstOrCreate(
+            ['employee_code' => 'EMP-0006'],
+            [
+                'company_id'     => $company->id,
+                'user_id'        => $hr->id,
+                'office_id'      => $head->id,
+                'department_id'  => $departments[1]->id,   // Human Resources
+                'designation_id' => $designations[1]->id,  // HR Executive
+                'first_name'     => 'Hana',
+                'last_name'      => 'Ruiz',
+                'email'          => 'hr@emp.test',
+                'gender'         => 'female',
+                'hire_date'      => now()->subYears(2)->toDateString(),
+                'status'         => 'active',
+            ]
+        );
+
         // Reporting line, so the approval chain is demonstrable out of the box:
         // the first employee leads the rest. The manager role is held *in
         // addition to* employee — a manager is staff who also approves.
@@ -172,6 +204,15 @@ class DemoDataSeeder extends Seeder
             Employee::where('company_id', $company->id)
                 ->where('id', '!=', $lead->id)
                 ->whereNull('manager_id')
+                // HR is not on the lead's team. Everybody else reports to
+                // EMP-0001, but HR reporting to a software engineer would put
+                // HR's own leave into that manager's approvals inbox and show
+                // HR on their team screens, which is not the shape of the
+                // organisation this data is meant to demonstrate. With no
+                // manager, HR's own requests go straight to the HR stage —
+                // `isAwaitingManager()` is false without a `manager_id`, which
+                // is the correct path rather than a gap in it.
+                ->where('employee_code', '!=', 'EMP-0006')
                 ->update(['manager_id' => $lead->id]);
         }
     }

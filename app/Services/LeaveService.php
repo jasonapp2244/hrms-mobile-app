@@ -9,7 +9,9 @@ use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -405,6 +407,53 @@ class LeaveService
      *
      * @param array{leave_type_id:int,start_date:string,end_date:string,is_half_day?:bool,half_day_period?:?string,reason?:?string} $data
      */
+    /**
+     * [submit], with a file attached to the request that results (B4.1).
+     *
+     * **The file is stored first and removed again if the submission is
+     * refused.** The other order leaves a sick note on disk belonging to a
+     * request that was never created — a file with nothing pointing at it,
+     * which nobody will ever find to delete. Submissions are refused often:
+     * overlapping dates and an exhausted balance are both ordinary.
+     *
+     * Here rather than in a controller because both callers need it and neither
+     * should own the cleanup: the app posts to `Api\LeaveController` and the
+     * web form to `LeaveRequestController`, and a rollback implemented twice is
+     * a rollback that will be implemented once.
+     */
+    public function submitWithAttachment(
+        Employee $employee,
+        array $data,
+        ?UploadedFile $file,
+    ): LeaveRequest {
+        $path = $file?->store(
+            'leave-attachments/' . $employee->company_id . '/' . $employee->id,
+            LeaveRequest::ATTACHMENT_DISK,
+        );
+
+        try {
+            $leaveRequest = $this->submit($employee, $data);
+        } catch (\Throwable $e) {
+            if ($path) {
+                Storage::disk(LeaveRequest::ATTACHMENT_DISK)->delete($path);
+            }
+
+            throw $e;
+        }
+
+        if ($path) {
+            $leaveRequest->update([
+                'attachment' => $path,
+                // Display text and nothing else: every download reads the path
+                // and only *names* the file from this, so an uploaded name
+                // never reaches the filesystem.
+                'attachment_name' => $file->getClientOriginalName(),
+            ]);
+        }
+
+        return $leaveRequest;
+    }
+
     public function submit(Employee $employee, array $data): LeaveRequest
     {
         $type = LeaveType::find($data['leave_type_id']);
