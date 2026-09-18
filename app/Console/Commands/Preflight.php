@@ -33,7 +33,8 @@ use Throwable;
 class Preflight extends Command
 {
     protected $signature = 'emp:preflight
-                            {--strict : Treat warnings as failures too}';
+                            {--strict : Treat warnings as failures too}
+                            {--non-production : Staging or demo box — downgrade the failures that can be a deliberate choice there, but never the ones that cannot}';
 
     protected $description = 'Verify this install is correctly configured for production';
 
@@ -177,7 +178,7 @@ class Preflight extends Command
         // leaves a marker the first time a forwarded request arrives with
         // nothing trusted. That is proof the column is wrong *now*, so it fails
         // the deploy rather than warning about it.
-        $sighting = $proxies ? null : Cache::get(DetectUntrustedProxy::CACHE_KEY);
+        $sighting = $proxies ? null : $this->proxySighting();
 
         $this->assert(
             'TRUSTED_PROXIES',
@@ -196,6 +197,31 @@ class Preflight extends Command
                 : 'is unset — if a proxy sits in front of PHP, every punch will record the proxy IP',
             $proxies === '*' ? '* (only safe if the app port is unreachable directly)' : (string) $proxies,
         );
+    }
+
+    /**
+     * The marker `DetectUntrustedProxy` leaves, or null if it cannot be read.
+     *
+     * Wrapped because the default cache store is the database, this check runs
+     * before `checkDatabase()`, and a preflight that throws is a preflight that
+     * reports nothing at all. **That is the one failure mode this command must
+     * not have** — it exists to be run on boxes that are misconfigured, and the
+     * box with an unreachable database is precisely one of them. Caught here,
+     * the run continues and `checkDatabase()` says the true thing a few lines
+     * later; uncaught, a stack trace replaces the entire report.
+     *
+     * No evidence is not evidence of absence, so this falls back to the WARN
+     * the check gives when it cannot tell, never to a PASS.
+     */
+    protected function proxySighting(): ?array
+    {
+        try {
+            $sighting = Cache::get(DetectUntrustedProxy::CACHE_KEY);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_array($sighting) ? $sighting : null;
     }
 
     protected function checkDatabase(): void
@@ -656,10 +682,6 @@ class Preflight extends Command
     // -------------------------------------------------------------------------
 
     /**
-     * Record a check, and print it as it happens so a slow run still shows
-     * progress rather than sitting silent and then dumping everything.
-     */
-    /**
      * Known security advisories against the installed packages.
      *
      * The dependency register carried this as an open finding for months — "no
@@ -783,8 +805,51 @@ class Preflight extends Command
         return is_array($report) ? $report : null;
     }
 
+    /**
+     * Failures that stay failures on a staging or demo box.
+     *
+     * `--non-production` exists because a demo install is *meant* to have mail
+     * going to the log and the quick-login panel up, and a script that fails on
+     * those teaches people to stop running it. But it used to be all-or-nothing
+     * — `deploy.sh` ran the whole command with `|| echo "(advisory only)"` —
+     * which quietly downgraded every other check too: an empty `APP_KEY`, an
+     * administrator still on the seeded password, a corrupted audit trail, a
+     * critical CVE.
+     *
+     * The line between the two lists is whether the state could be somebody's
+     * deliberate choice. Mail to the log and a demo panel are choices. **None of
+     * these is.** Nobody decides to ship an unencrypted session store, or
+     * to publish `password` as an administrator's password on a URL strangers
+     * can reach, or to file every punch against the proxy's address, or to run
+     * a package with a known hole in it. They are all evidence of something
+     * having gone wrong, and the environment does not change that. A database
+     * nothing can reach belongs with them: a staging box that cannot read its
+     * own data is not a staging box, it is an outage.
+     */
+    protected const ALWAYS_FATAL = [
+        'APP_KEY',
+        'Database',
+        'Demo credentials',
+        'Dependency advisories',
+        'TRUSTED_PROXIES',
+    ];
+
+    /**
+     * Record a check, and print it as it happens so a slow run still shows
+     * progress rather than sitting silent and then dumping everything.
+     */
     protected function assert(string $name, string $level, string $detail = '', string $ok = 'ok'): void
     {
+        // Downgraded rather than hidden: the line still prints, and still says
+        // what is wrong. What changes is only whether it stops the deploy.
+        $downgraded = $level === self::FAIL
+            && $this->option('non-production')
+            && ! in_array($name, static::ALWAYS_FATAL, true);
+
+        if ($downgraded) {
+            $level = self::WARN;
+        }
+
         $this->results[] = compact('level', 'name', 'detail');
 
         [$mark, $colour, $text] = match ($level) {
@@ -794,11 +859,12 @@ class Preflight extends Command
         };
 
         $this->line(sprintf(
-            '  <fg=%s>%s</> %s  <fg=gray>%s</>',
+            '  <fg=%s>%s</> %s  <fg=gray>%s</>%s',
             $colour,
             $mark,
             str_pad($name, 22),
             $text,
+            $downgraded ? ' <fg=gray>(advisory on a non-production install)</>' : '',
         ));
     }
 
@@ -813,7 +879,12 @@ class Preflight extends Command
         $this->line('');
 
         if ($failed > 0) {
-            $this->error('  Not ready for production. Fix the failures above.');
+            $this->error($this->option('non-production')
+                // Naming it matters: on a staging box every other failure has
+                // just been downgraded, so somebody reading a red line here
+                // needs to know it survived that and is not noise.
+                ? '  Failures that no environment excuses. Fix them before this box serves anybody.'
+                : '  Not ready for production. Fix the failures above.');
 
             return self::FAILURE;
         }

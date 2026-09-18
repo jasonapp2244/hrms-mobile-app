@@ -6,11 +6,15 @@ use App\Console\Commands\Preflight;
 use App\Http\Middleware\DetectUntrustedProxy;
 use App\Models\User;
 use Database\Seeders\RolePermissionSeeder;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Mockery;
+use ReflectionClass;
+use RuntimeException;
 use Tests\TestCase;
 
 /**
@@ -203,5 +207,152 @@ class UntrustedProxyTest extends TestCase
         ], now()->addDay());
 
         $this->artisan('emp:preflight')->assertExitCode(0);
+    }
+
+    // ================= the non-production escape hatch =================
+
+    /**
+     * `--non-production` used to be `|| echo "(advisory only)"` in deploy.sh,
+     * which downgraded the whole command. These pin the line it draws now: a
+     * failure somebody could have *chosen* on a demo box is advisory there, and
+     * the four that nobody chooses are not.
+     */
+    public function test_non_production_downgrades_a_deliberate_choice(): void
+    {
+        $this->passingConfig();
+        Config::set('mail.default', 'log');
+
+        // Mail to the log is why a demo box exists. Failing on it is what
+        // taught people to stop running the script.
+        $this->artisan('emp:preflight --non-production')
+            ->expectsOutputToContain('MAIL_MAILER')
+            ->assertExitCode(0);
+    }
+
+    public function test_non_production_downgrades_the_demo_panel(): void
+    {
+        $this->passingConfig();
+        Config::set('demo.quick_login', true);
+
+        $this->artisan('emp:preflight --non-production')->assertExitCode(0);
+    }
+
+    public function test_non_production_still_fails_on_a_seeded_password(): void
+    {
+        $this->passingConfig();
+
+        $admin = User::create([
+            'name'     => 'Seeded Admin',
+            'email'    => 'admin@hrms.test',
+            'password' => Hash::make('password'),
+        ]);
+        $admin->assignRole('admin');
+
+        // The one the deployment notes call "the one to fix today". Nobody
+        // decides to publish `password` as an administrator's password on a URL
+        // strangers can reach — it is evidence, not a choice, so the box being
+        // staging changes nothing about it.
+        $this->artisan('emp:preflight --non-production')
+            ->expectsOutputToContain('Demo credentials')
+            ->assertExitCode(1);
+    }
+
+    public function test_non_production_still_fails_on_an_untrusted_proxy(): void
+    {
+        $this->passingConfig();
+        Config::set('trustedproxy.proxies', null);
+
+        Cache::put(DetectUntrustedProxy::CACHE_KEY, [
+            'header'   => 'X-Forwarded-For',
+            'claimed'  => '203.0.113.9',
+            'recorded' => '127.0.0.1',
+            'at'       => now()->toIso8601String(),
+        ], now()->addDay());
+
+        // A staging box behind a proxy files every punch against the proxy's
+        // address exactly as a production one does. The audit trail is either
+        // right or it is not; the environment has no opinion.
+        $this->artisan('emp:preflight --non-production')
+            ->expectsOutputToContain('TRUSTED_PROXIES')
+            ->assertExitCode(1);
+    }
+
+    public function test_non_production_still_fails_on_an_empty_app_key(): void
+    {
+        $this->passingConfig();
+        Config::set('app.key', '');
+
+        // Sessions and every encrypted value are broken without it. There is no
+        // install where this is a deliberate state.
+        $this->artisan('emp:preflight --non-production')
+            ->expectsOutputToContain('APP_KEY')
+            ->assertExitCode(1);
+    }
+
+    public function test_the_flag_changes_nothing_on_a_healthy_box(): void
+    {
+        $this->passingConfig();
+
+        // The hatch must not be a way of passing; it is only a way of not
+        // failing on the two things a demo box is for.
+        $this->artisan('emp:preflight --non-production')->assertExitCode(0);
+        $this->artisan('emp:preflight')->assertExitCode(0);
+    }
+
+    public function test_without_the_flag_a_deliberate_choice_still_fails(): void
+    {
+        $this->passingConfig();
+        Config::set('mail.default', 'log');
+
+        // The downgrade must be opt-in, or a production deploy inherits it.
+        $this->artisan('emp:preflight')->assertExitCode(1);
+    }
+
+    public function test_the_never_downgraded_list_covers_the_states_nobody_chooses(): void
+    {
+        $list = (new ReflectionClass(Preflight::class))
+            ->getConstant('ALWAYS_FATAL');
+
+        // The mechanism is proven by the four behavioural tests above; this
+        // pins the membership, which is the part a later edit is likely to get
+        // wrong. Each of these is evidence of something having gone wrong
+        // rather than a choice somebody made, so no environment excuses it.
+        //
+        // 'Database' is here and not tested behaviourally for a dull reason:
+        // breaking the connection inside a RefreshDatabase test breaks the
+        // harness's own rollback rather than the command.
+        $this->assertEqualsCanonicalizing([
+            'APP_KEY',
+            'Database',
+            'Demo credentials',
+            'Dependency advisories',
+            'TRUSTED_PROXIES',
+        ], $list);
+    }
+
+    public function test_it_reports_rather_than_throwing_when_the_cache_is_unreachable(): void
+    {
+        $this->passingConfig();
+        Config::set('trustedproxy.proxies', null);
+
+        // Found by running the command, not by a test. The proxy check reads
+        // the cache, the default store is the database, and this check runs
+        // *before* the database one — so with MySQL down the command died on a
+        // stack trace and reported nothing at all, on exactly the misconfigured
+        // box it exists to diagnose. A preflight that throws is a preflight
+        // that checks nothing.
+        $exploding = Mockery::mock(CacheRepository::class);
+        $exploding->shouldReceive('get')
+            ->andThrow(new RuntimeException('cache store unreachable'));
+        Cache::swap($exploding);
+
+        // It finishes and still prints the line, instead of a stack trace
+        // replacing the whole report. Exit 0 is the claim, not an accident:
+        // an unreadable cache falls back to the warning the check gives when
+        // it cannot tell, never to a failure and never to a pass. The failing
+        // path is the sibling test above, where the sighting is readable.
+        $this->artisan('emp:preflight')
+            ->expectsOutputToContain('TRUSTED_PROXIES')
+            ->assertExitCode(0);
     }
 }
