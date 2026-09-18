@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\Office;
 use App\Models\Shift;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class AttendanceService
@@ -745,6 +746,41 @@ class AttendanceService
         return (int) max(0, $minutes);
     }
 
+    /**
+     * The days whose **first** check-in was late, as `employeeId|date` keys.
+     *
+     * Lateness is a property of the day, not of every punch in it. Somebody who
+     * clocks in late, steps out and comes back has one late morning and three
+     * `in` rows, and counting the rows reports three black marks against one
+     * present day — a number that cannot be reconciled with the present-days
+     * column beside it, and that reaches a payroll export.
+     *
+     * The **first** punch decides, not any of them. `status` is computed per
+     * punch against the shift start, so an afternoon return is stamped `late`
+     * as a matter of arithmetic; it is not a late arrival, and only the arrival
+     * is one.
+     *
+     * Keyed by employee as well as date so a single collection can carry a
+     * whole company's week — the same key the present-days count uses, which is
+     * what keeps the two columns answering the same question.
+     *
+     * @param  iterable<int, AttendanceLog>  $logs
+     * @return Collection<int, string>
+     */
+    public function lateDayKeys(iterable $logs): Collection
+    {
+        return collect($logs)
+            ->filter(fn (AttendanceLog $log) => $log->type === 'in')
+            ->groupBy(fn (AttendanceLog $log) => $log->employee_id . '|' . (
+                $log->work_date instanceof Carbon
+                    ? $log->work_date->toDateString()
+                    : (string) $log->work_date
+            ))
+            ->map(fn (Collection $day) => $day->sortBy('scanned_at')->first())
+            ->filter(fn (?AttendanceLog $first) => $first?->status === 'late')
+            ->keys();
+    }
+
     /** Whether a day's punches include a completed break. */
     public function hasBreakPunches(iterable $logs): bool
     {
@@ -788,9 +824,12 @@ class AttendanceService
         // stays in the worked one. Taking it out of only one of the two would
         // put them on different footings and manufacture a break's worth of
         // overtime on every such shift, every day.
-        $unpaid = $shift->break_is_paid ? 0 : (int) ($shift->break_minutes ?? 0);
+        // The short-day floor is read here for that same reason: a shift too
+        // short to owe a break must not have one taken out of its scheduled
+        // figure while the worked figure keeps it.
+        $span = (int) $start->diffInMinutes($end);
 
-        return max(0, (int) $start->diffInMinutes($end) - $unpaid);
+        return max(0, $span - $shift->scheduledBreakDeduction($span));
     }
 
     /**
@@ -835,7 +874,13 @@ class AttendanceService
             ? max(0, $present - $punched)
             : max(
                 0,
-                $present - $shift->settledBreakDeduction($punched, $this->hasBreakPunches($logs)),
+                $present - $shift->settledBreakDeduction(
+                    $punched,
+                    $this->hasBreakPunches($logs),
+                    // The day's own length, so a day too short to owe a break
+                    // is not charged for one (A5.7).
+                    $present,
+                ),
             );
 
         $threshold = (int) config('attendance.overtime.threshold_minutes', 15);
@@ -1142,7 +1187,8 @@ class AttendanceService
             ->unique();
 
         $presentDays = $presentDates->count();
-        $lateCount = $logs->where('status', 'late')->count();
+        // Days, not punches — see lateDayKeys.
+        $lateCount = $this->lateDayKeys($logs)->count();
         $ontime = max(0, $presentDays - $lateCount);
         $ontimePct = $presentDays > 0 ? round($ontime / $presentDays * 100, 2) : 0;
 

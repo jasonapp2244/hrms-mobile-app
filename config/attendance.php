@@ -46,4 +46,32 @@ return [
         'count_unrostered_days' => env('OVERTIME_COUNT_UNROSTERED', true),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Breaks (A5.7)
+    |--------------------------------------------------------------------------
+    |
+    | A shift says how long its break is, whether it is paid, and whether it is
+    | a minimum. What it cannot say is that a break is a duty of the long day
+    | rather than of every day, and that is what this floor is for.
+    |
+    */
+
+    'break' => [
+
+        /*
+         * How long a day must run before the shift's nominal break is imposed.
+         *
+         * Six hours by default, which is the usual statutory shape. Below it
+         * only a break actually punched comes off.
+         *
+         * Without this the minimum-break rule is wrong at the short end rather
+         * than the long one: an employee present for twenty minutes is charged
+         * a full unpaid lunch, paid time clamps to zero, and a day that was
+         * worked is reported as a day that was not. Set it to 0 to impose the
+         * nominal break on every day of any length.
+         */
+        'nominal_after_minutes' => env('BREAK_NOMINAL_AFTER_MINUTES', 360),
+    ],
+
 ];

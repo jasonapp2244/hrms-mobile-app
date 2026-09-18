@@ -156,7 +156,9 @@ class ReportService
         $ins = AttendanceLog::whereIn('employee_id', $employees->pluck('id'))
             ->forDates($from, $to)
             ->where('type', 'in')
-            ->get(['employee_id', 'work_date', 'status']);
+            // scanned_at comes along because lateDayKeys has to know which of a
+            // day's check-ins was the first one.
+            ->get(['employee_id', 'work_date', 'status', 'scanned_at', 'type']);
 
         // Bucketed once by the Monday that starts each week, rather than
         // re-filtering the whole set per week.
@@ -203,9 +205,11 @@ class ReportService
             $presentDays = $logs->map(fn ($log) => $log->employee_id . '|' . $log->work_date->toDateString())
                 ->unique()->count();
 
-            $late   = $logs->where('status', 'late')->count();
-            $ontime = $logs->where('status', 'ontime')->count();
-            $total  = $logs->count();
+            // All three in days rather than punches, so they reconcile with the
+            // present-days column above — which has always counted days.
+            $late   = $this->attendance->lateDayKeys($logs)->count();
+            $ontime = max(0, $presentDays - $late);
+            $total  = $presentDays;
 
             $leaveDays = $leaveByWeek[$weekKey] ?? 0;
             $expected  = $headcount * $workingDays;
@@ -792,10 +796,12 @@ class ReportService
             $ins = $insByEmp->get($e->id, collect());
             $presentDates = $ins->pluck('work_date')->map->toDateString()->unique();
             $presentDays = $presentDates->count();
-            $late = $ins->where('status', 'late')->count();
-            $ontime = $ins->where('status', 'ontime')->count();
-            $totalIns = $ins->count();
-            $ontimePct = $totalIns > 0 ? round($ontime / $totalIns * 100, 1) : null;
+            // Days, not punches: three check-ins on one late morning is one
+            // late day, and dividing by punches moved the percentage every time
+            // somebody stepped out for an errand.
+            $late = $this->attendance->lateDayKeys($ins)->count();
+            $ontime = max(0, $presentDays - $late);
+            $ontimePct = $presentDays > 0 ? round($ontime / $presentDays * 100, 1) : null;
 
             $onLeave = collect($leaveDates[$e->id] ?? []);
             // Union so a day both worked and booked off is not deducted twice.
@@ -808,7 +814,6 @@ class ReportService
                 'absent_days'  => max(0, $expected - $covered),
                 'late'         => $late,
                 'ontime'       => $ontime,
-                'total_ins'    => $totalIns,
                 'ontime_pct'   => $ontimePct,
             ];
         })->keyBy(fn ($s) => $s['employee']->id);
@@ -822,7 +827,11 @@ class ReportService
             ->sortByDesc('late');
 
         $rows = $stats->map(function ($s) {
-            $latePct = $s['total_ins'] > 0 ? round($s['late'] / $s['total_ins'] * 100, 1) : 0;
+            // Late days over days attended. Against a punch count this read
+            // low for anybody who stepped out and back during the window.
+            $latePct = $s['present_days'] > 0
+                ? round($s['late'] / $s['present_days'] * 100, 1)
+                : 0;
             return [
                 'Employee'     => $s['employee']->full_name,
                 'Code'         => $s['employee']->employee_code,
@@ -850,7 +859,7 @@ class ReportService
     public function outliers(int $companyId, string $from, string $to, ?int $officeId = null): array
     {
         $stats = $this->employeeStats($companyId, $from, $to, $officeId)
-            ->filter(fn ($s) => $s['total_ins'] > 0); // only employees with activity
+            ->filter(fn ($s) => $s['present_days'] > 0); // only employees with activity
 
         $ontimePcts = $stats->pluck('ontime_pct')->filter(fn ($v) => $v !== null)->values();
         $lateCounts = $stats->pluck('late')->values();
@@ -915,8 +924,9 @@ class ReportService
             $late = $group->sum('late');
             $presentDays = $group->sum('present_days');
             $ontime = $group->sum('ontime');
-            $totalIns = $group->sum('total_ins');
-            $ontimePct = $totalIns > 0 ? round($ontime / $totalIns * 100, 1) : 0;
+            // Days over days. Dividing day-based on-time counts by a punch-based
+            // total is how a department ends up more than 100% on time.
+            $ontimePct = $presentDays > 0 ? round($ontime / $presentDays * 100, 1) : 0;
             return [
                 'Department'   => $deptName,
                 'Employees'    => $employees,

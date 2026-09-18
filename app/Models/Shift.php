@@ -103,20 +103,78 @@ class Shift extends Model
      * [$hasPunches] is passed rather than inferred from [$punched] because a
      * break punched and ended in the same minute is a real, zero-length break
      * and is not the same fact as no break at all.
+     *
+     * [$presentMinutes] is how long the day actually ran. Passing it applies
+     * the short-day floor (see [nominalBreakApplies]); omitting it keeps the
+     * answer every caller got before the floor existed, which is what a caller
+     * with no day to measure — a policy preview, a shift listing — still wants.
      */
-    public function settledBreakDeduction(int $punched, bool $hasPunches): int
-    {
+    public function settledBreakDeduction(
+        int $punched,
+        bool $hasPunches,
+        ?int $presentMinutes = null,
+    ): int {
         if ($this->break_is_paid) {
             return 0;
         }
 
         $nominal = (int) $this->break_minutes;
 
+        // Below the floor the nominal break is never imposed: somebody at work
+        // for twenty minutes cannot have taken an hour's lunch, and charging
+        // them for one reports a day that was worked as a day that was not.
+        // What they actually punched still comes off — a real break is a real
+        // break however short the day — but never more than the day itself.
+        if (! $this->nominalBreakApplies($presentMinutes)) {
+            return min($punched, $presentMinutes ?? $punched);
+        }
+
         if (! $hasPunches) {
             return $nominal;
         }
 
         return $this->break_is_minimum ? max($punched, $nominal) : $punched;
+    }
+
+    /**
+     * Whether a stretch this long imposes the nominal break at all (A5.7).
+     *
+     * Working-time rules make a break a duty of the *long* day rather than of
+     * every day: the usual shape is "a break once the shift passes six hours".
+     * Without this floor the minimum rule bites hardest at the wrong end — an
+     * employee present for half an hour is charged a full unpaid lunch,
+     * `worked` clamps to zero, and a day that was worked is reported as a day
+     * that was not.
+     *
+     * Null means "no day to measure", and the nominal applies.
+     */
+    public function nominalBreakApplies(?int $minutes): bool
+    {
+        if ($minutes === null) {
+            return true;
+        }
+
+        return $minutes >= (int) config('attendance.break.nominal_after_minutes', 360);
+    }
+
+    /**
+     * Minutes the **roster** takes off a shift of [$spanMinutes] for the break.
+     *
+     * The scheduled side of [settledBreakDeduction], and it has to read the
+     * same floor. `scheduled` and `worked` are subtracted from one another to
+     * get overtime, so a break taken out of one and left in the other invents a
+     * break's worth of overtime on every short shift, every day. Reading the
+     * floor in one place is what makes that impossible rather than unlikely.
+     */
+    public function scheduledBreakDeduction(int $spanMinutes): int
+    {
+        if ($this->break_is_paid) {
+            return 0;
+        }
+
+        return $this->nominalBreakApplies($spanMinutes)
+            ? (int) $this->break_minutes
+            : 0;
     }
 
     /**
