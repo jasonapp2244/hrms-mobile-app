@@ -188,12 +188,19 @@ fi
 
 # ---------------------------------------------------------------------------
 echo "==> Preflight"
-# Fails the deploy loudly rather than leaving a misconfigured site serving. On a
-# staging box it is advisory: MAIL_MAILER=log and a demo panel are the point
-# there, and failing on them would only teach people to skip the script.
+# Fails the deploy loudly rather than leaving a misconfigured site serving.
+#
+# On a staging or demo box some of these are the point — MAIL_MAILER=log and
+# the quick-login panel are why the box exists — and failing on them would only
+# teach people to skip the script. That used to be expressed as `|| echo
+# "(advisory)"`, which downgraded *every* check: an empty APP_KEY, an admin
+# still on the seeded password, a corrupted audit trail and a critical CVE all
+# printed red and the deploy carried on regardless.
+#
+# The command now makes that distinction itself, so the escape hatch covers the
+# failures somebody could have chosen and nothing else. See Preflight::ALWAYS_FATAL.
 if [ "${ALLOW_NON_PRODUCTION:-0}" = "1" ]; then
-    $AS_OWNER $PHP artisan emp:preflight || \
-        echo "    (advisory only on a non-production install)"
+    $AS_OWNER $PHP artisan emp:preflight --non-production
 else
     $AS_OWNER $PHP artisan emp:preflight
 fi
