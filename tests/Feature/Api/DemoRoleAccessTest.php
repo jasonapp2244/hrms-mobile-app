@@ -90,7 +90,7 @@ class DemoRoleAccessTest extends TestCase
         // empty state four screens are designed around.
         $this->getJson('/api/v1/attendance/today')
             ->assertForbidden()
-            ->assertJsonPath('error', 'forbidden');
+            ->assertJsonPath('error', 'no_employee_record');
     }
 
     // ================= the team tab =================

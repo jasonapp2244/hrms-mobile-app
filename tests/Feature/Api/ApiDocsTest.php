@@ -85,7 +85,7 @@ class ApiDocsTest extends TestCase
         // Codes raised by hand in controllers, plus the shared ones from the
         // exception handler. A client branching on `error` needs all of them.
         $codes = [
-            'validation_failed', 'unauthenticated', 'forbidden', 'not_found',
+            'validation_failed', 'unauthenticated', 'forbidden', 'no_employee_record', 'not_found',
             'too_many_requests', 'server_error',
             'invalid_credentials', 'account_disabled', 'duplicate_scan',
             'no_office', 'wrong_password', 'invalid_range', 'range_too_large',

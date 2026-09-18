@@ -241,7 +241,7 @@ class AttendanceApiTest extends TestCase
 
         $this->postJson('/api/v1/attendance/check')
             ->assertStatus(403)
-            ->assertJsonPath('error', 'forbidden');
+            ->assertJsonPath('error', 'no_employee_record');
     }
 
     public function test_checking_in_needs_a_token(): void

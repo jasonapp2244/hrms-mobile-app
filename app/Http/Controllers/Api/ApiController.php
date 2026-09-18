@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\NoEmployeeRecord;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -89,16 +90,18 @@ abstract class ApiController extends Controller
      *
      * Almost every endpoint is about a person rather than a login, and an
      * account with no employee record cannot answer any of those questions.
+     *
+     * Raised as its own exception rather than as `abort(403)` so it reaches
+     * the client under its own error code. See [NoEmployeeRecord] for why that
+     * distinction is load-bearing rather than tidiness.
      */
     protected function employee(): Employee
     {
         $employee = auth()->user()?->employee;
 
-        abort_if(
-            ! $employee,
-            403,
-            __('api.no_employee_record'),
-        );
+        if (! $employee) {
+            throw new NoEmployeeRecord();
+        }
 
         return $employee;
     }

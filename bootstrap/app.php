@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\NoEmployeeRecord;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -42,6 +43,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // The framework's own middleware reads `config('trustedproxy.proxies')`
         // at request time, by which point config is loaded — and a config file
         // is the only place `env()` survives `config:cache`.
+
+        // Notice a proxy forwarding to us that we are not trusting, so that the
+        // comment above stops describing a fault that can only be found by
+        // reading it. Global rather than per-group: a punch arrives on the API
+        // and a portal punch on the web, and both store the address.
+        $middleware->append([
+            \App\Http\Middleware\DetectUntrustedProxy::class,
+        ]);
 
         // Every API route sits under the 'api' limiter defined in
         // AppServiceProvider. Laravel does not apply one by default, so without
@@ -126,6 +135,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 $e instanceof ModelNotFoundException,
                 $e instanceof NotFoundHttpException    => [404, 'not_found', __('api.not_found')],
                 $e instanceof ThrottleRequestsException => [429, 'too_many_requests', __('api.too_many_requests')],
+                // Before the generic arm below, which would fold this into
+                // `forbidden` alongside "that leave request is not yours" and
+                // "that correction is not yours". The app treats this one as
+                // permanent and those two as ordinary refusals, so it needs a
+                // name of its own rather than a message to pattern-match.
+                $e instanceof NoEmployeeRecord         => [403, 'no_employee_record', __('api.no_employee_record')],
                 $e instanceof HttpExceptionInterface   => [
                     $e->getStatusCode(),
                     $byStatus[$e->getStatusCode()] ?? 'http_error',

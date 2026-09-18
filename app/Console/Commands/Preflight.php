@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Middleware\DetectUntrustedProxy;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -167,10 +169,31 @@ class Preflight extends Command
         // report "unset" on exactly the box that had just set it correctly, and
         // the one check that can catch this would be the thing crying wolf.
         $proxies = config('trustedproxy.proxies');
+
+        // Unset is not itself a fault — on a single-server install it is the
+        // right answer, and this used to warn at every one of them. What turns
+        // it into a fault is a proxy actually being in front, which
+        // configuration cannot tell us and traffic can: `DetectUntrustedProxy`
+        // leaves a marker the first time a forwarded request arrives with
+        // nothing trusted. That is proof the column is wrong *now*, so it fails
+        // the deploy rather than warning about it.
+        $sighting = $proxies ? null : Cache::get(DetectUntrustedProxy::CACHE_KEY);
+
         $this->assert(
             'TRUSTED_PROXIES',
-            $proxies ? self::PASS : self::WARN,
-            'is unset — if a proxy sits in front of PHP, every punch will record the proxy IP',
+            match (true) {
+                (bool) $proxies => self::PASS,
+                $sighting !== null => self::FAIL,
+                default => self::WARN,
+            },
+            $sighting !== null
+                ? sprintf(
+                    'is unset and a proxy is in front — %s arrived claiming %s, and the punch recorded %s. Every IP stored since is the proxy\'s.',
+                    $sighting['header'] ?? 'a forwarding header',
+                    $sighting['claimed'] ?? 'a client address',
+                    $sighting['recorded'] ?? 'the proxy',
+                )
+                : 'is unset — if a proxy sits in front of PHP, every punch will record the proxy IP',
             $proxies === '*' ? '* (only safe if the app port is unreachable directly)' : (string) $proxies,
         );
     }
