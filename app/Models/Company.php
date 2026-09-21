@@ -95,6 +95,26 @@ class Company extends Model
         // taken back. The directory still lists who works here and where; the
         // switch only governs how to reach them.
         'directory_show_contact_details' => false,
+
+        // The day a punch is judged against when nobody rostered one (A2.9).
+        //
+        // A rostered shift supplies its own start, end and grace, and on any
+        // day one is assigned these are not consulted. They are the fallback
+        // for the day nobody planned: a department carrying no shift, or
+        // somebody who comes in on a rostered day off.
+        //
+        // This was a literal 09:00–17:00 / 15 inside AttendanceService until
+        // 2026-09-21 — the last business rule in the codebase that no setting
+        // could move, and wrong for every company that does not keep office
+        // hours. A cleaning firm starting at six had its early shift judged
+        // against nine o'clock and could never be recorded as late at all.
+        //
+        // The defaults below are the literals they replaced, so a company that
+        // sets nothing is judged exactly as it was before: this change must not
+        // restate anybody's history.
+        'default_day_start' => '09:00:00',
+        'default_day_end' => '17:00:00',
+        'default_day_grace_minutes' => 15,
     ];
 
     /** A policy value for this company, falling back to the default. */

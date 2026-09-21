@@ -284,6 +284,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
+            'default_day_start' => '09:00',
+            'default_day_end' => '17:00',
+            'default_day_grace_minutes' => 15,
         ])->assertRedirect();
 
         $this->assertSame([5, 6], app(LeaveService::class)->weekendDays($this->company->fresh()));
@@ -298,6 +301,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
+            'default_day_start' => '09:00',
+            'default_day_end' => '17:00',
+            'default_day_grace_minutes' => 15,
         ])->assertRedirect();
 
         $this->assertSame([], app(LeaveService::class)->weekendDays($this->company->fresh()));
@@ -311,6 +317,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
+            'default_day_start' => '09:00',
+            'default_day_end' => '17:00',
+            'default_day_grace_minutes' => 15,
         ])->assertRedirect()->assertSessionHas('error');
 
         // Unchanged — leave still costs something.
@@ -349,6 +358,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes',
             'auto_close_after_minutes',
             'session_idle_timeout_minutes',
+            'default_day_start',
+            'default_day_end',
+            'default_day_grace_minutes',
         ] as $field) {
             $response->assertSee("name=\"{$field}\"", false);
         }
@@ -362,6 +374,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
+            'default_day_start' => '09:00',
+            'default_day_end' => '17:00',
+            'default_day_grace_minutes' => 15,
         ])->assertRedirect()->assertSessionHasNoErrors();
 
         $this->assertSame(0, $this->company->fresh()->policy('checkin_reminder_before_minutes'));
@@ -378,6 +393,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes' => 30,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
+            'default_day_start' => '09:00',
+            'default_day_end' => '17:00',
+            'default_day_grace_minutes' => 15,
         ])->assertSessionHasErrors('checkin_reminder_before_minutes');
 
         $this->assertSame(10, $this->company->fresh()->policy('checkin_reminder_before_minutes'));
@@ -391,6 +409,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes' => 5,
             'auto_close_after_minutes' => 5,
             'session_idle_timeout_minutes' => 5,
+            'default_day_start' => '09:00',
+            'default_day_end' => '17:00',
+            'default_day_grace_minutes' => 15,
         ])->assertForbidden();
     }
 
@@ -402,6 +423,9 @@ class SecurityPolicyTest extends TestCase
             'checkout_reminder_after_minutes' => 45,
             'auto_close_after_minutes' => 240,
             'session_idle_timeout_minutes' => 0,
+            'default_day_start' => '09:00',
+            'default_day_end' => '17:00',
+            'default_day_grace_minutes' => 15,
         ]);
 
         $this->assertDatabaseHas('activity_logs', [

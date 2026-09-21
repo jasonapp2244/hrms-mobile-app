@@ -41,6 +41,41 @@
   </div>
 
   <div class="card mb-3">
+    <div class="card-header"><h5 class="mb-0">Default Day</h5></div>
+    <div class="card-body">
+      <p class="text-muted small">
+        Used only when nobody rostered a shift — an unplanned day, or somebody who
+        comes in on their day off. A shift on the roster always wins, and carries its
+        own hours and grace.
+      </p>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label" for="default_day_start">Day starts</label>
+          <input type="time" name="default_day_start" id="default_day_start" class="form-control"
+                 value="{{ old('default_day_start', substr($company->policy('default_day_start'), 0, 5)) }}">
+          <div class="form-text">Arriving after this, plus the grace below, is recorded as late.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="default_day_end">Day ends</label>
+          <input type="time" name="default_day_end" id="default_day_end" class="form-control"
+                 value="{{ old('default_day_end', substr($company->policy('default_day_end'), 0, 5)) }}">
+          <div class="form-text">Leaving before this is recorded as an early leave.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="default_day_grace_minutes">Grace</label>
+          <div class="input-group">
+            <input type="number" min="0" max="120" name="default_day_grace_minutes" id="default_day_grace_minutes"
+                   class="form-control"
+                   value="{{ old('default_day_grace_minutes', $company->policy('default_day_grace_minutes')) }}">
+            <span class="input-group-text">minutes after the start</span>
+          </div>
+          <div class="form-text">Nobody is marked late inside this window.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
     <div class="card-header"><h5 class="mb-0">Attendance</h5></div>
     <div class="card-body">
       <div class="row g-3">

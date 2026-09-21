@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AttendanceLog;
+use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Office;
 use App\Models\Shift;
@@ -558,11 +559,27 @@ class AttendanceService
     }
 
     /**
+     * A default-day value, for a punch with no shift behind it.
+     *
+     * Null-safe on the company because an employee row can outlive the company
+     * being loaded — `$employee->company` is a relation, not a guarantee — and
+     * a punch must still be judged rather than fatal. The constant is the same
+     * value the column would have answered, so the two paths cannot drift.
+     */
+    protected function dayPolicy(?Company $company, string $key): string|int
+    {
+        return $company?->policy($key) ?? Company::POLICY_DEFAULTS[$key];
+    }
+
+    /**
      * Status is measured against the shift the employee actually works — their
      * own if one is set for them, otherwise their department's. On a clock-in,
      * compare to shift start (+ grace) for lateness; on a clock-out, compare to
-     * shift end for early leave. Falls back to a sensible 09:00–17:00 / 15-min
-     * default when no shift is assigned at all.
+     * shift end for early leave.
+     *
+     * When no shift applies at all the company's own default day is used —
+     * `default_day_start`, `default_day_end` and `default_day_grace_minutes`,
+     * which ship as 09:00–17:00 / 15 and are editable on the Policies screen.
      */
     protected function determineStatus(string $type, Carbon $now, Employee $employee, ?string $workDate = null): string
     {
@@ -570,9 +587,15 @@ class AttendanceService
         // whatever the employee's standing shift happens to be.
         $shift = $employee->shiftOn($workDate ?? $now->toDateString());
 
-        $startTime = $shift->start_time ?? '09:00:00';
-        $endTime   = $shift->end_time ?? '17:00:00';
-        $grace     = (int) ($shift->late_grace_minutes ?? 15);
+        // No shift for this day: an unplanned day, or a rostered day off that
+        // somebody worked anyway. The company says what an ordinary day looks
+        // like — these were literals until 2026-09-21, which made them the one
+        // rule in this service that no client could correct.
+        $company = $employee->company;
+
+        $startTime = $shift->start_time ?? $this->dayPolicy($company, 'default_day_start');
+        $endTime   = $shift->end_time ?? $this->dayPolicy($company, 'default_day_end');
+        $grace     = (int) ($shift->late_grace_minutes ?? $this->dayPolicy($company, 'default_day_grace_minutes'));
         $overnight = $shift?->crossesMidnight() ?? false;
         $small     = $now->hour < Shift::NIGHT_CUTOFF_HOUR;
 
