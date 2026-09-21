@@ -963,7 +963,10 @@ the Settings screen.
   reading the neighbouring controller is not a substitute for a test.
 
   **What is genuinely left is smaller than the ⬜ suggests** — the full working
-  is in `Multi-Company_Tenancy-Assessment.md`. Two companies can already be
+  was in `Multi-Company_Tenancy-Assessment.md`, removed along with the other
+  client documents; recover it with
+  `git log --diff-filter=D --oneline -- Multi-Company_Tenancy-Assessment.md`
+  and `git show <commit>^:Multi-Company_Tenancy-Assessment.md`. Two companies can already be
   created (`emp:install --force`, or `--company-id=N` to attach an admin to an
   existing one) and administered separately. What remains:
 
