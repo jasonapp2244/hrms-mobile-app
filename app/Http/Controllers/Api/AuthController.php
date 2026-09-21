@@ -304,6 +304,34 @@ class AuthController extends ApiController
                 'work_mode'     => $employee->work_mode,
                 'is_manager'    => $employee->isManager(),
             ] : null,
+
+            /*
+             * What this account may do, decided here rather than in Dart.
+             *
+             * `permissions` above has always been sent, and the app already
+             * derives one thing from it — `leadsATeam` is `approve-leave` plus
+             * a direct report, because the permission alone gave a permanently
+             * empty Team tab to every HR user. That rule now exists in two
+             * languages, and the HR section would have made it three.
+             *
+             * So the server states the conclusions. A capability here is a
+             * promise that the matching endpoints will answer, which is what a
+             * tab actually needs to know; a permission is only an input to that
+             * question. Adding a section to the app should be a new key here,
+             * not a new rule in Dart.
+             */
+            'can' => [
+                // The Team tab: the permission and somebody to use it on.
+                'lead_team' => $user->can('approve-leave') && (bool) $employee?->isManager(),
+
+                // The HR leave desk — the final decision, company-wide. Both
+                // permissions, matching the route group: manage-leave opens
+                // the register and approve-leave decides on it.
+                'decide_leave' => $user->can('manage-leave') && $user->can('approve-leave'),
+
+                // The employee register. Read-only on the phone.
+                'view_employees' => $user->can('manage-employees'),
+            ],
         ];
     }
 }

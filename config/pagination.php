@@ -91,6 +91,12 @@ return [
 
             // Deep notification history has no readers; the newest few do.
             'notifications' => 25,
+
+            // HR's queue and register on the phone. Smaller than the
+            // directory: each row carries dates, a balance and a decision,
+            // and a screen of thirty of those is a wall rather than a list.
+            'hr_leave'     => 20,
+            'hr_employees' => 20,
         ],
     ],
 

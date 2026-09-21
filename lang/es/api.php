@@ -51,6 +51,7 @@ return [
 
     // --- Permisos ----------------------------------------------------------
     'leave_not_yours'     => 'Esa solicitud de permiso no es tuya.',
+    'employee_not_yours' => 'Ese empleado pertenece a otra empresa.',
     'leave_attachment_missing' => 'El archivo adjunto a esta solicitud ya no está en el servidor.',
     'leave_own_request'   => 'No puedes decidir sobre tu propia solicitud de permiso.',
     'leave_outside_team'   => 'Esa solicitud es de alguien que no está en tu equipo.',
@@ -58,6 +59,7 @@ return [
     'leave_submitted'     => 'Solicitud de permiso enviada. Te avisaremos cuando se revise.',
     'leave_withdrawn'     => 'Solicitud de permiso retirada.',
     'leave_passed_to_hr'  => 'La solicitud de :name ha pasado a RR. HH. para la aprobación final.',
+    'leave_approved'      => 'Permiso aprobado. Los días se han descontado del saldo.',
     'leave_rejected'      => 'Solicitud rechazada.',
     'leave_reason_needed' => 'Indica un motivo: el empleado lo verá.',
 

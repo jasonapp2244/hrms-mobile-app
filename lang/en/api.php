@@ -60,6 +60,7 @@ return [
 
     // --- Leave ------------------------------------------------------------
     'leave_not_yours'      => 'That leave request is not yours.',
+    'employee_not_yours'   => 'That employee belongs to another company.',
     'leave_attachment_missing' => 'The file attached to this request is no longer on the server.',
     'leave_own_request'    => 'You cannot decide on your own leave request.',
     'leave_outside_team'   => 'That request belongs to someone outside your team.',
@@ -67,6 +68,7 @@ return [
     'leave_submitted'      => 'Leave request submitted. You will be notified once it is reviewed.',
     'leave_withdrawn'      => 'Leave request withdrawn.',
     'leave_passed_to_hr'   => ":name's request has been passed to HR for final approval.",
+    'leave_approved'       => 'Leave approved. The days have been deducted from the balance.',
     'leave_rejected'       => 'Request rejected.',
     'leave_reason_needed'  => 'Please give a reason — the employee sees this.',
 

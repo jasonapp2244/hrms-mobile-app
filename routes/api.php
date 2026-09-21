@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\CrashReportController;
 use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DirectoryController;
 use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\HrEmployeeController;
+use App\Http\Controllers\Api\HrLeaveController;
 use App\Http\Controllers\Api\LeaveApprovalController;
 use App\Http\Controllers\Api\LeaveController;
 use App\Http\Controllers\Api\NotificationController;
@@ -181,6 +183,44 @@ Route::middleware('auth:sanctum')->group(function () {
     // people, so it carries the least: no PII beyond a job title, and contact
     // details only where the company has switched them on.
     Route::get('directory', [DirectoryController::class, 'index'])->name('api.directory.index');
+
+    // ---- HR on the phone (client requirement, 2026-09-22) ----
+    //
+    // A second decision surface, not a second copy of the manager's. The inbox
+    // above is the *manager* step, scoped to one manager's reports, and its
+    // approve button only passes a request up. This is where the days are
+    // committed, so the gates are the ones the web uses on the register:
+    // `manage-leave` to look, and `approve-leave` as well to decide. A line
+    // manager holds the second and not the first, which is what keeps them
+    // out of here without a new rule being invented.
+    Route::prefix('hr')->middleware('permission:manage-leave')->group(function () {
+        Route::get('leave/approvals', [HrLeaveController::class, 'index'])
+            ->name('api.hr.leave.approvals');
+        Route::get('leave/decided', [HrLeaveController::class, 'decided'])
+            ->name('api.hr.leave.decided');
+        Route::get('leave/{leaveRequest}/attachment', [HrLeaveController::class, 'attachment'])
+            ->name('api.hr.leave.attachment');
+
+        Route::middleware('permission:approve-leave')->group(function () {
+            Route::post('leave/{leaveRequest}/approve', [HrLeaveController::class, 'approve'])
+                ->middleware('throttle:write')->name('api.hr.leave.approve');
+            Route::post('leave/{leaveRequest}/reject', [HrLeaveController::class, 'reject'])
+                ->middleware('throttle:write')->name('api.hr.leave.reject');
+        });
+    });
+
+    // The employee register (client requirement, 2026-09-22). `manage-employees`
+    // is the same gate the web puts on the employee screens, and the same one a
+    // manager deliberately does not hold — a supervisor needs to know who is on
+    // shift, not somebody's national id. Read-only: onboarding stays at a desk.
+    Route::prefix('hr')->middleware('permission:manage-employees')->group(function () {
+        Route::get('employees', [HrEmployeeController::class, 'index'])
+            ->name('api.hr.employees.index');
+        Route::get('employees/{employee}', [HrEmployeeController::class, 'show'])
+            ->name('api.hr.employees.show');
+        Route::get('employees/{employee}/leave', [HrEmployeeController::class, 'leave'])
+            ->name('api.hr.employees.leave');
+    });
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('api.schedule');
 
