@@ -9,3 +9,19 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+
+# deploy/ is checked out on Linux and must keep LF endings regardless of the
+# platform it was edited on. This is not cosmetic: a shell script with CRLF
+# fails on Linux with "bad interpreter: /bin/bash^M", and systemd and cron are
+# similarly unforgiving about a trailing carriage return.
+#
+# These rules used to live in a .gitattributes at the root of the combined
+# repository, above the Laravel app, because Laravel's own file could not reach
+# up to deploy/. Since the split the two are in the same repository, so they are
+# one file -- which is better, because the rule and the thing it protects are
+# now impossible to separate by accident.
+deploy/*            text eol=lf
+deploy/deploy.sh    text eol=lf
+deploy/*.cron       text eol=lf
+deploy/*.service    text eol=lf
+deploy/*.example    text eol=lf

@@ -23,3 +23,9 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Screenshots of the running dashboard, kept for the delivery report.
+screenshots/*.tmp
+*.sql
+*.sql.gz
+storage/backups/

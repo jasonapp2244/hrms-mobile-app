@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KEMP — What Each Role Can Do, on the Web and in the App</title>
+<style>
+  :root{
+    --navy:#033C93; --navy-deep:#01174B; --gold:#FDD810;
+    --bg:#f6f7f9; --panel:#fff; --ink:#1a2233; --muted:#5b6b85; --line:#e4e8ef;
+    --ok:#186B48; --warn:#7E5709; --no:#A13E36; --info:#33609D;
+    --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+    --mono:ui-monospace,SFMono-Regular,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:30px 20px 72px}
+
+  .masthead{background:linear-gradient(135deg,var(--navy-deep) 0%,var(--navy) 100%);
+    color:#fff;border-radius:14px;padding:32px 34px 28px;margin-bottom:26px;box-shadow:var(--shadow)}
+  .masthead h1{margin:0 0 6px;font-size:28px;letter-spacing:-.4px}
+  .masthead .sub{color:#c3d0e6;font-size:15px;max-width:780px;margin:0 0 18px}
+  .meta{display:flex;flex-wrap:wrap;gap:9px}
+  .meta span{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
+    padding:5px 12px;border-radius:20px;font-size:12.5px;color:#eef2f9}
+
+  section{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    padding:24px 26px;margin-bottom:20px;box-shadow:var(--shadow)}
+  section>h2{margin:0 0 4px;font-size:20px;letter-spacing:-.2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .lead{color:var(--muted);margin:4px 0 16px}
+  h3{margin:22px 0 8px;font-size:15.5px;color:var(--navy);text-transform:uppercase;letter-spacing:.05em}
+
+  .role-badge{display:inline-flex;align-items:center;justify-content:center;
+    min-width:30px;height:30px;padding:0 10px;border-radius:8px;font-size:13px;font-weight:800;color:#fff}
+  .r-admin{background:#01174B}.r-hr{background:#33609D}.r-manager{background:#186B48}.r-employee{background:#566069}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:860px){.cols{grid-template-columns:1fr}}
+  .col{border:1px solid var(--line);border-radius:11px;padding:16px 18px;background:#fcfdff}
+  .col h4{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;
+    color:var(--muted);display:flex;align-items:center;gap:7px}
+  .col ul{margin:0;padding-left:19px}
+  .col li{margin:5px 0;font-size:14.2px}
+  .col li b{font-weight:650}
+
+  .tbl-wrap{overflow-x:auto;margin:12px 0}
+  table{border-collapse:collapse;width:100%;font-size:13.8px;min-width:680px}
+  th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f4f6fa;font-weight:700;font-size:12px;text-transform:uppercase;
+    letter-spacing:.04em;color:#41506b}
+  tr:last-child td{border-bottom:none}
+  td.c{text-align:center;font-weight:700}
+  .y{color:var(--ok)}.n{color:#b3bac5}.p{color:var(--warn)}
+
+  code{background:#f1f3f7;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+    font-family:var(--mono);font-size:12.6px;color:#243b53}
+
+  .note{border-left:4px solid var(--info);background:#eef3fb;padding:12px 16px;
+    border-radius:0 10px 10px 0;margin:14px 0;font-size:14.2px}
+  .note.warn{border-color:var(--warn);background:#fdf8ec}
+  .note.no{border-color:var(--no);background:#fdf1f0}
+  .note.ok{border-color:var(--ok);background:#eef7f2}
+  .note b{color:var(--ink)}
+
+  .pill{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11.5px;
+    font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+  .pill.yes{background:#dcf2e7;color:#0f5537}
+  .pill.no{background:#fae4e2;color:#8a2f28}
+  .pill.dec{background:#e6ecf7;color:#1f3d70}
+
+  footer{color:var(--muted);font-size:13px;text-align:center;padding:10px 0 30px}
+  @media print{
+    body{background:#fff}
+    section{break-inside:avoid;box-shadow:none;border-color:#ccc}
+    .masthead{background:var(--navy-deep)!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <h1>What each role can do — web dashboard and mobile app</h1>
+  <p class="sub">The four roles in KEMP, what each one reaches on the web, what the same person gets
+    on their phone, and the boundaries that are held deliberately. Compiled from the permission
+    seeder, the route gates and the app's own tab logic — not from a specification.</p>
+  <div class="meta">
+    <span>4 roles · 19 permissions</span>
+    <span>Web dashboard + Flutter app</span>
+    <span>Compiled 14 September 2026</span>
+  </div>
+</header>
+
+<!-- ===================== how to read ===================== -->
+<section>
+  <h2>How to read this</h2>
+  <p class="lead">Three things are worth knowing before the tables.</p>
+
+  <div class="note">
+    <b>A role is not a job title — it is a set of permissions.</b> Access is decided by
+    <i>permission</i>, never by role name, in every screen. The roles below are named bundles of
+    those permissions. One person can hold more than one.
+  </div>
+
+  <div class="note">
+    <b>Manager is always held <i>in addition to</i> Employee, never on its own.</b> A manager is a
+    member of staff who also approves for their own reports — they clock in and book leave like
+    everybody else. Read the Manager section as "Employee, plus the following".
+  </div>
+
+  <div class="note warn">
+    <b>The app is not a smaller copy of the web.</b> Some things are on the web on purpose and will
+    not appear on a phone however senior the account. Where that is a decision rather than a gap, it
+    is marked <span class="pill dec">By decision</span> and the reason is given.
+  </div>
+</section>
+
+<!-- ===================== at a glance ===================== -->
+<section>
+  <h2>At a glance</h2>
+  <p class="lead">The short answer, if the detail below is more than you need.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Area</th>
+          <th class="c">Admin</th>
+          <th class="c">HR</th>
+          <th class="c">Manager</th>
+          <th class="c">Employee</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Clock in / out, own attendance</td>
+          <td class="c p">Only with an employee record</td><td class="c y">Yes</td><td class="c y">Yes</td><td class="c y">Yes</td></tr>
+        <tr><td>Book and cancel own leave</td>
+          <td class="c p">Only with an employee record</td><td class="c y">Yes</td><td class="c y">Yes</td><td class="c y">Yes</td></tr>
+        <tr><td>Approve leave — first step</td>
+          <td class="c y">Yes</td><td class="c y">Yes</td><td class="c y">Own reports only</td><td class="c n">No</td></tr>
+        <tr><td>Approve leave — final step</td>
+          <td class="c y">Yes</td><td class="c y">Yes</td><td class="c n">No</td><td class="c n">No</td></tr>
+        <tr><td>See another person's attendance</td>
+          <td class="c y">Everyone</td><td class="c y">Everyone</td><td class="c y">Own reports only</td><td class="c n">No</td></tr>
+        <tr><td>Employee records &amp; document vault</td>
+          <td class="c y">Yes</td><td class="c y">Yes</td><td class="c n">No</td><td class="c p">Own documents only</td></tr>
+        <tr><td>Correct or add an attendance punch</td>
+          <td class="c y">Yes</td><td class="c y">Yes</td><td class="c n">No</td><td class="c p">May request a correction</td></tr>
+        <tr><td>Build the roster / manage shifts</td>
+          <td class="c y">Yes</td><td class="c y">Yes</td><td class="c p">View only</td><td class="c p">Own schedule only</td></tr>
+        <tr><td>Reports &amp; exports</td>
+          <td class="c y">Company-wide</td><td class="c y">Company-wide</td><td class="c y">Own team only</td><td class="c n">No</td></tr>
+        <tr><td>Company setup, offices, roles, settings</td>
+          <td class="c y">Yes</td><td class="c n">No</td><td class="c n">No</td><td class="c n">No</td></tr>
+        <tr><td>Announcements to everyone</td>
+          <td class="c y">Yes</td><td class="c y">Yes</td><td class="c n">No</td><td class="c n">No</td></tr>
+        <tr><td><b>Usable on the phone</b></td>
+          <td class="c n">Sign-in only</td><td class="c p">Own self-service only</td><td class="c y">Yes, incl. team</td><td class="c y">Yes</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===================== EMPLOYEE ===================== -->
+<section>
+  <h2><span class="role-badge r-employee">E</span> Employee</h2>
+  <p class="lead">Self-service only. One permission — <code>view-attendance</code> — which means
+    "my own attendance", not anybody else's.</p>
+
+  <div class="cols">
+    <div class="col">
+      <h4>On the web dashboard</h4>
+      <ul>
+        <li>Clock in and out, and start/end a <b>break</b></li>
+        <li>Own dashboard — today, hours worked, this week</li>
+        <li><b>Leave</b> — balances, apply, track, cancel a pending request</li>
+        <li><b>Attendance corrections</b> — raise a request, withdraw it</li>
+        <li><b>Shift swaps</b> — offer, accept, decline, cancel</li>
+        <li>Own profile and password</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>In the mobile app</h4>
+      <ul>
+        <li><b>Clock</b> — punch in/out and breaks, with GPS recorded, and a queue that holds a punch taken with no signal</li>
+        <li><b>History</b> — day rows, totals, attendance score, and corrections</li>
+        <li><b>Leave</b> — balances, apply, track, withdraw</li>
+        <li><b>Schedule</b> — the published roster</li>
+        <li><b>Profile</b> — own documents, colleague directory, home address &amp; emergency contact, password, language, fingerprint/face lock</li>
+        <li>Notification centre, and push when it is switched on</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note ok">
+    <b>The app works with no signal.</b> It opens on the last verified sign-in, reads the saved copy
+    of profile, history and roster, and queues a punch to send when the phone is back on the
+    network. Anything shown from a saved copy says so, with the date it was taken.
+  </div>
+
+  <div class="note no">
+    <b>What an employee cannot see, deliberately:</b> anybody else's attendance, leave, salary or
+    personal details. The colleague directory shows name, department, job title and office and
+    nothing more — phone and email only if the company switches that on.
+  </div>
+</section>
+
+<!-- ===================== MANAGER ===================== -->
+<section>
+  <h2><span class="role-badge r-manager">M</span> Manager</h2>
+  <p class="lead">Everything an Employee has, plus a team. Four permissions:
+    <code>view-attendance</code>, <code>view-team</code>, <code>approve-leave</code>,
+    <code>approve-swaps</code>.</p>
+
+  <div class="cols">
+    <div class="col">
+      <h4>On the web dashboard — own <code>/manager</code> area</h4>
+      <ul>
+        <li><b>Manager dashboard</b> — the team's day at a glance</li>
+        <li><b>Team list</b>, and a page per direct report</li>
+        <li><b>Team attendance</b> and the attendance log, any date</li>
+        <li><b>Team schedule</b> — published roster, read-only</li>
+        <li><b>Approvals inbox</b> — leave, first step; shift swaps</li>
+        <li><b>Team reports</b> — scoped to their own reports</li>
+        <li>Everything in the employee portal, for themselves</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>In the mobile app — a <b>Team</b> tab appears</h4>
+      <ul>
+        <li><b>Approvals</b> — approve or reject leave, with a note; clashes shown before deciding</li>
+        <li><b>In today</b> — who is in, late, on leave or absent, for <i>any past date</i></li>
+        <li><b>Roster</b> — a week per direct report, published days only</li>
+        <li><b>Off</b> — a month calendar of who is away, approved and pending</li>
+        <li>Plus all five employee tabs, for themselves</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>"Team" means direct reports, and only direct reports.</b> It is read from the reporting line
+    on the employee record. It does <i>not</i> include a reporting sub-tree: a manager two levels up
+    is not in the approval chain and does not see those records.
+  </div>
+
+  <div class="note warn">
+    <b>The Team tab needs a team.</b> It appears only when the account both holds
+    <code>approve-leave</code> <i>and</i> has somebody reporting to them. A manager with nobody
+    assigned sees no Team tab rather than an empty one.
+  </div>
+
+  <div class="note no">
+    <b>What a manager cannot do, deliberately:</b>
+    <ul style="margin:6px 0 0;padding-left:19px">
+      <li><b>No final leave approval.</b> Leave is manager, then HR. A manager passes it up.</li>
+      <li><b>No attendance corrections.</b> Deciding a correction is HR's alone, on the web.</li>
+      <li><b>No roster editing.</b> They read the published roster; building it stays with
+        <code>manage-shifts</code>. <span class="pill dec">By decision</span></li>
+      <li><b>No personal details.</b> Date of birth, home address, national ID, salary, documents and
+        emergency contact are HR-grade and are not shown to a manager, even for their own team.</li>
+      <li><b>No company-wide anything.</b> Every query behind this role is scoped to their reports.</li>
+      <li><b>No announcements.</b> Broadcasting to a department or office is HR's.
+        <span class="pill dec">By decision</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ===================== HR ===================== -->
+<section>
+  <h2><span class="role-badge r-hr">HR</span> HR</h2>
+  <p class="lead">Day-to-day people operations, company-wide. Fifteen permissions — everything
+    except company-level configuration.</p>
+
+  <div class="cols">
+    <div class="col">
+      <h4>On the web dashboard</h4>
+      <ul>
+        <li><b>Employees</b> — full records, create, edit, deactivate, photos, bulk import, export, org chart, onboarding/offboarding checklists</li>
+        <li><b>Document vault</b> — contracts, ID, certificates, with expiry chasing</li>
+        <li><b>Attendance</b> — logs, the live "who's in" board, manual entry and correction with an audit reason, regularisation decisions</li>
+        <li><b>Leave</b> — the register, final approval, leave types, holidays, balances, accrual, team leave calendar</li>
+        <li><b>Shifts &amp; roster</b> — shifts, break policy, the weekly planner with drag-and-drop, rotations, publish/withdraw</li>
+        <li><b>Reports</b> — late, overtime, payroll, department, weekly, the custom builder, plus PDF/Excel export and scheduled email delivery</li>
+        <li><b>Announcements</b> — compose and send to everyone, a department or an office</li>
+        <li>Departments and designations</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>In the mobile app</h4>
+      <ul>
+        <li>The <b>employee screens only</b> — clock, history, leave, schedule, profile</li>
+        <li>HR clocks in and books their own leave like anybody else</li>
+        <li><b>No Team tab</b>, and no HR approvals inbox</li>
+      </ul>
+      <p style="margin:12px 0 0"><span class="pill dec">By decision</span></p>
+    </div>
+  </div>
+
+  <div class="note warn">
+    <b>HR is desk-only on the phone, and that is intended rather than missing.</b> Everything HR
+    actually does — employee records, the leave register, reports, the document vault — is desk
+    work. The company-wide stage-two approval queue stays on the dashboard, where the record it
+    decides on is visible. If phone approvals for HR are wanted later, that is an addition, not a
+    repair.
+  </div>
+
+  <div class="note no">
+    <b>What HR cannot reach:</b> company profile, offices and geofences, roles and permissions, and
+    system settings. Those stay with the Admin.
+  </div>
+</section>
+
+<!-- ===================== ADMIN ===================== -->
+<section>
+  <h2><span class="role-badge r-admin">A</span> Administrator</h2>
+  <p class="lead">Everything HR has, plus the configuration of the system itself. All nineteen
+    permissions.</p>
+
+  <div class="cols">
+    <div class="col">
+      <h4>On the web dashboard</h4>
+      <ul>
+        <li>Everything listed under HR, and in addition:</li>
+        <li><b>Company profile</b> — name, logo, address, timezone</li>
+        <li><b>Offices</b> — branches, GPS coordinates, geofence radius</li>
+        <li><b>Roles &amp; permissions</b> — the editor for all of the above</li>
+        <li><b>Settings &amp; policies</b> — working week, reminder windows, geofence enforcement, idle timeout, 2FA requirement, directory contact visibility</li>
+        <li><b>Security trail</b> — sign-ins, failures, lockouts, timeouts, password and settings changes</li>
+        <li><b>App crash reports</b></li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>In the mobile app</h4>
+      <ul>
+        <li>Signs in successfully — and then <b>every employee screen is refused</b>, because an
+          administrator account normally has no employee record behind it</li>
+        <li>An admin who <i>is also</i> a member of staff — with an employee record linked — gets the
+          ordinary employee screens like anybody else</li>
+      </ul>
+      <p style="margin:12px 0 0"><span class="pill dec">By design</span></p>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>An employee record and a login are separate things.</b> Plenty of staff are on the payroll
+    and have never signed in; an administrator account may exist with nobody on the payroll behind
+    it. The app is built around the employee record, which is why an admin-only login has nothing to
+    show there. Link the account to an employee record and the app behaves normally.
+  </div>
+
+  <div class="note warn">
+    <b>Who may create a login, and at what level.</b> HR can create sign-in accounts — onboarding is
+    their job — but only at <i>employee</i> or <i>manager</i> level. Promoting somebody to HR or
+    Admin needs <code>manage-roles</code>, which only an Admin holds. Without that split, HR could
+    mint an account, make it an admin and sign in as one. The same rule runs in reverse: HR cannot
+    demote an existing administrator.
+  </div>
+</section>
+
+<!-- ===================== permission reference ===================== -->
+<section>
+  <h2>Permission reference</h2>
+  <p class="lead">The nineteen permissions and who holds each. This is the actual gate — screens
+    check these, not the role name.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr><th>Permission</th><th>What it opens</th>
+          <th class="c">Admin</th><th class="c">HR</th><th class="c">Manager</th><th class="c">Employee</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>view-dashboard</code></td><td>The admin/HR dashboard</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>view-attendance</code></td><td>Attendance screens; own punches for staff</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td></tr>
+        <tr><td><code>manage-attendance</code></td><td>Manual entry, corrections, regularisation decisions</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>view-team</code></td><td>The manager's team screens</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td></tr>
+        <tr><td><code>approve-leave</code></td><td>The approvals inbox, and the app's Team tab</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td></tr>
+        <tr><td><code>approve-swaps</code></td><td>Deciding shift swap requests</td><td class="c y">✓</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-leave</code></td><td>Leave register, types, holidays, balances</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-employees</code></td><td>Employee records, documents, org chart, export</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>import-employees</code></td><td>Bulk CSV/Excel import</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-departments</code></td><td>Departments</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-designations</code></td><td>Job titles</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-shifts</code></td><td>Shifts, break policy, the roster planner, publishing</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>view-reports</code></td><td>All reports</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>export-reports</code></td><td>PDF and Excel downloads</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-announcements</code></td><td>Company, department and office broadcasts</td><td class="c y">✓</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-company</code></td><td>Company profile</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-offices</code></td><td>Offices, GPS, geofence radius</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-roles</code></td><td>Roles and permissions editor</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td></tr>
+        <tr><td><code>manage-settings</code></td><td>Policies, security trail, crash reports</td><td class="c y">✓</td><td class="c n">—</td><td class="c n">—</td><td class="c n">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <b>Manager holds a subset of HR's permissions, but sees far less.</b> The three they share —
+    <code>view-team</code>, <code>approve-leave</code>, <code>approve-swaps</code> — are the same
+    permissions applied to different data: HR's screens are company-wide, the manager's are filtered
+    to their own reports before anything is read. The permission opens the door; the scope decides
+    what is in the room.
+  </div>
+</section>
+
+<!-- ===================== boundaries ===================== -->
+<section>
+  <h2>Boundaries held on purpose</h2>
+  <p class="lead">The six that come up most often. Each is a decision, not an oversight — worth
+    knowing before anyone reports them as bugs.</p>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th style="width:34%">The boundary</th><th>Why it is there</th></tr></thead>
+      <tbody>
+        <tr><td><b>HR has no approvals inbox in the app</b></td>
+          <td>HR's work is desk work, and the final approval is made against a record that is only
+            fully visible on the dashboard.</td></tr>
+        <tr><td><b>A manager cannot correct attendance</b></td>
+          <td>A correction changes the record a payroll was calculated from. It carries an audit
+            reason and belongs to HR.</td></tr>
+        <tr><td><b>A manager cannot edit the roster</b></td>
+          <td>Building and publishing the roster is one job held by <code>manage-shifts</code>.
+            Managers read the published version — the same one their staff see.</td></tr>
+        <tr><td><b>A manager sees no personal details</b></td>
+          <td>Date of birth, address, national ID, salary, documents and the emergency contact are
+            HR-grade. A colleague cannot see more than a manager, and a manager cannot see these.</td></tr>
+        <tr><td><b>Scope is direct reports, not a sub-tree</b></td>
+          <td>Leave approval is one hop — manager, then HR. Giving a manager two levels up sight of
+            records they can never act on would be data without a purpose.</td></tr>
+        <tr><td><b>An admin login alone cannot use the app</b></td>
+          <td>The app is built around the employee record. An account with none has no attendance,
+            no leave and no schedule to show. Link one and it works.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<footer>
+  KEMP — Klutch Employment Management Program · Role capabilities, web and app · 14 September 2026<br>
+  Compiled from <code>RolePermissionSeeder</code>, the route middleware and the app's tab logic.
+</footer>
+
+</div>
+</body>
+</html>

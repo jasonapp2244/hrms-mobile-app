@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employment Management Portal — Master Feature Catalogue</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --ink:#1a2233; --muted:#5b6b85;
+    --line:#e6e9f0; --brand:#F26522; --brand-2:#c44f16; --accent:#1e3a8a;
+    --ok:#16a34a; --warn:#d97706; --crit:#dc2626; --chip:#fff2ea;
+    --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
+  a{color:var(--brand-2);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+  header.hero{background:linear-gradient(135deg,#7a2f08,#F26522 62%,#f79b57);color:#fff;padding:52px 0 44px}
+  header.hero .wrap{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:12px;font-weight:700;opacity:.9}
+  header.hero h1{margin:6px 0 2px;font-size:32px;line-height:1.2;font-weight:800}
+  header.hero p.sub{margin:0;font-size:16px;opacity:.95;max-width:820px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+  .meta{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+    padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600}
+
+  main{padding:34px 0 70px}
+  .grid{display:grid;grid-template-columns:246px 1fr;gap:32px;align-items:start}
+  @media(max-width:960px){.grid{grid-template-columns:1fr}nav.toc{position:static!important;max-height:none!important}}
+
+  nav.toc{position:sticky;top:18px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px;box-shadow:var(--shadow);max-height:90vh;overflow:auto}
+  nav.toc h4{margin:2px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  nav.toc .grp{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    color:var(--brand-2);margin:12px 0 4px;padding-left:8px}
+  nav.toc ul{list-style:none;margin:0;padding:0}
+  nav.toc li{margin:1px 0}
+  nav.toc a{display:block;padding:5px 8px;border-radius:8px;font-size:13px;color:var(--ink)}
+  nav.toc a:hover{background:var(--chip);text-decoration:none}
+
+  section{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:24px 26px;margin-bottom:20px;box-shadow:var(--shadow)}
+  section h2{margin:0 0 6px;font-size:20px;font-weight:800;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  section h2 .num{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;
+    background:var(--brand);color:#fff;border-radius:9px;font-size:14px;font-weight:800}
+  section h3{margin:24px 0 6px;font-size:16px;font-weight:700;color:var(--brand-2);
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  section h3:first-of-type{margin-top:16px}
+  .lead{color:var(--muted);font-size:14.5px;margin:6px 0 4px}
+  .cnt{font-size:12px;font-weight:700;color:var(--muted);background:#f4f6fa;
+    border:1px solid var(--line);padding:2px 9px;border-radius:999px}
+
+  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+  .b-crit{background:#fee2e2;color:#991b1b}
+  .b-high{background:#ffedd5;color:#9a3412}
+  .b-med{background:#fef9c3;color:#854d0e}
+  .b-low{background:#e0e7ff;color:#3730a3}
+  .b-done{background:#dcfce7;color:#166534}
+  .b-part{background:#fef3c7;color:#92400e}
+
+  .tbl-wrap{overflow-x:auto;margin:10px 0 4px}
+  table{border-collapse:collapse;width:100%;font-size:13.8px;min-width:640px}
+  th,td{text-align:left;padding:8px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#faf6f3;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:#40506b}
+  tr:last-child td{border-bottom:none}
+  td.id{white-space:nowrap;font-weight:700;color:var(--muted);font-size:12.5px;width:56px}
+  td.st{white-space:nowrap;width:84px}
+  td.pr{white-space:nowrap;width:64px}
+  td.eff{white-space:nowrap;font-weight:600;color:var(--muted);width:78px}
+  tbody tr:hover{background:#fffaf6}
+  td ul{margin:4px 0 0;padding-left:17px}
+  td li{margin:2px 0;font-size:13px}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+  .stat{border:1px solid var(--line);border-radius:12px;padding:14px;text-align:center;background:#fffdfb}
+  .stat .n{font-size:26px;font-weight:800;color:var(--brand)}
+  .stat .l{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+
+  .note{border-left:4px solid var(--accent);background:#eef2ff;padding:11px 15px;border-radius:0 10px 10px 0;margin:14px 0}
+  .note.ok{border-color:var(--ok);background:#f0fdf4}
+  .note.warn{border-color:var(--warn);background:#fffbeb}
+  .note.crit{border-color:var(--crit);background:#fef2f2}
+
+  .legend{display:flex;flex-wrap:wrap;gap:16px;margin:10px 0 0;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:26px 0 40px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Master Catalogue · Complete Feature Register</div>
+    <h1>Employment Management Portal — Every Feature &amp; Module</h1>
+    <p class="sub">A single consolidated register of the entire product: what is built today, the complete
+      planned scope for web, mobile and backend, and all 31 additional modules that make up a full
+      HR platform. Every item listed individually with status, priority and phase.</p>
+    <div class="meta-row">
+      <span class="meta">164 features · 31 modules</span>
+      <span class="meta">Stack: Laravel 12 + MySQL · Android/iOS</span>
+      <span class="meta">Version 1.0 · 2026-07-29</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+<div class="grid">
+
+  <nav class="toc">
+    <h4>Contents</h4>
+    <div class="grp">Overview</div>
+    <ul>
+      <li><a href="#s1">1 · Summary &amp; How to Read</a></li>
+      <li><a href="#s2">2 · Critical Fixes (P0)</a></li>
+    </ul>
+    <div class="grp">Part A — Web Dashboard</div>
+    <ul>
+      <li><a href="#s3">3 · Auth &amp; Access</a></li>
+      <li><a href="#s4">4 · Company &amp; Organisation</a></li>
+      <li><a href="#s5">5 · Employee Management</a></li>
+      <li><a href="#s6">6 · Attendance</a></li>
+      <li><a href="#s7">7 · Shift &amp; Schedule</a></li>
+      <li><a href="#s8">8 · Leave Management</a></li>
+      <li><a href="#s9">9 · Reporting &amp; Analytics</a></li>
+      <li><a href="#s10">10 · Dashboard</a></li>
+      <li><a href="#s11">11 · Notifications</a></li>
+    </ul>
+    <div class="grp">Part B–D</div>
+    <ul>
+      <li><a href="#s12">12 · Mobile Application</a></li>
+      <li><a href="#s13">13 · Backend &amp; API</a></li>
+      <li><a href="#s14">14 · AI HR Assistant</a></li>
+    </ul>
+    <div class="grp">Part E — Further Modules</div>
+    <ul>
+      <li><a href="#s15">15 · Attendance Extensions</a></li>
+      <li><a href="#s16">16 · Employee Lifecycle</a></li>
+      <li><a href="#s17">17 · Payroll &amp; Money</a></li>
+      <li><a href="#s18">18 · Workplace Operations</a></li>
+      <li><a href="#s19">19 · Platform &amp; Integration</a></li>
+    </ul>
+    <div class="grp">Totals</div>
+    <ul>
+      <li><a href="#s20">20 · Master Summary</a></li>
+    </ul>
+    <div class="grp">Annex</div>
+    <ul>
+      <li><a href="#s21">21 · Required Accounts &amp; Services</a></li>
+    </ul>
+    <div class="legend" style="margin-top:14px;flex-direction:column;gap:6px">
+      <span><span class="badge b-done">Built</span> Delivered</span>
+      <span><span class="badge b-part">Partial</span> In progress</span>
+      <span><span class="badge b-crit">P0</span> Critical</span>
+      <span><span class="badge b-high">P1</span> High</span>
+      <span><span class="badge b-med">P2</span> Medium</span>
+      <span><span class="badge b-low">P3</span> Future</span>
+    </div>
+  </nav>
+
+  <div>
+
+  <!-- ============ 1 ============ -->
+  <section id="s1">
+    <h2><span class="num">1</span> Summary &amp; How to Read</h2>
+    <p class="lead">This catalogue merges every prior document into one register. Sections 2–14 are the
+      <b>core product</b> (individual features). Sections 15–19 are <b>further modules</b> (whole subsystems,
+      listed with their capabilities). Nothing is omitted.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="n">41</div><div class="l">Built</div></div>
+      <div class="stat"><div class="n">122</div><div class="l">Planned features</div></div>
+      <div class="stat"><div class="n">31</div><div class="l">Further modules</div></div>
+      <div class="stat"><div class="n">7</div><div class="l">Modules complete</div></div>
+      <div class="stat"><div class="n">6</div><div class="l">Critical fixes</div></div>
+    </div>
+
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Part</th><th>Covers</th><th>Items</th><th>Status</th></tr>
+      <tr><td><b>P0</b> — Critical fixes</td><td>Data-loss, security exposure and a blocked employee login path that must close before real staff data is entered</td><td>6</td><td><span class="badge b-crit">Urgent</span></td></tr>
+      <tr><td><b>A</b> — Web Dashboard</td><td>Admin and HR system: access, company, employees, attendance, shifts, leave, reporting, dashboard, notifications</td><td>94</td><td>41 built · 1 partial · 52 planned</td></tr>
+      <tr><td><b>B</b> — Mobile Application</td><td>Android and iOS employee app, plus manager mode</td><td>44</td><td>All planned</td></tr>
+      <tr><td><b>C</b> — Backend &amp; API</td><td>API layer, jobs, testing, hosting, operations</td><td>14</td><td>All planned</td></tr>
+      <tr><td><b>D</b> — AI Assistant</td><td>Natural-language HR queries with permission-aware answers</td><td>7</td><td>All planned</td></tr>
+      <tr><td><b>E</b> — Further modules</td><td>Attendance technology, employee lifecycle, payroll, workplace operations, integrations</td><td>31</td><td>Strategic options</td></tr>
+    </table>
+    </div>
+
+    <div class="note">
+      <b>Reading the columns.</b> <b>Status</b> shows what exists today. <b>Priority</b> shows the recommended
+      order for anything not yet built — P0 is urgent, P3 is future. Items already built carry no priority.
+      Effort figures on the further modules are indicative development days for planning discussion only.
+    </div>
+  </section>
+
+  <!-- ============ 2 ============ -->
+  <section id="s2">
+    <h2><span class="num">2</span> Critical Fixes <span class="badge b-crit">P0</span> <span class="cnt">5 items</span></h2>
+    <p class="lead">Not features — defects. These sit in live code paths and should be closed before the
+      system holds real employee data.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Item</th><th>Why it matters</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">P0.1</td><td><b>Permanent attendance retention</b></td><td>Deleting an employee currently erases their entire attendance history permanently. Records are evidence in pay and labour disputes and must survive employee removal.</td><td class="eff">0.5 d</td></tr>
+      <tr><td class="id">P0.2</td><td><b>Soft delete / archive</b></td><td>Removing an employee, department or office destroys the record outright. Archiving supports rehire and historical reporting.</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">P0.3</td><td><b>Login brute-force protection</b></td><td>Unlimited password attempts are currently possible. Rate limiting and lockout is a baseline security control.</td><td class="eff">0.5 d</td></tr>
+      <tr><td class="id">P0.4</td><td><b>Production configuration</b></td><td>Debug mode exposes internal errors and database details to any visitor who triggers a failure.</td><td class="eff">0.5 d</td></tr>
+      <tr><td class="id">P0.5</td><td><b>Branded error pages</b></td><td>Users currently see raw framework screens on 403, 404 and 500 errors.</td><td class="eff">0.5 d</td></tr>
+      <tr><td class="id">P0.6</td><td><b>Employee login creation</b></td><td>There is no way to give an employee a login from the dashboard — the record has no account or password field. Every employee added since setup is unable to sign in, which makes the self-service portal and the future mobile app unreachable for them. See A3.5.</td><td class="eff">1 d</td></tr>
+    </table>
+    </div>
+    <div class="note crit"><b>Total ≈ 4 days.</b> The highest-value four days available anywhere in this catalogue.</div>
+  </section>
+
+  <!-- ============ 3 ============ -->
+  <section id="s3">
+    <h2><span class="num">3</span> Auth &amp; Access Control <span class="cnt">A1 · 9 items · 5 built</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">A1.1</td><td>Secure login / logout</td><td>Session-based authentication</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A1.2</td><td>Role-based access control</td><td>Admin, HR and Employee roles</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A1.3</td><td>Granular permissions</td><td>16 permissions enforced at route, screen and action level (one is obsolete, left over from the withdrawn QR design)</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A1.4</td><td>Roles &amp; permissions editor</td><td>Admin can reassign permissions without a developer</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A1.5</td><td>Staff profile &amp; password change</td><td>Admin/HR only — employees cannot yet change their own</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A1.6</td><td>Forgot password / email reset</td><td>Removes password resets from HR's workload</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A1.7</td><td>Audit trail</td><td>Immutable record of who changed what and when</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A1.8</td><td>Two-factor authentication</td><td>Protects accounts that can see the whole workforce</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A1.9</td><td>Session timeout policy</td><td>Forced re-login after inactivity</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 4 ============ -->
+  <section id="s4">
+    <h2><span class="num">4</span> Company &amp; Organisation <span class="cnt">A2 · 10 items · 5 built</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">A2.1</td><td>Company profile</td><td>Name, logo, address, timezone</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A2.2</td><td>Office / branch management</td><td>Multiple locations per company</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A2.3</td><td>Office coordinates &amp; geofence radius</td><td>Stored on every office but not currently enforced</td><td class="st"><span class="badge b-part">Partial</span></td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A2.4</td><td>Departments</td><td>Create, edit, assign</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A2.5</td><td>Designations / job titles</td><td>Beyond original specification</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A2.6</td><td>General settings</td><td>System-wide configuration screen</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A2.7</td><td>Holiday calendar</td><td>Without it, public holidays are miscounted as absence</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A2.8</td><td>Weekend / working-days config</td><td>Per office — essential for multi-region clients</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A2.9</td><td>Policy rules engine</td><td>Attendance and leave rules configurable per company</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A2.10</td><td>Multi-company (SaaS) mode</td><td>Serve many client organisations from one installation</td><td class="st">—</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 5 ============ -->
+  <section id="s5">
+    <h2><span class="num">5</span> Employee Management <span class="cnt">A3 · 12 items · 5 built</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">A3.1</td><td>Employee records (create, edit, deactivate)</td><td>Full record management</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A3.2</td><td>Assign department, office, designation</td><td>Organisational placement</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A3.3</td><td>Employment details</td><td>Code, job title, hire date, status</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A3.4</td><td>Work mode — office / WFH / hybrid</td><td>Drives per-employee attendance policy</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A3.5</td><td>Login credential creation &amp; reset</td><td><b>Not available in the interface.</b> The employee record has no password or account field, so an employee added through the dashboard cannot sign in to the self-service portal at all. Existing logins were created programmatically during setup. <b>This makes the employee portal unusable for any new joiner.</b></td><td class="st">—</td><td class="pr"><span class="badge b-crit">P0</span></td></tr>
+      <tr><td class="id">A3.6</td><td>CSV / Excel bulk import</td><td>Onboard an entire workforce at once</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A3.7</td><td>Profile photographs</td><td>Storage field already exists; upload screen not built</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A3.8</td><td>Document vault with expiry alerts</td><td>Contracts, ID, visas, certificates</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A3.9</td><td>Personal &amp; emergency contacts</td><td>Standard HR record content</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A3.10</td><td>Reporting-manager hierarchy &amp; org chart</td><td>Prerequisite for every approval workflow</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A3.11</td><td>Employee data export</td><td>Full record export for audit or handover</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A3.12</td><td>Onboarding / offboarding checklists</td><td>Repeatable joiner and leaver process</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 6 ============ -->
+  <section id="s6">
+    <h2><span class="num">6</span> Attendance <span class="cnt">A4 · 19 items · 10 built</span></h2>
+    <p class="lead">The core module. Check-in is button-based on any device — the original QR kiosk design was
+      withdrawn at the client's request and is not planned to return.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">A4.1</td><td>One-tap check in / check out</td><td>Works on phone or PC, from any location</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.2</td><td>Server-authoritative timestamps</td><td>Device clock never trusted — anti-spoofing</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.3</td><td>GPS &amp; IP capture per punch</td><td>Recorded for HR; never blocks a punch</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.4</td><td>Duplicate-punch cooldown</td><td>Prevents accidental double entries</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.5</td><td>Automatic in/out detection</td><td>Derived from the previous punch</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.6</td><td>Attendance log register</td><td>Employee, office, type, time, status, location</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.7</td><td>Filterable paginated history</td><td>By date, office, department, employee</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.8</td><td>Late &amp; early-leave detection</td><td>Measured against the assigned shift with grace period</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.9</td><td>Daily summary</td><td>Present, late, absent, headcount</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.10</td><td>Monthly attendance scoring</td><td>On-time percentage and late count per employee</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A4.11</td><td>Manual attendance correction</td><td><b>HR currently cannot fix a wrong or missed punch at all.</b> Must be logged with a reason.</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A4.12</td><td>Automatic absence marking</td><td>Scheduled job closes gaps instead of leaving blanks</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A4.13</td><td>Missing-checkout policy</td><td>Auto-close forgotten checkouts under a configurable rule</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A4.14</td><td>Working-hours calculation</td><td>Actual hours per day, week and month — the basis of payroll</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A4.15</td><td>Overtime tracking</td><td>Hours beyond shift, with configurable rules and rates</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A4.16</td><td>Regularisation requests</td><td>Employee raises a correction, manager approves</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A4.17</td><td>Break in / break out</td><td>Accurate net working time; required in some jurisdictions</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A4.18</td><td>Geofence enforcement</td><td>Optionally block punches outside the office radius</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A4.19</td><td>Live "who is in now" board</td><td>Real-time floor view for operations</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 7 ============ -->
+  <section id="s7">
+    <h2><span class="num">7</span> Shift &amp; Schedule <span class="cnt">A5 · 9 items · 4 built</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">A5.1</td><td>Shift definitions</td><td>Start, end and grace period</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A5.2</td><td>Shift assignment per department</td><td>Inherited by every employee in the department</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A5.3</td><td>Weekly roster view</td><td>Schedule overview across the company</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A5.4</td><td>Shift-driven attendance validation</td><td>Lateness measured against the real schedule</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A5.5</td><td>Per-employee shift override</td><td>Currently department-level only</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A5.6</td><td>Rotating &amp; night shift patterns</td><td>Repeating cycles across weeks</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A5.7</td><td>Break rule configuration</td><td>Paid and unpaid break definitions</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A5.8</td><td>Roster planner &amp; publish</td><td>Drag-and-drop planning, released to staff</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A5.9</td><td>Shift swap requests</td><td>Employee-to-employee, manager approved</td><td class="st">—</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 8 ============ -->
+  <section id="s8">
+    <h2><span class="num">8</span> Leave Management <span class="cnt">A6 · 9 items · 0 built</span> <span class="badge b-high">P1</span></h2>
+    <p class="lead">Entirely unbuilt. The access permission exists but there is no data, screen or logic
+      behind it. This is the largest functional gap in the product.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">A6.1</td><td>Leave types</td><td>Annual, sick, casual, unpaid, maternity — each with its own rules</td><td class="st">—</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">A6.2</td><td>Leave request submission</td><td>Dates, reason and supporting document</td><td class="st">—</td><td class="eff">2 d</td></tr>
+      <tr><td class="id">A6.3</td><td>Approval workflow</td><td>Manager then HR, with comments</td><td class="st">—</td><td class="eff">3 d</td></tr>
+      <tr><td class="id">A6.4</td><td>Balance tracking &amp; accrual</td><td>Automatic accrual and deduction</td><td class="st">—</td><td class="eff">3 d</td></tr>
+      <tr><td class="id">A6.5</td><td>Leave history &amp; status</td><td>Full record per employee, exportable</td><td class="st">—</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">A6.6</td><td>Company leave policy config</td><td>Entitlements per role, grade and year</td><td class="st">—</td><td class="eff">2 d</td></tr>
+      <tr><td class="id">A6.7</td><td>Team leave calendar</td><td>Clash detection so departments stay covered</td><td class="st">—</td><td class="eff">2 d</td></tr>
+      <tr><td class="id">A6.8</td><td>Leave ↔ attendance link</td><td>Approved leave stops counting as absence</td><td class="st">—</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">A6.9</td><td>Carry-forward &amp; year-end processing</td><td>Annual entitlement rollover</td><td class="st">—</td><td class="eff">2 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 9 ============ -->
+  <section id="s9">
+    <h2><span class="num">9</span> Reporting &amp; Analytics <span class="cnt">A7 · 14 items · 9 built</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">A7.1</td><td>Attendance report</td><td>Date range, office and department filters</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.2</td><td>PDF export</td><td>Formatted, print-ready</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.3</td><td>Excel export</td><td>For further analysis</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.4</td><td>Late employee report</td><td>Ranked by lateness frequency</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.5</td><td>Attendance outlier report</td><td>Statistical deviation from the norm</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.6</td><td>Department report</td><td>Comparative departmental performance</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.7</td><td>Historical attendance analysis</td><td>Trends over any period</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.8</td><td>Company adherence overview</td><td>Organisation-wide punctuality picture</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.9</td><td>Location &amp; IP columns in exports</td><td>Full audit detail in every export</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A7.10</td><td>Payroll-ready export</td><td>Hours, overtime, leave and absence per pay period</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A7.11</td><td>Leave reports</td><td>Depends on the Leave module</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A7.12</td><td>Overtime reports</td><td>Cost and hours by department</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A7.13</td><td>Scheduled report delivery</td><td>Daily, weekly or monthly, emailed automatically</td><td class="st">—</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">A7.14</td><td>Custom report builder</td><td>Management selects columns and filters without a developer</td><td class="st">—</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 10 ============ -->
+  <section id="s10">
+    <h2><span class="num">10</span> Dashboard <span class="cnt">A8 · 6 items · 3 built</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">A8.1</td><td>Live tiles</td><td>Present, late, absent, headcount</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A8.2</td><td>Recent attendance feed</td><td>Live activity stream</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A8.3</td><td>Charts &amp; visualisation</td><td>Attendance patterns at a glance</td><td class="st"><span class="badge b-done">Built</span></td><td class="pr">—</td></tr>
+      <tr><td class="id">A8.4</td><td>Role-specific dashboards</td><td>Admin, HR and Manager each see what is relevant</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A8.5</td><td>Trend comparison</td><td>This period against the last — direction, not just numbers</td><td class="st">—</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">A8.6</td><td>Configurable widgets</td><td>Each user arranges their own view</td><td class="st">—</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 11 ============ -->
+  <section id="s11">
+    <h2><span class="num">11</span> Notifications <span class="cnt">A9 · 6 items · 0 built</span> <span class="badge b-high">P1</span></h2>
+    <p class="lead">Nothing in this area exists. Email currently sends nowhere — credentials, resets and
+      approvals are written to a log file rather than delivered.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="st">Status</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">A9.1</td><td>Live email delivery</td><td>Prerequisite for everything else in this section</td><td class="st">—</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">A9.2</td><td>In-app notification centre</td><td>Notification bell with history</td><td class="st">—</td><td class="eff">3 d</td></tr>
+      <tr><td class="id">A9.3</td><td>Clock-in / clock-out reminders</td><td>Reduces missed punches — the largest source of correction work</td><td class="st">—</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">A9.4</td><td>Late-arrival alerts to HR</td><td>Real-time visibility instead of month-end discovery</td><td class="st">—</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">A9.5</td><td>Leave request &amp; decision alerts</td><td>Keeps the approval chain moving</td><td class="st">—</td><td class="eff">1 d</td></tr>
+      <tr><td class="id">A9.6</td><td>Roster change alerts</td><td>Staff informed the moment a shift changes</td><td class="st">—</td><td class="eff">1 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 12 ============ -->
+  <section id="s12">
+    <h2><span class="num">12</span> Mobile Application <span class="cnt">Part B · 44 items · 0 built</span></h2>
+    <p class="lead">Android and iOS, consuming the shared API. Every item here depends on section 13.1
+      existing first.</p>
+
+    <h3>B1 · Onboarding &amp; Access <span class="cnt">7</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">B1.1</td><td>Splash &amp; onboarding screens</td><td>Branded first-run experience</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B1.2</td><td>Secure token login</td><td>Email and password against the API</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B1.3</td><td>Biometric unlock</td><td>Fingerprint or face unlock of the app itself</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B1.4</td><td>Forgot password</td><td>Self-service reset from the phone</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B1.5</td><td>Stay logged in / token refresh</td><td>No daily re-authentication</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B1.6</td><td>Trusted-device binding</td><td>One account tied to one registered device</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B1.7</td><td>Remote session revoke</td><td>HR can log a lost device out</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+    </table>
+    </div>
+
+    <h3>B2 · Attendance <span class="cnt">8</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">B2.1</td><td>One-tap check in / out</td><td>The primary screen of the app</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B2.2</td><td>Live status card</td><td>Checked in at, hours worked so far today</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B2.3</td><td>GPS capture at punch</td><td>Location recorded with each event</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B2.4</td><td>Offline punch queue</td><td>Records without signal and syncs automatically — essential for sites with poor coverage</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B2.5</td><td>Geofence-aware punch</td><td>Warn or block outside the office radius</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B2.6</td><td>Break in / break out</td><td>Mirrors the web capability</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B2.7</td><td>Mock-location &amp; rooted-device detection</td><td>Defeats fake-GPS applications</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B2.8</td><td>Home-screen widget</td><td>Punch without opening the app</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+
+    <h3>B3 · Employee Self-Service <span class="cnt">8</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">B3.1</td><td>View profile &amp; employment details</td><td>Own record, read-only fields</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B3.2</td><td>Edit permitted personal details</td><td>Phone, address, emergency contact</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B3.3</td><td>Change password</td><td>Self-service</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B3.4</td><td>Attendance calendar</td><td>Monthly visual view of own attendance</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B3.5</td><td>Personal attendance score</td><td>Punctuality and on-time streak</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B3.6</td><td>Shift &amp; upcoming roster</td><td>Employees can currently see neither</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B3.7</td><td>Documents &amp; payslips</td><td>Download own records</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+      <tr><td class="id">B3.8</td><td>Company directory</td><td>Colleagues, departments, contact details</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+
+    <h3>B4 · Leave <span class="cnt">6</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">B4.1</td><td>Apply for leave</td><td>Type, dates, reason, attachment</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B4.2</td><td>View leave balances</td><td>Remaining entitlement by type</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B4.3</td><td>Track request status</td><td>Pending, approved, rejected with history</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B4.4</td><td>Cancel a pending request</td><td>Withdraw before approval</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B4.5</td><td>Manager approval inbox</td><td>Approve or reject from the phone</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B4.6</td><td>Team leave calendar</td><td>Who is away and when</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+
+    <h3>B5 · Push Notifications <span class="cnt">6</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">B5.1</td><td>Clock-in reminder</td><td>At shift start</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B5.2</td><td>Clock-out reminder</td><td>At shift end — prevents missing checkouts</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B5.3</td><td>Leave approved / rejected</td><td>Immediate decision notice</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B5.4</td><td>Roster updated</td><td>Shift changes pushed instantly</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B5.5</td><td>HR announcements</td><td>Company-wide broadcasts</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B5.6</td><td>In-app notification centre</td><td>Full history on the device</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+    </table>
+    </div>
+
+    <h3>B6 · App Experience <span class="cnt">6</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">B6.1</td><td>Dark mode</td><td>System-following theme</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+      <tr><td class="id">B6.2</td><td>Multi-language support</td><td>Required outside a single language market</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+      <tr><td class="id">B6.3</td><td>Offline cache</td><td>Profile, history and roster available without signal</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B6.4</td><td>Accessibility</td><td>Font scaling and contrast</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+      <tr><td class="id">B6.5</td><td>Crash &amp; usage reporting</td><td>Faults reach the team before users report them</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">B6.6</td><td>Force-update &amp; maintenance gate</td><td>Retire old app versions safely</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+    </table>
+    </div>
+
+    <h3>B7 · Manager Mode <span class="cnt">3</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">B7.1</td><td>Team attendance today</td><td>Who is in, late or absent</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+      <tr><td class="id">B7.2</td><td>Approve from the phone</td><td>Leave and regularisation decisions</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+      <tr><td class="id">B7.3</td><td>Team roster view</td><td>Upcoming schedule for the team</td><td class="pr"><span class="badge b-low">P3</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 13 ============ -->
+  <section id="s13">
+    <h2><span class="num">13</span> Backend, API &amp; Operations <span class="cnt">Part C · 14 items · 0 built</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Item</th><th>Notes</th><th class="pr">Priority</th></tr>
+      <tr><td class="id">C1.1</td><td><b>Mobile API layer</b></td><td><b>Hard blocker for the entire mobile phase.</b> Token authentication and endpoints; does not exist today.</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.2</td><td>Authentication endpoints</td><td>Login, logout, current user</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.3</td><td>Attendance endpoints</td><td>Punch, today, history</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.4</td><td>Leave endpoints</td><td>Apply, list, approve, balances</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.5</td><td>Profile &amp; schedule endpoints</td><td>Own record and roster</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.6</td><td>Device registration</td><td>Required for push notifications</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.7</td><td>API rate limiting</td><td>Abuse protection on public endpoints</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.8</td><td>Versioning &amp; error format</td><td>Lets the app and server evolve independently</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.9</td><td>Background job processing</td><td>Reminders, absence marking, scheduled reports</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">C1.10</td><td>Immutable audit log</td><td>Tamper-evident record of attendance changes</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">C1.11</td><td><b>Automated test suite</b></td><td><b>No coverage exists.</b> Should be funded before expansion, not after.</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">C1.12</td><td>API documentation</td><td>Needed by the mobile team and integration partners</td><td class="pr"><span class="badge b-med">P2</span></td></tr>
+      <tr><td class="id">C1.13</td><td>Automated encrypted backups</td><td>No recovery path exists today</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+      <tr><td class="id">C1.14</td><td>Secure hosting &amp; monitoring</td><td>HTTPS, hardened configuration, error alerting</td><td class="pr"><span class="badge b-high">P1</span></td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 14 ============ -->
+  <section id="s14">
+    <h2><span class="num">14</span> AI HR Assistant <span class="cnt">Part D · 7 items · 0 built</span> <span class="badge b-low">P3</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Feature</th><th>Notes</th></tr>
+      <tr><td class="id">D1.1</td><td>Natural-language HR queries</td><td>"Who was late in Sales last week?"</td></tr>
+      <tr><td class="id">D1.2</td><td>Attendance history search</td><td>Conversational lookup across all records</td></tr>
+      <tr><td class="id">D1.3</td><td>Leave history search</td><td>Depends on the Leave module</td></tr>
+      <tr><td class="id">D1.4</td><td>Automatic summaries</td><td>Attendance and department digests on request</td></tr>
+      <tr><td class="id">D1.5</td><td>Context-aware follow-ups</td><td>Retains the thread of a conversation</td></tr>
+      <tr><td class="id">D1.6</td><td><b>Permission-aware answers</b></td><td>Never reveals data above the asker's role — the critical safeguard</td></tr>
+      <tr><td class="id">D1.7</td><td>Available on web and mobile</td><td>Same assistant in both places</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 15 ============ -->
+  <section id="s15">
+    <h2><span class="num">15</span> Further Modules · Tier A — Attendance Extensions <span class="cnt">9 modules · ~70 d</span></h2>
+    <p class="lead">Highest fit. Each builds directly on data the system already records.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Module</th><th>Capabilities</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">E-A1</td><td><b>Face / selfie punch</b></td><td><ul><li>Selfie captured at every punch</li><li>Face enrolment per employee</li><li>Automatic match with confidence score</li><li>Liveness detection against photo spoofing</li><li>HR photo-audit gallery</li><li>Configurable: off / photo-only / match required</li></ul></td><td class="eff">8–12 d</td></tr>
+      <tr><td class="id">E-A2</td><td><b>Biometric device integration</b></td><td><ul><li>Fingerprint terminal support</li><li>Device registry per office</li><li>Automatic punch import</li><li>Device health &amp; last-sync alerts</li><li>Fingerprint / card enrolment</li></ul></td><td class="eff">10–15 d</td></tr>
+      <tr><td class="id">E-A3</td><td><b>Shared kiosk mode</b></td><td><ul><li>Entrance tablet, permanently signed in</li><li>Employee code + PIN, or photo grid</li><li>Optional selfie confirmation</li><li>Works offline and syncs later</li><li>Locked-down browser mode</li></ul></td><td class="eff">5–7 d</td></tr>
+      <tr><td class="id">E-A4</td><td><b>Trusted network / IP whitelist</b></td><td><ul><li>Whitelist office networks</li><li>Punches tagged on- or off-network</li><li>Policy varies by work mode</li><li>Off-network reporting</li><li>Optional hard block</li></ul></td><td class="eff">2–3 d</td></tr>
+      <tr><td class="id">E-A5</td><td><b>Field-staff attendance</b></td><td><ul><li>Check in at client sites</li><li>Client site registry with coordinates</li><li>Visit log with photo and notes</li><li>Route replay on a map</li><li>Distance and visit-count reports</li></ul></td><td class="eff">12–15 d</td></tr>
+      <tr><td class="id">E-A6</td><td><b>Timesheets &amp; project time</b></td><td><ul><li>Project and task registry</li><li>Split attendance hours across projects</li><li>Billable vs non-billable</li><li>Manager approval</li><li>Utilisation and profitability reports</li></ul></td><td class="eff">12–15 d</td></tr>
+      <tr><td class="id">E-A7</td><td><b>Travel / on-duty</b></td><td><ul><li>Travel request with dates and purpose</li><li>Manager approval</li><li>Counted present, not absent</li><li>Links to expense claims</li><li>Travel calendar</li></ul></td><td class="eff">4–5 d</td></tr>
+      <tr><td class="id">E-A8</td><td><b>Hourly &amp; contract workers</b></td><td><ul><li>Employment type per person</li><li>Hourly and daily rates</li><li>Wage calculation from attendance</li><li>Contractor registry and reports</li><li>Contract expiry alerts</li></ul></td><td class="eff">6–8 d</td></tr>
+      <tr><td class="id">E-A9</td><td><b>Shift marketplace</b></td><td><ul><li>Open shifts staff can claim</li><li>Swap requests with approval</li><li>Availability preferences</li><li>Understaffing alerts</li><li>Auto-suggested roster fills</li></ul></td><td class="eff">8–10 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 16 ============ -->
+  <section id="s16">
+    <h2><span class="num">16</span> Tier B — Employee Lifecycle <span class="cnt">6 modules · ~65 d</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Module</th><th>Capabilities</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">E-B1</td><td><b>Recruitment / ATS</b></td><td><ul><li>Job requisition and approval</li><li>Public careers page</li><li>Application capture with CV upload</li><li>Candidate pipeline</li><li>Interview scheduling and feedback</li><li>Offer letters with e-acceptance</li><li>One-click convert hire to employee</li><li>Time-to-hire analytics</li></ul></td><td class="eff">15–20 d</td></tr>
+      <tr><td class="id">E-B2</td><td><b>Probation &amp; confirmation</b></td><td><ul><li>Probation period auto-calculated from hire date</li><li>Reminders before it ends</li><li>Confirmation review and decision</li><li>Attendance surfaced in the review</li></ul></td><td class="eff">3–4 d</td></tr>
+      <tr><td class="id">E-B3</td><td><b>Performance management</b></td><td><ul><li>Goals, KPIs and OKRs</li><li>Appraisal cycles</li><li>Self, manager and 360° review</li><li>Weighted scorecards</li><li>Attendance score feeds appraisal automatically</li><li>Improvement plans</li><li>Increment recommendations</li></ul></td><td class="eff">15–20 d</td></tr>
+      <tr><td class="id">E-B4</td><td><b>Training &amp; development</b></td><td><ul><li>Course catalogue</li><li>Session scheduling</li><li>Enrolment and training attendance</li><li>Certification tracking with expiry alerts</li><li>Skill matrix per designation</li><li>Cost and effectiveness tracking</li></ul></td><td class="eff">12–15 d</td></tr>
+      <tr><td class="id">E-B5</td><td><b>Exit &amp; offboarding</b></td><td><ul><li>Resignation and acceptance</li><li>Notice period and last working day</li><li>Multi-department clearance checklist</li><li>Asset return verification</li><li>Final settlement calculation</li><li>Exit interview and attrition analytics</li><li>Automatic account deactivation</li><li>Experience letter generation</li></ul></td><td class="eff">8–10 d</td></tr>
+      <tr><td class="id">E-B6</td><td><b>Disciplinary &amp; grievance</b></td><td><ul><li>Incident logging with evidence</li><li>Warning letters with acknowledgement</li><li>Automatic trigger from attendance patterns</li><li>Confidential grievance intake</li><li>Case tracking and history</li></ul></td><td class="eff">6–8 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 17 ============ -->
+  <section id="s17">
+    <h2><span class="num">17</span> Tier C — Payroll &amp; Money <span class="cnt">5 modules · ~65 d</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Module</th><th>Capabilities</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">E-C1</td><td><b>Payroll engine</b></td><td><ul><li>Salary structure with allowances and deductions</li><li>Revision history with effective dates</li><li>Pay period processing</li><li>Attendance-driven calculation — absence, overtime, unpaid leave</li><li>Statutory deductions</li><li>Payslip generation and self-service download</li><li>Bank transfer file export</li><li>Payroll register and cost reports</li><li>Approval and lock before disbursement</li></ul></td><td class="eff">25–30 d</td></tr>
+      <tr><td class="id">E-C2</td><td><b>Expenses &amp; reimbursement</b></td><td><ul><li>Claim submission with receipt photo</li><li>Categories with limits</li><li>Multi-level approval</li><li>Mileage claims from visit data</li><li>Flows into payroll as a payable</li></ul></td><td class="eff">8–10 d</td></tr>
+      <tr><td class="id">E-C3</td><td><b>Loans &amp; salary advances</b></td><td><ul><li>Request and approval</li><li>Repayment schedule</li><li>Automatic payroll deduction</li><li>Outstanding balance visibility</li></ul></td><td class="eff">5–6 d</td></tr>
+      <tr><td class="id">E-C4</td><td><b>Benefits &amp; insurance</b></td><td><ul><li>Benefit plan catalogue</li><li>Enrolment with dependants</li><li>Renewal alerts</li><li>Contribution split tracking</li></ul></td><td class="eff">8–10 d</td></tr>
+      <tr><td class="id">E-C5</td><td><b>Statutory compliance</b></td><td><ul><li>Country-specific labour reports</li><li>Minimum wage and hour checks</li><li>Overtime-limit breach alerts</li><li>Inspection-ready registers</li></ul></td><td class="eff">10–15 d<br>per country</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 18 ============ -->
+  <section id="s18">
+    <h2><span class="num">18</span> Tier D — Workplace Operations <span class="cnt">6 modules · ~40 d</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Module</th><th>Capabilities</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">E-D1</td><td><b>Announcements &amp; noticeboard</b></td><td><ul><li>Company, office or department targeted</li><li>Attachments, pinning, scheduled publish</li><li>Read receipts — proof staff saw a policy</li><li>Pushed to the mobile app</li><li>Automatic birthday and anniversary posts</li></ul></td><td class="eff">4–5 d</td></tr>
+      <tr><td class="id">E-D2</td><td><b>HR helpdesk / ticketing</b></td><td><ul><li>Employee raises an HR query</li><li>Category routing and SLA tracking</li><li>Threaded conversation with attachments</li><li>Policy knowledge base</li><li>Ticket volume analytics</li></ul></td><td class="eff">8–10 d</td></tr>
+      <tr><td class="id">E-D3</td><td><b>Asset management</b></td><td><ul><li>Registry of laptops, phones, vehicles, ID cards</li><li>Issue with acknowledgement</li><li>Return feeds the exit checklist</li><li>Maintenance and warranty tracking</li><li>Unreturned-asset alerts</li></ul></td><td class="eff">6–8 d</td></tr>
+      <tr><td class="id">E-D4</td><td><b>Engagement &amp; surveys</b></td><td><ul><li>Surveys and pulse polls, optionally anonymous</li><li>Peer recognition wall</li><li>Reward points</li><li>Engagement trend per department</li></ul></td><td class="eff">8–10 d</td></tr>
+      <tr><td class="id">E-D5</td><td><b>Visitor &amp; contractor management</b></td><td><ul><li>Pre-registration and host notification</li><li>Reception check in/out with badges</li><li>Contractor attendance on the same engine</li><li>Safety induction acknowledgement</li><li>Live evacuation list</li></ul></td><td class="eff">6–8 d</td></tr>
+      <tr><td class="id">E-D6</td><td><b>ID cards &amp; badges</b></td><td><ul><li>Card designer with company branding</li><li>Bulk generation with photo and code</li><li>Print-ready output</li><li>Expiry and reissue tracking</li></ul></td><td class="eff">4–5 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 19 ============ -->
+  <section id="s19">
+    <h2><span class="num">19</span> Tier E — Platform &amp; Integration <span class="cnt">5 modules · ~35 d</span></h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">ID</th><th>Module</th><th>Capabilities</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">E-E1</td><td><b>Single sign-on</b></td><td><ul><li>Google Workspace and Microsoft 365 login</li><li>Enterprise SAML</li><li>Automatic user provisioning</li><li>Enforced SSO-only mode</li></ul>Frequently a purchase requirement for larger clients.</td><td class="eff">6–8 d</td></tr>
+      <tr><td class="id">E-E2</td><td><b>Chat platform integration</b></td><td><ul><li>Check in/out from Slack, Teams or WhatsApp</li><li>Leave requests in chat</li><li>Daily attendance digest to a channel</li><li>Absence alerts to a manager</li></ul></td><td class="eff">8–10 d</td></tr>
+      <tr><td class="id">E-E3</td><td><b>Calendar sync</b></td><td><ul><li>Approved leave into Google or Outlook</li><li>Roster as a calendar subscription</li><li>Holidays and events synced</li></ul></td><td class="eff">4–5 d</td></tr>
+      <tr><td class="id">E-E4</td><td><b>Webhooks &amp; public API</b></td><td><ul><li>Outbound events to other systems</li><li>Client API keys with scopes</li><li>Automation-platform connector</li><li>Bulk import/export centre</li></ul></td><td class="eff">6–8 d</td></tr>
+      <tr><td class="id">E-E5</td><td><b>Localisation</b></td><td><ul><li>Multi-language web and app</li><li>Right-to-left layout support</li><li>Locale-aware dates and numbers</li><li>Multi-currency</li></ul></td><td class="eff">8–10 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <!-- ============ 20 ============ -->
+  <section id="s20">
+    <h2><span class="num">20</span> Master Summary</h2>
+
+    <h3>By part</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Part</th><th>Section</th><th>Items</th><th>Built</th><th>Remaining</th></tr>
+      <tr><td>P0 — Critical fixes</td><td>2</td><td>6 <span style="font-weight:400;color:#5b6b85">(P0.6 also listed as A3.5)</span></td><td>0</td><td>5 unique</td></tr>
+      <tr><td>A1 — Auth &amp; access</td><td>3</td><td>9</td><td>5</td><td>4</td></tr>
+      <tr><td>A2 — Company &amp; organisation</td><td>4</td><td>10</td><td>5 <span class="badge b-part">+1 partial</span></td><td>4</td></tr>
+      <tr><td>A3 — Employee management</td><td>5</td><td>12</td><td>5</td><td>7</td></tr>
+      <tr><td>A4 — Attendance</td><td>6</td><td>19</td><td>10</td><td>9</td></tr>
+      <tr><td>A5 — Shift &amp; schedule</td><td>7</td><td>9</td><td>4</td><td>5</td></tr>
+      <tr><td>A6 — Leave management</td><td>8</td><td>9</td><td>0</td><td>9</td></tr>
+      <tr><td>A7 — Reporting</td><td>9</td><td>14</td><td>9</td><td>5</td></tr>
+      <tr><td>A8 — Dashboard</td><td>10</td><td>6</td><td>3</td><td>3</td></tr>
+      <tr><td>A9 — Notifications</td><td>11</td><td>6</td><td>0</td><td>6</td></tr>
+      <tr><td><b>Part A total</b></td><td>3–11</td><td><b>94</b></td><td><b>41 + 1 partial</b></td><td><b>52</b></td></tr>
+      <tr><td>B — Mobile application</td><td>12</td><td>44</td><td>0</td><td>44</td></tr>
+      <tr><td>C — Backend &amp; API</td><td>13</td><td>14</td><td>0</td><td>14</td></tr>
+      <tr><td>D — AI assistant</td><td>14</td><td>7</td><td>0</td><td>7</td></tr>
+      <tr><td><b>Core product total</b></td><td>2–14</td><td><b>164</b></td><td><b>41 + 1 partial</b></td><td><b>122</b></td></tr>
+      <tr><td>E — Further modules (5 tiers)</td><td>15–19</td><td>31 modules</td><td>0</td><td>31</td></tr>
+    </table>
+    </div>
+
+    <h3>By priority</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Priority</th><th>Scope</th><th>Indicative effort</th></tr>
+      <tr><td><span class="badge b-crit">P0</span></td><td>Critical fixes — data retention, archiving, login protection, production configuration, error pages, employee login creation</td><td class="eff">~4 days</td></tr>
+      <tr><td><span class="badge b-high">P1</span></td><td>Leave, holiday calendar, manager hierarchy, attendance correction, overtime, payroll export, notifications, audit trail, backups, tests</td><td class="eff">~40 days</td></tr>
+      <tr><td><span class="badge b-med">P2</span></td><td>Mobile API, Android and iOS apps, full self-service, documents, two-factor, regularisation, breaks</td><td class="eff">~45 days</td></tr>
+      <tr><td><span class="badge b-low">P3</span></td><td>AI assistant, advanced analytics, custom reporting, multi-company mode</td><td class="eff">~40 days</td></tr>
+      <tr><td><span class="badge b-low">P3+</span></td><td>Further modules — Tiers A to E (sections 15–19)</td><td class="eff">~275 days</td></tr>
+    </table>
+    </div>
+
+    <h3>Quick wins — best value for effort</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">#</th><th>Item</th><th>Why</th><th class="eff">Effort</th></tr>
+      <tr><td class="id">1</td><td>P0 critical fixes</td><td>Closes a permanent data-loss risk sitting behind a live delete button, and unblocks employee logins</td><td class="eff">4 d</td></tr>
+      <tr><td class="id">2</td><td>Trusted network / IP whitelist (E-A4)</td><td>Every punch already stores the IP address; nothing uses it</td><td class="eff">2–3 d</td></tr>
+      <tr><td class="id">3</td><td>Probation &amp; confirmation (E-B2)</td><td>Entirely derivable from the hire date already on record</td><td class="eff">3–4 d</td></tr>
+      <tr><td class="id">4</td><td>Announcements (E-D1)</td><td>Makes the platform somewhere staff actually visit</td><td class="eff">4–5 d</td></tr>
+      <tr><td class="id">5</td><td>Travel / on-duty (E-A7)</td><td>Fixes a live reporting error — travelling staff show as absent</td><td class="eff">4–5 d</td></tr>
+      <tr><td class="id">6</td><td>Live email delivery (A9.1)</td><td>Unblocks credentials, resets and every approval notice</td><td class="eff">1 d</td></tr>
+    </table>
+    </div>
+
+    <div class="note ok">
+      <b>Recommended sequence.</b> Close the P0 fixes first (~4 days). Then the P1 block — Leave,
+      manager hierarchy, notifications and attendance correction — which turns the current attendance
+      tool into a complete HR system. Build the API and mobile app only once the web platform is
+      feature-complete, so the app is written against a finished, stable interface. The further modules
+      in sections 15–19 are a product-direction decision to be taken separately.
+    </div>
+
+    <div class="note warn">
+      <b>One standing caveat.</b> The full programme is roughly one developer-year on a codebase with no
+      automated test coverage. The risk is not in any individual feature — it is in expanding an untested
+      foundation. Item C1.11 should be funded before the expansion, not after it.
+    </div>
+  </section>
+
+  <!-- ============ 21 ============ -->
+  <section id="s21">
+    <h2><span class="num">21</span> Annex — Required Accounts &amp; Services</h2>
+    <p class="lead">External accounts, subscriptions and assets the project depends on. Nothing here is
+      written by the development team — each item must be registered, purchased or supplied by the
+      organisation. Items are grouped by the stage at which they become blocking.</p>
+
+    <div class="note crit">
+      <b>Register everything under a company identity, never a personal one.</b> Store accounts,
+      Firebase projects and hosting must be owned by a company email address controlled by the
+      organisation. If a developer registers the Google Play or Apple account personally, transferring
+      it later is slow, sometimes impossible, and the organisation cannot publish updates without that
+      person. This is the single most common and most expensive mistake in mobile projects.
+    </div>
+
+    <h3>21.1 Stage 1 — Going live on the web <span class="cnt">Required now</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">#</th><th>Item</th><th>Needed for</th><th>Provider / account type</th><th class="eff">Indicative cost</th></tr>
+      <tr><td class="id">R1</td><td><b>Domain name</b></td><td>Production web address</td><td>Any registrar — company account</td><td class="eff">~$10–20 / yr</td></tr>
+      <tr><td class="id">R2</td><td><b>Web hosting or VPS</b></td><td>Running the application (PHP 8.2+, MySQL)</td><td>Hosting provider. A VPS is recommended over basic shared hosting — see section 12.4</td><td class="eff">~$5–50 / mo</td></tr>
+      <tr><td class="id">R3</td><td><b>SSL certificate</b></td><td>HTTPS — mandatory for password and location data</td><td>Free via Let's Encrypt, or purchased</td><td class="eff">Free–$100 / yr</td></tr>
+      <tr><td class="id">R4</td><td><b>Email sending service</b></td><td>A9.1 · credentials, password resets, approvals, scheduled reports. <b>Nothing is delivered today.</b></td><td>Google Workspace SMTP, or a dedicated sender (Mailgun / SendGrid / Amazon SES / Postmark) — <b>a Google account is sufficient to start</b></td><td class="eff">Free tier–$20 / mo</td></tr>
+      <tr><td class="id">R5</td><td><b>Backup storage</b></td><td>C1.13 · off-site encrypted backups</td><td>Cloud storage — Google Drive, S3, Backblaze</td><td class="eff">~$1–10 / mo</td></tr>
+      <tr><td class="id">R6</td><td><b>Company branding assets</b></td><td>Logo, colours, letterhead for reports and ID cards</td><td>Supplied by the organisation</td><td class="eff">—</td></tr>
+      <tr><td class="id">R7</td><td><b>Privacy policy &amp; terms</b></td><td>Legal requirement wherever employee data is held; also mandatory for both app stores later</td><td>Organisation / legal advisor</td><td class="eff">—</td></tr>
+      <tr><td class="id">R8</td><td>Error monitoring</td><td>C1.14 · alerts before users report faults</td><td>Sentry or similar — free tier adequate</td><td class="eff">Free–$26 / mo</td></tr>
+    </table>
+    </div>
+
+    <h3>21.2 Stage 2 — Mobile application <span class="cnt">Before app development</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">#</th><th>Item</th><th>Needed for</th><th>Provider / account type</th><th class="eff">Indicative cost</th></tr>
+      <tr><td class="id">R9</td><td><b>Google Play Console</b></td><td>Publishing the Android app</td><td><b>Google account</b> — company owned. One-time registration.</td><td class="eff">~$25 one-time</td></tr>
+      <tr><td class="id">R10</td><td><b>Apple Developer Program</b></td><td>Publishing the iOS app</td><td><b>Apple ID</b> — company owned. An organisation account also requires a <b>D-U-N-S number</b>, which can take one to two weeks to obtain, so start early.</td><td class="eff">~$99 / yr</td></tr>
+      <tr><td class="id">R11</td><td><b>Firebase project (FCM)</b></td><td>B5 · push notifications to Android and iOS</td><td><b>Google account</b> — same company account as R9</td><td class="eff">Free</td></tr>
+      <tr><td class="id">R12</td><td>Apple Push Notification service</td><td>B5 · iOS notifications</td><td>Included with R10 — certificates generated per app</td><td class="eff">Included</td></tr>
+      <tr><td class="id">R13</td><td>App signing keys</td><td>Release builds for both stores</td><td>Generated during development — <b>must be backed up by the organisation</b>; losing the Android key prevents all future updates</td><td class="eff">Free</td></tr>
+      <tr><td class="id">R14</td><td>Object storage</td><td>Employee photos, documents, punch selfies</td><td>S3, Cloudflare R2, DigitalOcean Spaces</td><td class="eff">~$5–25 / mo</td></tr>
+      <tr><td class="id">R15</td><td>Apple &amp; Google store assets</td><td>App listing: icon, screenshots, description, support URL</td><td>Organisation / designer</td><td class="eff">—</td></tr>
+    </table>
+    </div>
+
+    <h3>21.3 Stage 3 — Feature-dependent services <span class="cnt">Only if the feature is approved</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th class="id">#</th><th>Item</th><th>Needed for</th><th>Provider / account type</th><th class="eff">Indicative cost</th></tr>
+      <tr><td class="id">R16</td><td><b>Google Maps Platform</b></td><td>A2.3 geofence map picker · E-A5 field-staff route replay</td><td><b>Google Cloud account with billing enabled</b> — a card must be attached even to use the free monthly allowance</td><td class="eff">Free allowance, then per use</td></tr>
+      <tr><td class="id">R17</td><td><b>Face recognition service</b></td><td>E-A1 · automatic face matching</td><td>AWS Rekognition, Azure Face or similar. <b>Not needed</b> if only photo capture with human review is built.</td><td class="eff">Per image processed</td></tr>
+      <tr><td class="id">R18</td><td><b>AI provider API key</b></td><td>D1 · the AI HR assistant</td><td>Claude / OpenAI account with billing</td><td class="eff">Per query</td></tr>
+      <tr><td class="id">R19</td><td><b>Biometric hardware</b></td><td>E-A2 · fingerprint terminals</td><td>Physical devices — at least one unit is required for development, and cannot be substituted</td><td class="eff">~$100–200 per unit</td></tr>
+      <tr><td class="id">R20</td><td>SMS gateway</td><td>Optional one-time codes and urgent alerts</td><td>Twilio or a regional provider</td><td class="eff">Per message</td></tr>
+      <tr><td class="id">R21</td><td>WhatsApp Business API</td><td>E-E2 · check-in and approvals over WhatsApp</td><td>Requires Meta approval through an accredited provider. Slack and Teams need only a free workspace app registration.</td><td class="eff">Per conversation</td></tr>
+      <tr><td class="id">R22</td><td>Identity provider</td><td>E-E1 · single sign-on</td><td><b>Google Workspace or Microsoft 365 tenant</b>, with administrator consent to register the application</td><td class="eff">Existing subscription</td></tr>
+      <tr><td class="id">R23</td><td>Payroll tax data</td><td>E-C1 / E-C5 · payroll and statutory reporting</td><td>Local accountant or payroll advisor — rules differ by country and change annually</td><td class="eff">Advisory fee</td></tr>
+      <tr><td class="id">R24</td><td>Consent documentation</td><td>E-A1 face data · E-A5 location tracking</td><td>Legal advisor — see section 12.3. Required before either feature is switched on.</td><td class="eff">Advisory fee</td></tr>
+    </table>
+    </div>
+
+    <h3>21.4 Access the development team needs</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Access</th><th>Purpose</th></tr>
+      <tr><td>Company email address for registrations</td><td>Every account above should be created against this, not a personal address</td></tr>
+      <tr><td>Domain registrar / DNS control</td><td>Pointing the domain, mail records for R4, domain verification</td></tr>
+      <tr><td>Hosting control panel or server access</td><td>Deployment, scheduled jobs, backups</td></tr>
+      <tr><td>Google account (company)</td><td>Play Console, Firebase, Maps — a single account covers R9, R11 and R16</td></tr>
+      <tr><td>Apple ID (company)</td><td>App Store Connect and push certificates</td></tr>
+      <tr><td>Workspace administrator</td><td>Only if single sign-on or chat integration is approved</td></tr>
+    </table>
+    </div>
+
+    <div class="note ok">
+      <b>Minimum to launch the web system.</b> Items R1 to R4 only — a domain, hosting, a certificate and
+      an email sender. Everything else is deferred until the relevant feature is approved. Realistic
+      recurring cost for a small deployment is modest; the figures above are indicative and should be
+      confirmed against current provider pricing at the time of purchase.
+    </div>
+
+    <div class="note warn">
+      <b>Lead times to plan around.</b> The Apple organisation account can take one to two weeks because
+      of the D-U-N-S verification. App store review adds days to each release. Neither is development
+      time, but both delay a launch date if started late.
+    </div>
+  </section>
+
+  </div>
+</div>
+</main>
+
+<footer>
+  Employment Management Portal — Master Feature Catalogue<br>
+  Version 1.0 · 2026-07-29 · Consolidates <i>Requirements.html</i>, <i>Feature-List_Web-and-App.md</i>,
+  <i>Advanced-Modules_Full-HRMS.md</i> and <i>Professional-HRMS_Recommended-Features.html</i>
+</footer>
+
+</body>
+</html>

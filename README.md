@@ -1,63 +1,66 @@
-# Employment Management Portal — Admin Web Dashboard (Phase 1)
+# KEMP — Backend
 
-Laravel 12 + MySQL admin dashboard focused on the **Attendance module** (QR-based clock in/out).
-Built on the SmartHR (Bootstrap 5) template. Admin-only login in Phase 1; HR/Employee roles are
-structured (Spatie RBAC) and can be enabled later without schema changes.
+Laravel 12 + MySQL. The API the mobile app talks to, and the web dashboard for
+administrators, HR and line managers.
 
-## Requirements
-- PHP 8.2+ (XAMPP)
-- MySQL / MariaDB (XAMPP)
-- Composer
+The Flutter client lives in a separate repository, **`hr-mobile`**.
 
-## Setup (already done during build)
+## Getting started
+
 ```bash
 composer install
-# .env is already configured for MySQL db "emp"
+cp .env.example .env
 php artisan key:generate
-php artisan migrate --seed
+php artisan migrate
+php artisan emp:install          # creates one administrator, prompted
+
+php artisan serve                # http://127.0.0.1:8000
+php artisan test                 # 1561 tests, ~300s, SQLite in memory
 ```
 
-## Run the app
-1. Start **MySQL** (XAMPP Control Panel → MySQL → Start).
-2. From the `hrms/` folder:
-   ```bash
-   php artisan serve
-   ```
-3. Open **http://127.0.0.1:8000**
+MySQL must be started **from the XAMPP Control Panel** on the dev machine —
+launching `mysqld.exe` as a background task does not persist, it exits.
 
-### Demo login (Phase 1 = admin only)
-- **Email:** admin@emp.test
-- **Password:** password
+**A plain `php artisan db:seed` creates no users**, deliberately, so that seeding
+a real installation cannot conjure an account with a known password. For the
+demo company and its seven accounts:
 
-*(An `hr@emp.test` user exists with the HR role but cannot log in yet — Phase 1 gate.)*
-
-## Attendance / QR flow
-- **QR Kiosk** (`Attendance → QR Kiosk`): a screen for each office that displays a **dynamic
-  rotating QR** (rotates every 20s). Put it on a tablet/monitor at the entrance.
-- **PWA Scanner** (`Attendance → QR Scanner`): opens the device camera in the browser (no app
-  install). Employee selects their name and scans the kiosk QR to clock in/out.
-- The server validates the rotating token (HMAC of the office secret + time window), rejects
-  expired/forged codes, and records a **server-side timestamp** (device clock is never trusted).
-- Clock in/out is auto-detected; lateness is flagged against each office's `work_start_time` + grace.
-
-## Key structure
-```
-app/Services/QrTokenService.php     # rotating HMAC QR token engine
-app/Services/AttendanceService.php  # clock in/out, late detection, scoring
-app/Http/Controllers/AttendanceController.php
-app/Models/                         # Company, Office, Department, Designation, Employee, AttendanceLog, AttendanceScore
-database/seeders/                   # RolePermissionSeeder, DemoDataSeeder
-resources/views/                    # Blade views (SmartHR template)
-public/assets/                      # SmartHR template assets
+```bash
+php artisan db:seed --class='Database\Seeders\DemoDataSeeder'
 ```
 
-## Roles & Permissions (Spatie)
-- **admin** — all permissions (only role that can log in now)
-- **hr** — HR subset (seeded, login disabled in Phase 1)
-- **employee** — reserved for the mobile self-service phase
+Quote that class name — unquoted, bash eats the backslashes.
 
-Manage under **Administration → Roles & Permissions**.
+## What is in here
 
-## Future phases (not built — reserved in the data model)
-Leave management · Shift/Schedule engine · AI HR Assistant · Notifications · Android/iOS apps
-(served by the same Laravel API via Sanctum).
+| | |
+|---|---|
+| `app/`, `routes/`, `resources/` | The application. `routes/api.php` is the app's contract, `routes/web.php` the dashboard |
+| `tests/` | 1561 tests. `ApiDocsTest` walks the route table and fails the build on an undocumented endpoint |
+| `deploy/` | `deploy.sh`, nginx config, the systemd unit and the cron lines |
+| `CLAUDE.md` | **Read this first.** The traps that have already cost time, the four roles, and how to deploy |
+| `API-Reference_v1.md` | The API contract, and **authoritative**. `hr-mobile` carries a stamped copy |
+| `Feature-List_Backend.md` | What is built across Parts A, C and D |
+| `Deployment-Guide_Production.md` | The runbook |
+
+## Deploying
+
+The app is live at `https://hrams.devonlinetestserver.com` — permanent, not a
+staging step. Managed webspace, so the queue and scheduler are cron-driven.
+
+```bash
+cd /home/devonlinetestserver-hrams/htdocs/hrams.devonlinetestserver.com
+ALLOW_NON_PRODUCTION=1 bash deploy/deploy.sh
+```
+
+**The flag is required and is not a workaround** — that box's `.env` says
+`APP_ENV=staging` and `deploy.sh` refuses to guess which database to migrate.
+`php artisan emp:preflight` gates the deploy; `CLAUDE.md` explains what it
+checks and which of its findings are deliberate.
+
+## The boundary with the app
+
+`API-Reference_v1.md` is authoritative here and checked on every test run.
+Changing anything the app can see — a route, an error code, a notification
+route, a capability in the `can` block on `/auth/me` — needs a matching change
+in `hr-mobile`. `CLAUDE.md` has the four rules in full.

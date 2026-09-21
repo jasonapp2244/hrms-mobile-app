@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employment Management Portal — Recommended Feature Set for a Professional-Grade System</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --ink:#1a2233; --muted:#5b6b85;
+    --line:#e6e9f0; --brand:#F26522; --brand-2:#c44f16; --accent:#1e3a8a;
+    --ok:#16a34a; --warn:#d97706; --crit:#dc2626; --chip:#fff2ea; --code:#0f172a; --codeink:#e2e8f0;
+    --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
+  a{color:var(--brand-2);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+  header.hero{background:linear-gradient(135deg,#7a2f08,#F26522 62%,#f79b57);color:#fff;padding:54px 0 46px}
+  header.hero .wrap{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:12px;font-weight:700;opacity:.9}
+  header.hero h1{margin:6px 0 2px;font-size:32px;line-height:1.2;font-weight:800}
+  header.hero p.sub{margin:0;font-size:16px;opacity:.95;max-width:800px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+  .meta{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+    padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600}
+
+  main{padding:34px 0 70px}
+  .grid{display:grid;grid-template-columns:236px 1fr;gap:34px;align-items:start}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}nav.toc{position:static!important;max-height:none!important}}
+
+  nav.toc{position:sticky;top:18px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px;box-shadow:var(--shadow);max-height:88vh;overflow:auto}
+  nav.toc h4{margin:2px 0 10px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:t}
+  nav.toc li{counter-increment:t;margin:2px 0}
+  nav.toc a{display:block;padding:6px 8px;border-radius:8px;font-size:13.5px;color:var(--ink)}
+  nav.toc a::before{content:counter(t) ". ";color:var(--muted);font-weight:700}
+  nav.toc a:hover{background:var(--chip);text-decoration:none}
+
+  section{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:var(--shadow)}
+  section h2{margin:0 0 6px;font-size:21px;font-weight:800;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  section h2 .num{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;
+    background:var(--brand);color:#fff;border-radius:9px;font-size:15px;font-weight:800}
+  section h3{margin:22px 0 8px;font-size:16.5px;font-weight:700;color:var(--brand-2)}
+  .lead{color:var(--muted);font-size:15px;margin:6px 0 4px}
+
+  .badge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.03em}
+  .b-crit{background:#fee2e2;color:#991b1b}
+  .b-high{background:#ffedd5;color:#9a3412}
+  .b-med{background:#fef9c3;color:#854d0e}
+  .b-low{background:#e0e7ff;color:#3730a3}
+  .b-done{background:#dcfce7;color:#166534}
+
+  .tbl-wrap{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:600px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#faf6f3;font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:#40506b}
+  tr:last-child td{border-bottom:none}
+  td.eff{white-space:nowrap;font-weight:600;color:var(--muted)}
+
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px;margin:14px 0}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px;background:#fffdfb}
+  .card h4{margin:0 0 6px;font-size:14.5px;color:var(--brand-2);display:flex;align-items:center;gap:8px}
+  .card ul{padding-left:18px;margin:6px 0 0;font-size:13.5px}
+  .card li{margin:3px 0}
+
+  .note{border-left:4px solid var(--accent);background:#eef2ff;padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+  .note.ok{border-color:var(--ok);background:#f0fdf4}
+  .note.warn{border-color:var(--warn);background:#fffbeb}
+  .note.crit{border-color:var(--crit);background:#fef2f2}
+  .note b{color:var(--ink)}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:16px 0}
+  .stat{border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;background:#fffdfb}
+  .stat .n{font-size:28px;font-weight:800;color:var(--brand)}
+  .stat .l{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:26px 0 40px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:8px 0 0;font-size:12.5px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Product Recommendation · Feature Expansion Plan</div>
+    <h1>Building a Professional-Grade Employment Management Portal</h1>
+    <p class="sub">What the platform has today, and the complete set of features required to bring it to
+      commercial, enterprise-ready standard across web and mobile.</p>
+    <div class="meta-row">
+      <span class="meta">Prepared for: Management Review</span>
+      <span class="meta">Product: Employment Management Portal</span>
+      <span class="meta">Stack: Laravel 12 + MySQL · Android/iOS</span>
+      <span class="meta">Version 1.1 · 2026-07-29</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+<div class="grid">
+
+  <nav class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#s1">Executive Summary</a></li>
+      <li><a href="#s2">Current Platform Status</a></li>
+      <li><a href="#s3">Data Integrity &amp; Security</a></li>
+      <li><a href="#s4">Core HR Modules</a></li>
+      <li><a href="#s5">Time &amp; Payroll Readiness</a></li>
+      <li><a href="#s6">Employee Self-Service</a></li>
+      <li><a href="#s7">Mobile Application</a></li>
+      <li><a href="#s8">Automation &amp; Notifications</a></li>
+      <li><a href="#s9">Analytics &amp; Intelligence</a></li>
+      <li><a href="#s10">Platform &amp; Operations</a></li>
+      <li><a href="#s11">Additional HRMS Modules</a></li>
+      <li><a href="#s12">Feasibility &amp; Constraints</a></li>
+      <li><a href="#s13">Priority Matrix</a></li>
+      <li><a href="#s14">Delivery Roadmap</a></li>
+      <li><a href="#s15">Accounts &amp; Services Required</a></li>
+    </ol>
+    <div class="legend" style="margin-top:12px">
+      <span><span class="badge b-crit">P0</span> Critical</span>
+      <span><span class="badge b-high">P1</span> High</span>
+      <span><span class="badge b-med">P2</span> Medium</span>
+      <span><span class="badge b-low">P3</span> Future</span>
+      <span><span class="badge b-done">Done</span> Delivered</span>
+    </div>
+  </nav>
+
+  <div>
+
+  <section id="s1">
+    <h2><span class="num">1</span> Executive Summary</h2>
+    <p class="lead">The platform today is a working attendance system. This document sets out what is
+      required to make it a <b>professional Employment Management Portal</b> — the standard
+      expected of a commercial product sold to multiple organisations.</p>
+
+    <div class="stats">
+      <div class="stat"><div class="n">41</div><div class="l">Features delivered</div></div>
+      <div class="stat"><div class="n">6</div><div class="l">Critical gaps</div></div>
+      <div class="stat"><div class="n">122</div><div class="l">Features proposed</div></div>
+      <div class="stat"><div class="n">31</div><div class="l">Further modules</div></div>
+    </div>
+
+    <p>The recommendations fall into four bands:</p>
+    <div class="cards">
+      <div class="card">
+        <h4>🛡️ Must-fix now</h4>
+        <ul>
+          <li>Permanent attendance retention</li>
+          <li>Deletion safety (soft delete)</li>
+          <li>Login brute-force protection</li>
+          <li>Production configuration</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>🏢 Completes the product</h4>
+        <ul>
+          <li>Leave Management</li>
+          <li>Holiday calendar</li>
+          <li>Manager hierarchy &amp; approvals</li>
+          <li>Attendance correction + audit</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>💰 Commercial value</h4>
+        <ul>
+          <li>Overtime &amp; hours calculation</li>
+          <li>Payroll-ready exports</li>
+          <li>Automated reporting</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>📱 Market reach</h4>
+        <ul>
+          <li>Mobile API layer</li>
+          <li>Android &amp; iOS apps</li>
+          <li>Push notifications</li>
+          <li>AI HR assistant</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="note crit">
+      <b>Two items need immediate attention.</b> First, deleting an employee currently erases that
+      person's entire attendance history permanently — a compliance and payroll-dispute risk in any
+      organisation. Second, there is no way to issue an employee a login from the dashboard, so nobody
+      added since initial setup can reach the self-service portal. Both are small fixes and both should
+      be closed before the system holds real staff data.
+    </div>
+  </section>
+
+  <section id="s2">
+    <h2><span class="num">2</span> Current Platform Status <span class="badge b-done">Delivered</span></h2>
+    <p class="lead">Built, tested and running. This is a genuinely solid foundation — the architecture
+      does not need reworking to support anything proposed in this document.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Module</th><th>Capability</th></tr>
+      <tr><td><b>Access Control</b></td><td>Role-based permissions (Admin / HR / Employee), enforced at route, screen and action level</td></tr>
+      <tr><td><b>Company Setup</b></td><td>Company profile, multiple offices/branches, departments, designations, timezone handling</td></tr>
+      <tr><td><b>Employee Records</b></td><td>Full records management, work mode (office/WFH/hybrid), CSV/Excel bulk import</td></tr>
+      <tr><td><b>Attendance</b></td><td>One-tap check in/out from any device, server-controlled timestamps, GPS + IP capture, late/early detection, monthly scoring</td></tr>
+      <tr><td><b>Shifts</b></td><td>Shift definitions with grace periods, department assignment, weekly roster, shift-driven attendance validation</td></tr>
+      <tr><td><b>Reporting</b></td><td>Attendance, late, outlier and department reports with PDF and Excel export</td></tr>
+      <tr><td><b>Dashboard</b></td><td>Live present/late/absent/headcount tiles, activity feed, charts</td></tr>
+    </table>
+    </div>
+    <div class="note ok">
+      <b>Engineering quality is sound.</b> Proper database relationships and indexing, a service layer
+      rather than logic crammed into controllers, multi-company data separation, and anti-spoofing on
+      timestamps. The gaps below are missing features — not architectural debt.
+    </div>
+  </section>
+
+  <section id="s3">
+    <h2><span class="num">3</span> Data Integrity &amp; Security <span class="badge b-crit">P0</span></h2>
+    <p class="lead">Non-negotiable for any system holding employee records. These are the items that
+      determine whether the platform can be trusted with real staff data.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Why it is required</th><th>Priority</th><th>Effort</th></tr>
+      <tr><td><b>Permanent attendance retention</b></td><td>Attendance records are evidence in pay and labour disputes. They must survive employee deletion and must never be silently destroyed.</td><td><span class="badge b-crit">P0</span></td><td class="eff">0.5 d</td></tr>
+      <tr><td><b>Soft delete / archive</b></td><td>Removing an employee, department or office should archive, not destroy. Supports rehire and historical reporting.</td><td><span class="badge b-crit">P0</span></td><td class="eff">1 d</td></tr>
+      <tr><td><b>Login brute-force protection</b></td><td>Rate-limit failed logins and lock accounts. Standard security baseline; currently unlimited attempts are possible.</td><td><span class="badge b-crit">P0</span></td><td class="eff">0.5 d</td></tr>
+      <tr><td><b>Production configuration</b></td><td>Debug mode currently exposes internal errors and database details. Must be hardened before hosting.</td><td><span class="badge b-crit">P0</span></td><td class="eff">0.5 d</td></tr>
+      <tr><td><b>Branded error pages</b></td><td>Professional handling of 403/404/500 instead of raw framework screens.</td><td><span class="badge b-crit">P0</span></td><td class="eff">0.5 d</td></tr>
+      <tr><td><b>Employee login creation</b></td><td>There is currently no way to give an employee a login from the dashboard — the employee record carries no account or password field. Every employee added since initial setup is unable to sign in, leaving the self-service portal unreachable for them and blocking the mobile app for new joiners.</td><td><span class="badge b-crit">P0</span></td><td class="eff">1 d</td></tr>
+      <tr><td><b>Audit trail</b></td><td>Immutable record of who changed what and when — attendance edits, role changes, employee records. Expected in every HR audit.</td><td><span class="badge b-high">P1</span></td><td class="eff">3 d</td></tr>
+      <tr><td><b>Two-factor authentication</b></td><td>Protects Admin/HR accounts, which can see the entire workforce's data.</td><td><span class="badge b-med">P2</span></td><td class="eff">2 d</td></tr>
+      <tr><td><b>Data privacy / export on request</b></td><td>Ability to export or erase an individual's data — required under GDPR-style regimes.</td><td><span class="badge b-med">P2</span></td><td class="eff">2 d</td></tr>
+      <tr><td><b>Encrypted backups &amp; restore drill</b></td><td>No recovery path exists today. Required before production.</td><td><span class="badge b-high">P1</span></td><td class="eff">1 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s4">
+    <h2><span class="num">4</span> Core HR Modules <span class="badge b-high">P1</span></h2>
+    <p class="lead">The functional gaps that separate an attendance tracker from an HR management system.
+      No competing product ships without these.</p>
+
+    <h3>4.1 Leave Management <span class="badge b-high">P1</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Description</th><th>Effort</th></tr>
+      <tr><td>Leave types</td><td>Annual, sick, casual, unpaid, maternity — each with its own rules</td><td class="eff">1 d</td></tr>
+      <tr><td>Leave request submission</td><td>Employee applies with dates, reason and supporting document</td><td class="eff">2 d</td></tr>
+      <tr><td>Approval workflow</td><td>Manager → HR multi-step approval with comments</td><td class="eff">3 d</td></tr>
+      <tr><td>Balance tracking &amp; accrual</td><td>Automatic accrual, deduction and carry-forward at year end</td><td class="eff">3 d</td></tr>
+      <tr><td>Leave history &amp; status</td><td>Full record per employee, filterable and exportable</td><td class="eff">1 d</td></tr>
+      <tr><td>Team leave calendar</td><td>Visual calendar with clash detection so departments are never left uncovered</td><td class="eff">2 d</td></tr>
+      <tr><td>Leave ↔ attendance link</td><td>Approved leave days stop counting as absence — corrects reporting accuracy</td><td class="eff">1 d</td></tr>
+      <tr><td>Company leave policy config</td><td>Entitlements per role, per grade, per year</td><td class="eff">2 d</td></tr>
+    </table>
+    </div>
+
+    <h3>4.2 Organisation Structure <span class="badge b-high">P1</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Description</th><th>Effort</th></tr>
+      <tr><td>Reporting-manager hierarchy</td><td>Every employee has a manager. Prerequisite for all approval workflows.</td><td class="eff">2 d</td></tr>
+      <tr><td>Manager role &amp; team views</td><td>Managers see and approve for their own team only</td><td class="eff">3 d</td></tr>
+      <tr><td>Organisation chart</td><td>Visual hierarchy of the company</td><td class="eff">2 d</td></tr>
+      <tr><td>Holiday calendar</td><td>Public and company holidays. Without it, holidays are miscounted as absence.</td><td class="eff">2 d</td></tr>
+      <tr><td>Weekend / working-days config</td><td>Per office — essential for international or multi-region clients</td><td class="eff">1 d</td></tr>
+    </table>
+    </div>
+
+    <h3>4.3 Employee Records — depth <span class="badge b-med">P2</span></h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Description</th><th>Effort</th></tr>
+      <tr><td>Profile photographs</td><td>Identification across dashboard, reports and app</td><td class="eff">1 d</td></tr>
+      <tr><td>Document vault</td><td>Contracts, ID, visas, certificates — with expiry alerts to HR</td><td class="eff">3 d</td></tr>
+      <tr><td>Personal &amp; emergency contacts</td><td>Standard HR record content</td><td class="eff">1 d</td></tr>
+      <tr><td>Onboarding / offboarding checklists</td><td>Repeatable joiner and leaver process</td><td class="eff">3 d</td></tr>
+      <tr><td>Employee data export</td><td>Full record export for audit or handover</td><td class="eff">1 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s5">
+    <h2><span class="num">5</span> Time &amp; Payroll Readiness <span class="badge b-high">P1</span></h2>
+    <p class="lead">This is where an attendance system earns its commercial value. Payroll is the reason
+      organisations pay for attendance software.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Why it matters</th><th>Priority</th><th>Effort</th></tr>
+      <tr><td><b>Manual attendance correction</b></td><td>HR currently cannot fix a wrong or missed punch at all. Every correction must be logged with a reason.</td><td><span class="badge b-high">P1</span></td><td class="eff">2 d</td></tr>
+      <tr><td><b>Regularisation requests</b></td><td>Employee raises a correction, manager approves — removes HR from every small dispute.</td><td><span class="badge b-med">P2</span></td><td class="eff">3 d</td></tr>
+      <tr><td><b>Working-hours calculation</b></td><td>Actual hours worked per day, week and month — the basis of payroll.</td><td><span class="badge b-high">P1</span></td><td class="eff">2 d</td></tr>
+      <tr><td><b>Overtime tracking</b></td><td>Hours beyond shift, with configurable rules and rates.</td><td><span class="badge b-high">P1</span></td><td class="eff">3 d</td></tr>
+      <tr><td><b>Break in / break out</b></td><td>Accurate net working time; required in many jurisdictions.</td><td><span class="badge b-med">P2</span></td><td class="eff">2 d</td></tr>
+      <tr><td><b>Auto-absent marking</b></td><td>Scheduled job marks no-shows automatically instead of leaving gaps.</td><td><span class="badge b-high">P1</span></td><td class="eff">1 d</td></tr>
+      <tr><td><b>Missing-checkout policy</b></td><td>Auto-close forgotten checkouts under a configurable rule.</td><td><span class="badge b-high">P1</span></td><td class="eff">1 d</td></tr>
+      <tr><td><b>Payroll-ready export</b></td><td>One file per pay period: hours, overtime, leave, absence. The single most requested integration.</td><td><span class="badge b-high">P1</span></td><td class="eff">3 d</td></tr>
+      <tr><td><b>Payroll system integration</b></td><td>Direct export to common payroll platforms.</td><td><span class="badge b-low">P3</span></td><td class="eff">5 d+</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s6">
+    <h2><span class="num">6</span> Employee Self-Service <span class="badge b-med">P2</span></h2>
+    <p class="lead">Every self-service feature removes work from the HR team. This is the clearest
+      efficiency argument for the platform.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Description</th><th>Effort</th></tr>
+      <tr><td>View own profile &amp; employment details</td><td>Currently the employee portal offers check in/out and history only</td><td class="eff">1 d</td></tr>
+      <tr><td>Update permitted personal details</td><td>Phone, address, emergency contact — with HR approval where needed</td><td class="eff">2 d</td></tr>
+      <tr><td>Change own password</td><td>Standard self-service; not currently available to employees</td><td class="eff">0.5 d</td></tr>
+      <tr><td>Forgot-password / reset by email</td><td>Removes password resets from HR's workload entirely</td><td class="eff">1 d</td></tr>
+      <tr><td>Monthly attendance calendar</td><td>Visual month view of own attendance</td><td class="eff">2 d</td></tr>
+      <tr><td>Personal attendance score</td><td>Own punctuality and on-time streak — drives behaviour</td><td class="eff">1 d</td></tr>
+      <tr><td>View own shift &amp; upcoming roster</td><td>Employees can currently see neither</td><td class="eff">1 d</td></tr>
+      <tr><td>Apply for leave</td><td>Depends on the Leave module</td><td class="eff">included</td></tr>
+      <tr><td>Company directory</td><td>Colleagues, departments, contact details</td><td class="eff">2 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s7">
+    <h2><span class="num">7</span> Mobile Application <span class="badge b-med">P2</span></h2>
+    <p class="lead">The mobile app is the difference between an internal tool and a sellable product.
+      All of it depends on one prerequisite: the API layer.</p>
+
+    <div class="note warn">
+      <b>Prerequisite.</b> The mobile API (secure token authentication and endpoints) does not exist yet.
+      It is a hard dependency — no mobile work can begin until it is built. Estimated at 5 days, it
+      unlocks the entire mobile phase.
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h4>🔐 Access</h4>
+        <ul>
+          <li>Secure token login</li>
+          <li>Biometric unlock (fingerprint / Face ID)</li>
+          <li>Trusted-device binding</li>
+          <li>Remote session revoke</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>⏱️ Attendance</h4>
+        <ul>
+          <li>One-tap check in / out</li>
+          <li>Live status &amp; hours today</li>
+          <li>Offline punch queue with auto-sync</li>
+          <li>Optional geofence enforcement</li>
+          <li>Fake-GPS detection</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>👤 Self-service</h4>
+        <ul>
+          <li>Profile &amp; employment details</li>
+          <li>Attendance calendar</li>
+          <li>Shift &amp; roster view</li>
+          <li>Leave apply and track</li>
+          <li>Documents &amp; payslips</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>👔 Manager mode</h4>
+        <ul>
+          <li>Team attendance today</li>
+          <li>Approve leave from phone</li>
+          <li>Team roster</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Deliverable</th><th>Scope</th><th>Effort</th></tr>
+      <tr><td>Mobile API layer</td><td>Token auth, attendance, profile, leave, roster, device registration</td><td class="eff">5 d</td></tr>
+      <tr><td>App v1 — Android &amp; iOS</td><td>Login, punch in/out, attendance history, profile</td><td class="eff">15–20 d</td></tr>
+      <tr><td>App v2</td><td>Leave, push notifications, roster, manager mode</td><td class="eff">10–15 d</td></tr>
+      <tr><td>Store publication</td><td>Play Store + App Store listing, review, release</td><td class="eff">3 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s8">
+    <h2><span class="num">8</span> Automation &amp; Notifications <span class="badge b-high">P1</span></h2>
+    <p class="lead">A professional system tells people what they need to know without being asked.
+      Nothing in this area exists today.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Description</th><th>Effort</th></tr>
+      <tr><td>Email delivery</td><td>Live mail service — credentials, resets and approvals currently send nowhere</td><td class="eff">1 d</td></tr>
+      <tr><td>In-app notification centre</td><td>Notification bell with history, on web and mobile</td><td class="eff">3 d</td></tr>
+      <tr><td>Push notifications</td><td>Mobile alerts via Firebase / APNs</td><td class="eff">3 d</td></tr>
+      <tr><td>Clock-in / clock-out reminders</td><td>Reduces missed punches — the single largest source of correction work</td><td class="eff">1 d</td></tr>
+      <tr><td>Late-arrival alerts to HR</td><td>Real-time visibility rather than end-of-month discovery</td><td class="eff">1 d</td></tr>
+      <tr><td>Leave request / approval / rejection alerts</td><td>Keeps the approval chain moving</td><td class="eff">1 d</td></tr>
+      <tr><td>Roster / schedule change alerts</td><td>Staff are informed the moment a shift changes</td><td class="eff">1 d</td></tr>
+      <tr><td>Document expiry alerts</td><td>Visa, contract and certificate renewals never missed</td><td class="eff">1 d</td></tr>
+      <tr><td>Scheduled report delivery</td><td>Daily / weekly / monthly reports emailed automatically to management</td><td class="eff">2 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s9">
+    <h2><span class="num">9</span> Analytics &amp; Intelligence <span class="badge b-low">P3</span></h2>
+    <p class="lead">Differentiators. These are what a buyer compares when choosing between two products
+      that both "do attendance".</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Feature</th><th>Description</th><th>Effort</th></tr>
+      <tr><td>Role-specific dashboards</td><td>Admin, HR and Manager each see what is relevant to them</td><td class="eff">3 d</td></tr>
+      <tr><td>Trend comparison</td><td>This week vs last, this month vs last — direction, not just numbers</td><td class="eff">2 d</td></tr>
+      <tr><td>Live "who is in right now" board</td><td>Real-time floor view for operations</td><td class="eff">2 d</td></tr>
+      <tr><td>Absenteeism &amp; attrition insight</td><td>Patterns that predict turnover risk</td><td class="eff">4 d</td></tr>
+      <tr><td>Custom report builder</td><td>Management selects its own columns and filters without developer involvement</td><td class="eff">5 d</td></tr>
+      <tr><td><b>AI HR assistant</b></td><td>Plain-language questions — "who was late in Sales last week?" — with permission-aware answers, so no one ever sees data above their role</td><td class="eff">10–15 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s10">
+    <h2><span class="num">10</span> Platform &amp; Operations <span class="badge b-high">P1</span></h2>
+    <p class="lead">Invisible to users, decisive for reliability. These determine whether the system can
+      be supported once it is live with real clients.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Item</th><th>Requirement</th><th>Effort</th></tr>
+      <tr><td>Background job processing</td><td>Queue worker + scheduler for reminders, auto-absent and reports</td><td class="eff">1 d</td></tr>
+      <tr><td>Automated test suite</td><td>No test coverage exists. Required before the codebase grows further, or every release risks regressions.</td><td class="eff">5 d</td></tr>
+      <tr><td>API documentation</td><td>Needed by the mobile team and any future integration partner</td><td class="eff">2 d</td></tr>
+      <tr><td>Secure hosting &amp; HTTPS</td><td>Production deployment with certificates and hardened configuration</td><td class="eff">2 d</td></tr>
+      <tr><td>Automated backups</td><td>Scheduled, encrypted, with a tested restore procedure</td><td class="eff">1 d</td></tr>
+      <tr><td>Monitoring &amp; error alerting</td><td>Failures reach the team before clients report them</td><td class="eff">1 d</td></tr>
+      <tr><td>Multi-company (SaaS) mode</td><td>Serve many client organisations from one installation — required if the product is to be sold rather than installed per client</td><td class="eff">8 d</td></tr>
+      <tr><td>User manual &amp; training material</td><td>Admin, HR and employee guides for handover</td><td class="eff">3 d</td></tr>
+    </table>
+    </div>
+  </section>
+
+  <section id="s11">
+    <h2><span class="num">11</span> Additional HRMS Modules <span class="badge b-low">P3</span></h2>
+    <p class="lead">Sections 3–10 complete the <b>attendance product</b>. This section covers the remainder of a
+      <b>full HR platform</b> — the employee lifecycle, payroll, workplace operations and the attendance-technology
+      extensions. These are strategic options, not committed scope.</p>
+
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Tier</th><th>Modules</th><th>Fit with current product</th><th>Indicative effort</th></tr>
+      <tr><td><b>A — Attendance extensions</b></td><td>9</td><td>⭐⭐⭐ Highest — builds directly on data the system already holds</td><td class="eff">~70 d</td></tr>
+      <tr><td><b>B — Employee lifecycle</b></td><td>6</td><td>⭐⭐ Standard HRMS expectation</td><td class="eff">~65 d</td></tr>
+      <tr><td><b>C — Payroll &amp; money</b></td><td>5</td><td>⭐⭐ Standard HRMS expectation</td><td class="eff">~65 d</td></tr>
+      <tr><td><b>D — Workplace operations</b></td><td>6</td><td>⭐ Product breadth</td><td class="eff">~40 d</td></tr>
+      <tr><td><b>E — Platform &amp; integration</b></td><td>5</td><td>⭐⭐ Often required by larger clients</td><td class="eff">~35 d</td></tr>
+      <tr><td colspan="3"><b>Total</b></td><td class="eff"><b>~275 d</b></td></tr>
+    </table>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <h4>📍 A — Attendance extensions</h4>
+        <ul>
+          <li>Face / selfie punch verification</li>
+          <li>Biometric device integration</li>
+          <li>Shared kiosk mode (tablet + PIN)</li>
+          <li>Trusted network / IP whitelist</li>
+          <li>Field-staff GPS &amp; client visits</li>
+          <li>Timesheets &amp; project time</li>
+          <li>Travel / on-duty attendance</li>
+          <li>Hourly &amp; daily-wage workers</li>
+          <li>Shift marketplace &amp; swaps</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>👥 B — Employee lifecycle</h4>
+        <ul>
+          <li>Recruitment / applicant tracking</li>
+          <li>Probation &amp; confirmation</li>
+          <li>Performance &amp; appraisals</li>
+          <li>Training &amp; certifications</li>
+          <li>Exit &amp; offboarding</li>
+          <li>Disciplinary &amp; grievance</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>💰 C — Payroll &amp; money</h4>
+        <ul>
+          <li>Full payroll engine</li>
+          <li>Expenses &amp; reimbursement</li>
+          <li>Loans &amp; salary advances</li>
+          <li>Benefits &amp; insurance</li>
+          <li>Statutory compliance</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>🏢 D — Workplace operations</h4>
+        <ul>
+          <li>Announcements &amp; noticeboard</li>
+          <li>HR helpdesk / ticketing</li>
+          <li>Asset management</li>
+          <li>Engagement &amp; surveys</li>
+          <li>Visitor management</li>
+          <li>ID cards &amp; badges</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4>🔌 E — Platform &amp; integration</h4>
+        <ul>
+          <li>Single sign-on (Google / Microsoft / SAML)</li>
+          <li>Slack, Teams &amp; WhatsApp check-in</li>
+          <li>Calendar sync</li>
+          <li>Webhooks &amp; public API</li>
+          <li>Multi-language &amp; RTL</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>11.1 Recommended first six</h3>
+    <p>Selected for value against effort. Each extends data the system <b>already records</b>, so the
+      groundwork is done.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>#</th><th>Module</th><th>Rationale</th><th>Effort</th></tr>
+      <tr><td>1</td><td><b>Trusted network / IP whitelist</b></td><td>Every attendance record already stores the IP address but nothing uses it. This converts existing data into a verification feature.</td><td class="eff">2–3 d</td></tr>
+      <tr><td>2</td><td><b>Probation &amp; confirmation</b></td><td>Entirely derivable from the hire date already on record. Real HR value for a few days' work.</td><td class="eff">3–4 d</td></tr>
+      <tr><td>3</td><td><b>Announcements &amp; noticeboard</b></td><td>Makes the platform a place staff visit, not only a clock. Includes automatic birthday and work-anniversary posts.</td><td class="eff">4–5 d</td></tr>
+      <tr><td>4</td><td><b>Travel / on-duty attendance</b></td><td>Corrects a live reporting error — staff on business travel currently appear as absent.</td><td class="eff">4–5 d</td></tr>
+      <tr><td>5</td><td><b>Shared kiosk mode</b></td><td>Reaches staff without smartphones and restores the entrance-terminal use case.</td><td class="eff">5–7 d</td></tr>
+      <tr><td>6</td><td><b>Face / selfie punch</b></td><td>The strongest competitive differentiator available to an attendance product.</td><td class="eff">8–12 d</td></tr>
+      <tr><td colspan="3"><b>Total</b></td><td class="eff"><b>~30 d</b></td></tr>
+    </table>
+    </div>
+
+    <div class="note">
+      <b>Strategic choice.</b> Not all 31 modules should be built. The realistic options are
+      <b>(a) deep attendance specialist</b> — Tier A in full plus payroll export, competing on accuracy,
+      proof-of-presence and field-staff coverage; or <b>(b) full HR suite</b> — all tiers, a materially
+      larger investment competing directly with established platforms. Tier A is where the product is
+      already strongest and where the remaining work is cheapest.
+    </div>
+  </section>
+
+  <section id="s12">
+    <h2><span class="num">12</span> Feasibility &amp; Constraints</h2>
+    <p class="lead">Every module in this document has been checked against the current technology stack
+      (PHP 8.2, Laravel 12, MySQL). The conclusion: <b>all of it is buildable</b> — but seven items carry a
+      condition that should be settled before they are scheduled.</p>
+
+    <h3>12.1 Buildable with no new dependency — 24 of 31</h3>
+    <p>Standard application development on the existing database. Nothing to purchase, no external service,
+      no hardware. This includes the entire employee lifecycle tier, all workplace operations, timesheets,
+      travel, IP whitelist, expenses, loans and benefits.</p>
+    <div class="note ok">
+      <b>Two components are already paid for and idle.</b> The PDF engine used for attendance reports also
+      produces ID cards and badges; and a QR-code library remains installed from the original design,
+      unused since the check-in method changed — it is exactly what badge generation requires.
+    </div>
+
+    <h3>12.2 Buildable with a condition — 7 modules</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Module</th><th>Condition to resolve first</th></tr>
+      <tr><td><b>Face / selfie punch</b></td><td>Automatic face matching needs either a paid cloud service (per-use cost, and an internet dependency on every punch) or on-device matching, which requires the mobile app to exist first. <b>Recommended:</b> ship photo capture with an HR review gallery immediately — roughly two days — and treat automatic matching as a separate decision.</td></tr>
+      <tr><td><b>Biometric devices</b></td><td>Requires physical hardware to develop against — this cannot be built unseen. Also a deployment decision: a cloud-hosted system cannot reach devices inside a client's private network without a small on-site sync agent.</td></tr>
+      <tr><td><b>Field-staff tracking</b></td><td>Depends on the mobile app. Apple restricts background location and rejects applications without a clearly documented business justification. Also the most privacy-sensitive feature proposed.</td></tr>
+      <tr><td><b>Payroll engine</b></td><td>Not a technical constraint — a jurisdictional one. Tax and social-insurance rules differ by country and change annually. A target country must be chosen, and the rules carry an ongoing yearly maintenance obligation.</td></tr>
+      <tr><td><b>Statutory compliance</b></td><td>Requires local legal and accounting input. Budget for an advisor alongside development.</td></tr>
+      <tr><td><b>Single sign-on</b></td><td>Google and Microsoft are straightforward. Enterprise SAML additionally needs a client identity provider to test against.</td></tr>
+      <tr><td><b>Chat integration</b></td><td>Slack and Teams are straightforward. WhatsApp requires provider approval and carries a per-message charge.</td></tr>
+    </table>
+    </div>
+
+    <h3>12.3 Regulatory considerations</h3>
+    <div class="note warn">
+      <b>Biometric and location data are legally special.</b> Face data and employee location are treated as
+      sensitive personal data in most jurisdictions, typically requiring explicit consent, a stated retention
+      period and a right of withdrawal. Employers have faced significant claims over biometric timeclocks
+      specifically. Neither feature is blocked — but each ships with a consent flow and a written policy,
+      and that should be inside the estimate rather than discovered afterwards.
+    </div>
+
+    <h3>12.4 Hosting decisions to settle early</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Area</th><th>Consideration</th></tr>
+      <tr><td>Background processing</td><td>Reminders, automatic absence marking and scheduled reports need a continuously running worker. Basic shared hosting often disallows this; a scheduled fallback works but should inform the hosting choice.</td></tr>
+      <tr><td>Live updates</td><td>Genuinely instant screens need websocket support, commonly blocked on shared hosting. A short refresh interval is an adequate substitute at this scale — but "real-time" should not be promised on shared hosting.</td></tr>
+      <tr><td>Photo storage</td><td>A photograph per employee per punch grows quickly. Production should use cloud object storage rather than server disk.</td></tr>
+    </table>
+    </div>
+
+    <div class="note crit">
+      <b>The real constraint is capacity, not technology.</b> The full programme is approximately 275
+      development days — around one developer-year — on a codebase that currently has <b>no automated test
+      coverage</b>. The risk is not in any single feature; it is in expanding an untested foundation. The
+      test suite should therefore be funded <i>before</i> the expansion, not after it.
+    </div>
+  </section>
+
+  <section id="s13">
+    <h2><span class="num">13</span> Priority Matrix</h2>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Priority</th><th>Contents</th><th>Business case</th><th>Indicative effort</th></tr>
+      <tr>
+        <td><span class="badge b-crit">P0</span></td>
+        <td>Data retention, soft delete, login protection, production config, error pages, employee login creation</td>
+        <td>The system cannot safely hold real employee data until these are done</td>
+        <td class="eff">~4 days</td>
+      </tr>
+      <tr>
+        <td><span class="badge b-high">P1</span></td>
+        <td>Leave, holiday calendar, manager hierarchy, attendance correction, audit trail, overtime, payroll export, notifications, email, backups</td>
+        <td>Completes the product. Without these it is an attendance tracker, not an HR system.</td>
+        <td class="eff">~40 days</td>
+      </tr>
+      <tr>
+        <td><span class="badge b-med">P2</span></td>
+        <td>Mobile API, Android &amp; iOS apps, full self-service, documents, 2FA, regularisation, breaks</td>
+        <td>Opens the mobile market and cuts HR workload significantly</td>
+        <td class="eff">~45 days</td>
+      </tr>
+      <tr>
+        <td><span class="badge b-low">P3</span></td>
+        <td>AI assistant, advanced analytics, custom report builder, SaaS multi-company, payroll integration</td>
+        <td>Competitive differentiation and scale</td>
+        <td class="eff">~40 days</td>
+      </tr>
+      <tr>
+        <td><span class="badge b-low">P3+</span></td>
+        <td>Additional HRMS modules — Tiers A–E (section 11): attendance technology, employee lifecycle, payroll engine, workplace operations, integrations</td>
+        <td>Expands the product from an attendance system into a full HR platform. Strategic option, not committed scope.</td>
+        <td class="eff">~275 days</td>
+      </tr>
+    </table>
+    </div>
+    <div class="note">
+      <b>Note on estimates.</b> Figures are indicative development days for planning discussion, based on
+      the existing codebase and architecture. They exclude client review cycles, user acceptance testing
+      and store approval waiting time.
+    </div>
+  </section>
+
+  <section id="s14">
+    <h2><span class="num">14</span> Delivery Roadmap</h2>
+    <p class="lead">Sequenced by dependency, not by preference. Each stage unlocks the next.</p>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Stage</th><th>Delivers</th><th>Why this order</th><th>Duration</th></tr>
+      <tr><td><b>Stage 1</b><br>Stabilise</td><td>All P0 items</td><td>Removes the data-loss and security exposure before real staff data is entered</td><td class="eff">~1 week</td></tr>
+      <tr><td><b>Stage 2</b><br>Complete HR core</td><td>Manager hierarchy → Leave Management → holiday calendar</td><td>Hierarchy first because leave approval depends on it</td><td class="eff">~4 weeks</td></tr>
+      <tr><td><b>Stage 3</b><br>Automate</td><td>Email, notifications, scheduled jobs, auto-absent, reminders</td><td>Cuts manual HR work immediately; visible benefit to the client</td><td class="eff">~2 weeks</td></tr>
+      <tr><td><b>Stage 4</b><br>Payroll ready</td><td>Attendance correction, audit trail, hours, overtime, payroll export</td><td>The commercial justification for the platform</td><td class="eff">~3 weeks</td></tr>
+      <tr><td><b>Stage 5</b><br>Open the API</td><td>Mobile API layer + documentation + tests</td><td>Hard prerequisite for every mobile feature</td><td class="eff">~2 weeks</td></tr>
+      <tr><td><b>Stage 6</b><br>Mobile v1</td><td>Android &amp; iOS: login, punch, history, profile</td><td>First app release to staff</td><td class="eff">~4 weeks</td></tr>
+      <tr><td><b>Stage 7</b><br>Mobile v2</td><td>Leave, push notifications, roster, manager mode</td><td>Full self-service on the phone</td><td class="eff">~3 weeks</td></tr>
+      <tr><td><b>Stage 8</b><br>Differentiate</td><td>AI assistant, advanced analytics, SaaS multi-company</td><td>Requires mature attendance and leave data to be useful</td><td class="eff">~6 weeks</td></tr>
+    </table>
+    </div>
+
+    <p><b>Beyond Stage 8</b> — the additional modules in section 11 are sequenced separately, as a
+      product-direction decision rather than a continuation of this roadmap. The six quick wins in
+      section 11.1 (~30 days) can be inserted between any two stages above without disruption, since none
+      of them depends on the mobile or payroll work.</p>
+
+    <div class="note ok">
+      <b>Recommendation.</b> Approve Stage 1 immediately — it is roughly one week and closes a
+      permanent data-loss risk. Stages 2–4 turn the current attendance tool into a complete HR system
+      and should be treated as one funded block; the mobile phase (Stages 5–7) is best scheduled once
+      the web platform is feature-complete, so the app is built against a stable, finished API.
+      Fund the automated test suite before, not after, the expansion — see section 12.4.
+    </div>
+  </section>
+
+  <section id="s15">
+    <h2><span class="num">15</span> Accounts &amp; Services Required</h2>
+    <p class="lead">What the organisation must provide. None of these are built by the development team —
+      each is an account to register, a subscription to purchase, or an asset to supply. They are grouped
+      by when they become blocking, so nothing is bought before it is needed.</p>
+
+    <div class="note crit">
+      <b>Ownership matters more than cost.</b> Every account below should be registered under a company
+      email address that the organisation controls — never a developer's personal account. If the Google
+      Play or Apple account is held personally, transferring it later is slow, occasionally impossible,
+      and the organisation cannot publish app updates without that individual. This is the most common
+      and most costly administrative mistake in mobile projects.
+    </div>
+
+    <h3>15.1 Needed now — to put the web system live</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Item</th><th>Why it is needed</th><th>Indicative cost</th></tr>
+      <tr><td><b>Domain name</b></td><td>The address staff will use to reach the system</td><td class="eff">~$10–20 / yr</td></tr>
+      <tr><td><b>Hosting</b></td><td>Runs the application and database. A private server is recommended over basic shared hosting, for the reasons in section 12.4.</td><td class="eff">~$5–50 / mo</td></tr>
+      <tr><td><b>Security certificate</b></td><td>Encrypts passwords and location data in transit. Free options are available and sufficient.</td><td class="eff">Free–$100 / yr</td></tr>
+      <tr><td><b>Email sending service</b></td><td><b>Currently nothing is delivered</b> — credentials, password resets and approval notices are written to a file rather than sent. A standard Google Workspace account is enough to begin with.</td><td class="eff">Free tier–$20 / mo</td></tr>
+      <tr><td><b>Backup storage</b></td><td>Off-site copies of the database. No recovery path exists today.</td><td class="eff">~$1–10 / mo</td></tr>
+      <tr><td><b>Branding assets</b></td><td>Logo and colours for reports, payslips and ID cards</td><td class="eff">—</td></tr>
+      <tr><td><b>Privacy policy &amp; terms</b></td><td>A legal requirement wherever employee data is held, and mandatory for both app stores later</td><td class="eff">—</td></tr>
+    </table>
+    </div>
+
+    <h3>15.2 Needed before the mobile app</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Item</th><th>Why it is needed</th><th>Indicative cost</th></tr>
+      <tr><td><b>Google Play Console</b></td><td>Publishing the Android app. Requires a <b>company Google account</b>; one-time registration fee.</td><td class="eff">~$25 one-time</td></tr>
+      <tr><td><b>Apple Developer Program</b></td><td>Publishing the iOS app. Requires a company Apple ID, and an organisation account additionally needs a <b>D-U-N-S business number</b> — allow one to two weeks for that verification.</td><td class="eff">~$99 / yr</td></tr>
+      <tr><td><b>Firebase</b></td><td>Delivers push notifications to both platforms. Uses the same company Google account as the Play Console.</td><td class="eff">Free</td></tr>
+      <tr><td><b>File storage</b></td><td>Employee photographs, documents and attendance photos</td><td class="eff">~$5–25 / mo</td></tr>
+      <tr><td><b>App store listing assets</b></td><td>Icon, screenshots, description and a support contact</td><td class="eff">—</td></tr>
+      <tr><td><b>App signing keys</b></td><td>Generated during development, but the organisation must retain a backup — losing the Android key permanently prevents future updates.</td><td class="eff">Free</td></tr>
+    </table>
+    </div>
+
+    <h3>15.3 Only if the related feature is approved</h3>
+    <div class="tbl-wrap">
+    <table>
+      <tr><th>Item</th><th>Feature it enables</th><th>Indicative cost</th></tr>
+      <tr><td><b>Google Maps</b></td><td>Office boundary selection and field-staff route history. Requires a Google account with billing details attached, even to use the free monthly allowance.</td><td class="eff">Free allowance, then per use</td></tr>
+      <tr><td><b>Face recognition service</b></td><td>Automatic face matching at check-in. <b>Not required</b> if only photo capture with human review is built.</td><td class="eff">Per image</td></tr>
+      <tr><td><b>AI provider account</b></td><td>The AI HR assistant</td><td class="eff">Per query</td></tr>
+      <tr><td><b>Fingerprint terminals</b></td><td>Biometric device integration. At least one physical unit is required for development — it cannot be built without hardware.</td><td class="eff">~$100–200 per unit</td></tr>
+      <tr><td><b>Messaging provider</b></td><td>WhatsApp check-in requires provider approval and per-message charges. Slack and Teams need only a free registration.</td><td class="eff">Per message</td></tr>
+      <tr><td><b>Workspace administrator consent</b></td><td>Single sign-on with Google or Microsoft accounts</td><td class="eff">Existing subscription</td></tr>
+      <tr><td><b>Payroll advisor</b></td><td>Tax and statutory rules for the target country, which change annually</td><td class="eff">Advisory fee</td></tr>
+      <tr><td><b>Legal review</b></td><td>Consent documentation for face and location data — see section 12.3</td><td class="eff">Advisory fee</td></tr>
+    </table>
+    </div>
+
+    <div class="note ok">
+      <b>Minimum to launch.</b> Only the first four items in 15.1 — domain, hosting, certificate and an
+      email sender. Everything else waits until the feature that needs it is approved. Costs shown are
+      indicative for planning and should be confirmed against current provider pricing.
+    </div>
+
+    <div class="note warn">
+      <b>Two lead times to plan around.</b> The Apple organisation account can take one to two weeks
+      because of business verification, and each app store release adds review time. Neither is
+      development effort, but both will delay a launch date if they are started late.
+    </div>
+  </section>
+
+  </div>
+</div>
+</main>
+
+<footer>
+  Employment Management Portal — Recommended Feature Set for a Professional-Grade System<br>
+  Version 1.1 · 2026-07-29 · Companion documents: <i>Requirements.html</i> (SRS) ·
+  <i>Feature-List_Web-and-App.md</i> · <i>Advanced-Modules_Full-HRMS.md</i>
+</footer>
+
+</body>
+</html>

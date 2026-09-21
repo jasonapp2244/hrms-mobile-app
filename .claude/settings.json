@@ -1,0 +1,19 @@
+{
+    "permissions": {
+        "allow": [
+            "Bash(dart analyze)",
+            "Bash(dart analyze *)",
+            "Bash(flutter doctor)",
+            "Bash(flutter doctor *)",
+            "Bash(adb devices)",
+            "Bash(adb logcat *)",
+            "mcp__claude-in-chrome__read_page",
+            "mcp__claude-in-chrome__get_page_text",
+            "mcp__claude-in-chrome__read_console_messages",
+            "mcp__claude-in-chrome__read_network_requests",
+            "mcp__claude-in-chrome__tabs_context_mcp",
+            "mcp__claude-in-chrome__list_connected_browsers",
+            "mcp__plugin_playwright_playwright__browser_find"
+        ]
+    }
+}

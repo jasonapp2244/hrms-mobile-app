@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employment Management Portal — Required Accounts &amp; Services: Procurement Guide</title>
+<style>
+  :root{
+    --bg:#f7f8fa; --panel:#ffffff; --ink:#1a2233; --muted:#5b6b85;
+    --line:#e6e9f0; --brand:#F26522; --brand-2:#c44f16; --accent:#1e3a8a;
+    --ok:#16a34a; --warn:#d97706; --crit:#dc2626; --chip:#fff2ea;
+    --shadow:0 1px 3px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.05);
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.6;font-size:15px}
+  a{color:var(--brand-2);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+  header.hero{background:linear-gradient(135deg,#7a2f08,#F26522 62%,#f79b57);color:#fff;padding:54px 0 46px}
+  header.hero .wrap{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{letter-spacing:.14em;text-transform:uppercase;font-size:12px;font-weight:700;opacity:.9}
+  header.hero h1{margin:6px 0 2px;font-size:32px;line-height:1.2;font-weight:800}
+  header.hero p.sub{margin:0;font-size:16px;opacity:.95;max-width:820px}
+  .meta-row{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+  .meta{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);
+    padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600}
+
+  main{padding:34px 0 70px}
+  .grid{display:grid;grid-template-columns:246px 1fr;gap:34px;align-items:start}
+  @media(max-width:900px){.grid{grid-template-columns:1fr}nav.toc{position:static!important;max-height:none!important}}
+
+  nav.toc{position:sticky;top:18px;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:16px;box-shadow:var(--shadow);max-height:88vh;overflow:auto}
+  nav.toc h4{margin:2px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+  nav.toc ul{list-style:none;margin:0 0 12px;padding:0}
+  nav.toc li{margin:2px 0}
+  nav.toc a{display:block;padding:5px 8px;border-radius:8px;font-size:13px;color:var(--ink)}
+  nav.toc a:hover{background:var(--chip);text-decoration:none}
+  nav.toc a.top{font-weight:700;font-size:13.5px}
+  nav.toc a.sub{padding-left:18px;font-size:12.6px;color:var(--muted)}
+
+  section{background:var(--panel);border:1px solid var(--line);border-radius:16px;
+    padding:26px 28px;margin-bottom:22px;box-shadow:var(--shadow)}
+  section h2{margin:0 0 6px;font-size:21px;font-weight:800;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  section h2 .num{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;
+    background:var(--brand);color:#fff;border-radius:9px;font-size:15px;font-weight:800}
+  section h3{margin:22px 0 8px;font-size:16.5px;font-weight:700;color:var(--brand-2)}
+  .lead{color:var(--muted);font-size:15px;margin:6px 0 4px}
+
+  .badge{display:inline-block;padding:2px 9px;border-radius:6px;font-size:11.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.03em;white-space:nowrap}
+  .b-crit{background:#fee2e2;color:#991b1b}
+  .b-high{background:#ffedd5;color:#9a3412}
+  .b-med{background:#fef9c3;color:#854d0e}
+  .b-low{background:#e0e7ff;color:#3730a3}
+  .b-done{background:#dcfce7;color:#166534}
+  .b-grey{background:#e5e7eb;color:#374151}
+
+  .tbl-wrap{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#faf6f3;font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:#40506b}
+  tr:last-child td{border-bottom:none}
+  code{background:#f1f3f7;border:1px solid var(--line);border-radius:5px;padding:1px 6px;
+    font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:12.8px;color:#243b53}
+
+  .item{border:1px solid var(--line);border-left:4px solid var(--brand);border-radius:0 12px 12px 0;
+    padding:18px 20px;margin:18px 0;background:#fffdfb}
+  .item.opt{border-left-color:#94a3b8}
+  .item.crit{border-left-color:var(--crit)}
+  .item h4{margin:0 0 4px;font-size:16px;font-weight:800;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .item h4 .n{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;
+    background:#fff;border:2px solid var(--brand);color:var(--brand-2);border-radius:50%;font-size:12.5px;font-weight:800}
+  .item.opt h4 .n{border-color:#94a3b8;color:#475569}
+  .item.crit h4 .n{border-color:var(--crit);color:var(--crit)}
+  .item .who{font-size:12.5px;color:var(--muted);margin:0 0 10px;padding-left:36px}
+
+  dl{margin:10px 0 0;display:grid;grid-template-columns:190px 1fr;gap:0}
+  @media(max-width:700px){dl{grid-template-columns:1fr}dd{padding-bottom:10px!important}}
+  dt{font-size:12.2px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:#40506b;
+    padding:9px 12px 9px 0;border-top:1px solid var(--line)}
+  dd{margin:0;padding:9px 0;border-top:1px solid var(--line);font-size:14.2px}
+  dt:first-of-type,dd:first-of-type{border-top:none}
+
+  .note{border-left:4px solid var(--accent);background:#eef2ff;padding:12px 16px;border-radius:0 10px 10px 0;margin:14px 0}
+  .note.ok{border-color:var(--ok);background:#f0fdf4}
+  .note.warn{border-color:var(--warn);background:#fffbeb}
+  .note.crit{border-color:var(--crit);background:#fef2f2}
+  .note b{color:var(--ink)}
+
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:16px 0}
+  .stat{border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center;background:#fffdfb}
+  .stat .n{font-size:28px;font-weight:800;color:var(--brand)}
+  .stat .l{font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+
+  .box{display:inline-block;width:15px;height:15px;border:2px solid #94a3b8;border-radius:4px;vertical-align:-2px}
+  .blank{color:#cbd5e1;letter-spacing:.08em}
+
+  footer{text-align:center;color:var(--muted);font-size:13px;padding:26px 0 40px}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="eyebrow">Procurement Guide · For Project Manager Review</div>
+    <h1>Required Accounts, Services &amp; Third-Party Commitments</h1>
+    <p class="sub">Every external account, subscription, licence and service this project needs — what each one is, why
+      it is needed, what breaks without it, how to obtain it, what it costs and how long it takes. Written to be read by
+      someone who is not a developer.</p>
+    <div class="meta-row">
+      <span class="meta">22 items</span>
+      <span class="meta">8 needed now</span>
+      <span class="meta">6 for mobile</span>
+      <span class="meta">8 optional</span>
+      <span class="meta">29 July 2026</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+<div class="grid">
+
+<nav class="toc">
+  <h4>Contents</h4>
+  <ul>
+    <li><a class="top" href="#s1">1 · How to use this</a></li>
+    <li><a class="top" href="#s2">2 · Needed now</a></li>
+    <li><a class="sub" href="#n1">1 Domain name</a></li>
+    <li><a class="sub" href="#n2">2 Hosting / server</a></li>
+    <li><a class="sub" href="#n3">3 SSL certificate</a></li>
+    <li><a class="sub" href="#n4">4 Email sending service</a></li>
+    <li><a class="sub" href="#n5">5 Backup storage</a></li>
+    <li><a class="sub" href="#n6">6 Branding assets</a></li>
+    <li><a class="sub" href="#n7">7 Privacy policy</a></li>
+    <li><a class="sub" href="#n8">8 Template licence</a></li>
+    <li><a class="top" href="#s3">3 · Before the mobile app</a></li>
+    <li><a class="sub" href="#m1">9 Google Play Console</a></li>
+    <li><a class="sub" href="#m2">10 Apple Developer</a></li>
+    <li><a class="sub" href="#m3">11 Firebase</a></li>
+    <li><a class="sub" href="#m4">12 File storage</a></li>
+    <li><a class="sub" href="#m5">13 Store listing assets</a></li>
+    <li><a class="sub" href="#m6">14 App signing keys</a></li>
+    <li><a class="top" href="#s4">4 · Only if approved</a></li>
+    <li><a class="sub" href="#o1">15 Google Maps</a></li>
+    <li><a class="sub" href="#o2">16 Face recognition</a></li>
+    <li><a class="sub" href="#o3">17 AI provider</a></li>
+    <li><a class="sub" href="#o4">18 Fingerprint hardware</a></li>
+    <li><a class="sub" href="#o5">19 SMS / WhatsApp</a></li>
+    <li><a class="sub" href="#o6">20 SSO consent</a></li>
+    <li><a class="sub" href="#o7">21 Payroll advisor</a></li>
+    <li><a class="sub" href="#o8">22 Legal review</a></li>
+    <li><a class="top" href="#s5">5 · Cost summary</a></li>
+    <li><a class="top" href="#s6">6 · Action checklist</a></li>
+  </ul>
+</nav>
+
+<div>
+
+<!-- ================= 1 ================= -->
+<section id="s1">
+  <h2><span class="num">1</span> How to use this document</h2>
+  <p class="lead">Every item below follows the same six-part structure so they can be compared and approved
+    consistently.</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Heading</th><th>What it tells you</th></tr></thead>
+    <tbody>
+      <tr><td><b>What it is</b></td><td>A plain description, avoiding technical vocabulary.</td></tr>
+      <tr><td><b>Why this project needs it</b></td><td>The specific function in our system that depends on it.</td></tr>
+      <tr><td><b>If we do not have it</b></td><td>The practical consequence. <b>This is the deciding column.</b> Several items turn out to be genuinely optional and say so plainly.</td></tr>
+      <tr><td><b>How to obtain it</b></td><td>Who registers it and what they will be asked to supply.</td></tr>
+      <tr><td><b>Cost</b></td><td>Indicative only — must be confirmed at purchase.</td></tr>
+      <tr><td><b>Lead time</b></td><td>How long until it is usable. Some are instant; one takes two weeks.</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="n">8</div><div class="l">Needed now</div></div>
+    <div class="stat"><div class="n">6</div><div class="l">Before the mobile app</div></div>
+    <div class="stat"><div class="n">8</div><div class="l">Only if approved</div></div>
+    <div class="stat"><div class="n">2</div><div class="l">Have a lead time</div></div>
+  </div>
+
+  <div class="note crit">
+    <b>One instruction that applies to every account on this list.</b> Register all of them under a
+    <b>company email address</b> — for example <code>it@company.com</code> — and never under an individual employee's
+    personal account. If accounts are registered personally, the organisation loses control of its own app store
+    listings, domain and certificates the day that person leaves. Recovering an app store account from a former employee
+    is slow, sometimes impossible, and it is the single most common avoidable failure in projects of this kind. Decide
+    the owning email address before purchasing anything.
+  </div>
+
+  <div class="note">
+    <b>Companion document.</b> A separate register lists the <b>software libraries</b> the system depends on
+    (130 packages, all free and open-source, no accounts required). See
+    <i>Third-Party Dependency &amp; External Service Register</i>. This document covers only things that require
+    <b>an account, a payment or a signature</b>.
+  </div>
+</section>
+
+<!-- ================= 2 ================= -->
+<section id="s2">
+  <h2><span class="num">2</span> Needed now — before the system can go live</h2>
+  <p class="lead">Eight items. Without these the web application cannot be deployed for real use, regardless of how much
+    development is completed.</p>
+
+  <!-- 1 -->
+  <div class="item" id="n1">
+    <h4><span class="n">1</span> Domain name <span class="badge b-crit">Required</span></h4>
+    <p class="who">Registered by: IT or Administration · Renewed annually</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The web address staff type to reach the system. For this deployment it is
+        <code>emp.klutchcleaning.com</code>, a subdomain of the existing company domain.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Employees need a stable, memorable address. It is also the identity that the security certificate is issued
+        against and that the mobile app will point at.</dd>
+      <dt>If we do not have it</dt>
+      <dd>Staff would reach the system by a raw numeric server address, which cannot be secured with a normal
+        certificate, is impossible to remember, and changes if the server is ever moved. Not workable for a
+        company-wide rollout.</dd>
+      <dt>How to obtain it</dt>
+      <dd>If the company already owns a domain, <b>no purchase is needed</b> — IT simply creates a subdomain, which is
+        free and takes minutes. Only if there is no company domain does one need buying, from any registrar.</dd>
+      <dt>Cost</dt>
+      <dd>Free if using an existing company domain. Otherwise roughly <b>$10–20 per year</b>.</dd>
+      <dt>Lead time</dt>
+      <dd>Minutes for a subdomain; up to 24 hours for a new domain to become active worldwide.</dd>
+    </dl>
+  </div>
+
+  <!-- 2 -->
+  <div class="item" id="n2">
+    <h4><span class="n">2</span> Web hosting or server <span class="badge b-crit">Required</span></h4>
+    <p class="who">Purchased by: IT · Monthly or annual</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The computer, in a data centre or in our own server room, that runs the application continuously.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>The system currently runs only on a developer's machine. It must move to a server that is always on and
+        reachable by every employee.</dd>
+      <dt>If we do not have it</dt>
+      <dd>There is no product. Development can continue but nobody outside the development machine can use it.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Three viable routes: <b>(a)</b> shared PHP hosting, cheapest and adequate for a few hundred employees;
+        <b>(b)</b> a small virtual private server, recommended, since it allows scheduled tasks and background jobs the
+        system will eventually need; <b>(c)</b> an internal company server, which keeps all employee data on premises.
+        Requirements to quote against: PHP 8.2+, MySQL, and the extension list in the companion register.</dd>
+      <dt>Cost</dt>
+      <dd>Shared hosting <b>$3–10/month</b>. Virtual server <b>$10–40/month</b>. Internal server: no new spend.</dd>
+      <dt>Lead time</dt>
+      <dd>Same day for hosted options. Internal provisioning depends on IT.</dd>
+    </dl>
+  </div>
+
+  <!-- 3 -->
+  <div class="item" id="n3">
+    <h4><span class="n">3</span> SSL certificate <span class="badge b-crit">Required — functional, not optional</span></h4>
+    <p class="who">Issued by: hosting provider · Auto-renewing</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The credential that produces the padlock in the browser and encrypts traffic between employee and server.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Two reasons, and the second is the one people miss. First, employee data and passwords must be encrypted in
+        transit. Second — <b>browsers refuse to provide GPS location over an unencrypted connection.</b></dd>
+      <dt>If we do not have it</dt>
+      <dd><b>Location-based check-in stops working entirely.</b> Not degraded — refused by the browser as a hard
+        security rule we cannot override. Since GPS check-in is the core feature of this product, the system without a
+        certificate does not perform its primary function. Passwords would also travel in readable form.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Nearly every host now issues free Let's Encrypt certificates with a single click, renewing automatically.
+        Ask the provider to confirm this is included before purchasing hosting.</dd>
+      <dt>Cost</dt>
+      <dd><b>Free</b> in almost all cases. Only buy a paid certificate if company policy demands a specific issuer
+        ($50–200/year).</dd>
+      <dt>Lead time</dt>
+      <dd>Minutes, once the domain points at the server.</dd>
+    </dl>
+  </div>
+
+  <!-- 4 -->
+  <div class="item crit" id="n4">
+    <h4><span class="n">4</span> Email sending service <span class="badge b-crit">Required</span></h4>
+    <p class="who">Configured by: IT with development team</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>A service permitted to send automated email on behalf of our domain — password resets, leave notifications,
+        scheduled reports.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Any feature that contacts an employee outside the application depends on it. Password reset is the critical
+        one: without email, a locked-out employee can only be helped manually by an administrator.</dd>
+      <dt>If we do not have it</dt>
+      <dd><b>This is not a hypothetical — it is the current state.</b> The system is configured to write emails into a
+        log file instead of sending them. Not one message has ever reached a recipient. Features already built and paid
+        for are sitting inert behind a single configuration setting. This is the fastest available win on the whole
+        list.</dd>
+      <dt>How to obtain it</dt>
+      <dd>If the company uses <b>Google Workspace or Microsoft 365</b>, this is already owned — IT supplies existing
+        credentials and the work is configuration only, no purchase. Otherwise use a dedicated sender such as Brevo,
+        Mailgun or Amazon SES. Whichever is chosen, IT must add sender-authentication records to the domain, or messages
+        will be filed as spam.</dd>
+      <dt>Cost</dt>
+      <dd>Free if using existing Workspace or 365. Dedicated services offer free tiers around 300 emails/day; paid
+        plans start near <b>$15–25/month</b> — well above what this system needs.</dd>
+      <dt>Lead time</dt>
+      <dd>Under an hour with existing credentials. One to two days for a new service, allowing for domain verification.</dd>
+    </dl>
+  </div>
+
+  <!-- 5 -->
+  <div class="item" id="n5">
+    <h4><span class="n">5</span> Backup storage <span class="badge b-crit">Required</span></h4>
+    <p class="who">Owned by: IT · Monthly</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>Somewhere separate from the server to keep automatic copies of the database.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Attendance records are the evidence base for payroll and for any employment dispute. They cannot be
+        reconstructed if lost — nobody can remember what time two hundred people arrived last March.</dd>
+      <dt>If we do not have it</dt>
+      <dd>A disk failure, a mistaken deletion or a ransomware incident destroys the complete attendance history
+        permanently. This is the highest-consequence, lowest-cost item on the entire list. It is also worth noting that
+        a backup stored on the same server is not a backup; it fails with the server.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Many hosting plans include automated backups — confirm this when purchasing, as it may make separate storage
+        unnecessary. Otherwise any object storage service, or a scheduled copy to internal company storage.</dd>
+      <dt>Cost</dt>
+      <dd>Often <b>included with hosting</b>. Standalone storage is roughly <b>$1–5/month</b> at this data volume.</dd>
+      <dt>Lead time</dt>
+      <dd>Same day.</dd>
+    </dl>
+  </div>
+
+  <!-- 6 -->
+  <div class="item" id="n6">
+    <h4><span class="n">6</span> Company branding assets <span class="badge b-high">Needed</span></h4>
+    <p class="who">Supplied by: Marketing or Management · One-off</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The official company logo in high resolution, the approved colour codes, and a preferred typeface if one is
+        mandated.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>The logo appears on the login screen, in the sidebar, and on every exported PDF report — documents that may be
+        shown to auditors or attached to employment matters.</dd>
+      <dt>If we do not have it</dt>
+      <dd>Nothing breaks. A neutral placeholder logo is in place and the system is fully functional. The consequence is
+        presentational: exported reports look unofficial. Worth resolving before any demonstration to senior management,
+        because it is the first thing noticed and creates a poor impression of otherwise finished work.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Request from Marketing. Useful formats: <b>SVG or PNG with transparent background</b>, a square version for
+        small spaces, and the brand colour codes.</dd>
+      <dt>Cost</dt>
+      <dd><b>None</b> if assets exist. Only relevant if a designer must produce them.</dd>
+      <dt>Lead time</dt>
+      <dd>Depends entirely on internal response.</dd>
+    </dl>
+  </div>
+
+  <!-- 7 -->
+  <div class="item" id="n7">
+    <h4><span class="n">7</span> Privacy policy and employee notice <span class="badge b-crit">Required</span></h4>
+    <p class="who">Approved by: HR and Legal · One-off, reviewed periodically</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>A written statement, shown to employees, explaining what the system records about them, why, how long it is
+        kept and who can see it.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>This system records <b>physical location</b> at check-in and check-out. Under GDPR and equivalent laws
+        worldwide, location is sensitive personal data. Employees must be informed before collection begins, not
+        afterwards.</dd>
+      <dt>If we do not have it</dt>
+      <dd>The organisation carries real legal exposure and, just as importantly, a staff-relations problem. Location
+        tracking introduced without explanation is reliably perceived as surveillance, and that perception is very hard
+        to reverse once formed. A clear notice stating that location is recorded <b>only at the moment of check-in and
+        check-out, and never between</b> resolves most objections before they arise — it is the single most useful
+        sentence in the document.</dd>
+      <dt>How to obtain it</dt>
+      <dd>HR drafts it; Legal reviews. The development team supplies the factual list of what is stored, which is short
+        and precise: name, employee code, department, check-in and check-out times, coordinates at those two moments,
+        and the network address used.</dd>
+      <dt>Cost</dt>
+      <dd><b>None</b> if handled internally.</dd>
+      <dt>Lead time</dt>
+      <dd>One to two weeks including legal review. Start early — it runs in parallel with development and blocks
+        rollout, not build.</dd>
+    </dl>
+  </div>
+
+  <!-- 8 -->
+  <div class="item crit" id="n8">
+    <h4><span class="n">8</span> Commercial interface template licence <span class="badge b-crit">Confirm before delivery</span></h4>
+    <p class="who">Confirmed by: whoever purchased it · One-off</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The administrative interface is built on <b>SmartHR</b>, a professionally designed Bootstrap template bought
+        from a template marketplace. It is the only purchased software component in the project.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>It provides the complete visual design — layout, navigation, forms, tables, charts. Recreating equivalent
+        design work from scratch would add several weeks and a designer to the budget.</dd>
+      <dt>If we do not have it</dt>
+      <dd>Using a marketplace template without a valid licence is a copyright breach, and it surfaces at the worst
+        possible time: during client delivery or an audit, when the work is already complete. Two questions need
+        answering. <b>(a)</b> Is a valid purchase receipt and licence key on file, held by the company rather than an
+        individual developer? <b>(b)</b> Is it the correct tier — marketplace templates are typically sold under a
+        "regular" licence for one product whose end users are not charged, and an "extended" licence where they are. If
+        this system is ever sold or offered as a paid service to another organisation, the extended licence applies.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Locate the original purchase record. If it cannot be found, or was bought under a personal account,
+        re-purchase under the company account — the cost is trivial next to the risk.</dd>
+      <dt>Cost</dt>
+      <dd>Typically <b>$25–60 regular</b>, or <b>$300–900 extended</b>, one-off.</dd>
+      <dt>Lead time</dt>
+      <dd>Immediate. This is an administrative check, not a technical task.</dd>
+    </dl>
+  </div>
+
+  <div class="note warn">
+    <b>Item 8 was identified during the dependency audit and was not in earlier versions of this list.</b> It is
+    included because it is the only item on the entire list carrying a legal rather than a technical risk, and because
+    it costs almost nothing to resolve now.
+  </div>
+</section>
+
+<!-- ================= 3 ================= -->
+<section id="s3">
+  <h2><span class="num">3</span> Before the mobile app can be published</h2>
+  <p class="lead">Six items, needed only when the mobile application phase is approved. Two have long lead times and can
+    be started well in advance of any development.</p>
+
+  <!-- 9 -->
+  <div class="item" id="m1">
+    <h4><span class="n">9</span> Google Play Console account <span class="badge b-high">Required for Android</span></h4>
+    <p class="who">Registered by: company, under a company Google account · One-off fee</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The developer account required to publish an Android app on the Google Play Store.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>There is no other practical way to distribute an Android app to staff and keep it updated automatically.</dd>
+      <dt>If we do not have it</dt>
+      <dd>The app can only be distributed as an installer file sent to employees, who must then permit installation from
+        unknown sources — a poor experience, a security-policy problem on managed devices, and no automatic updates.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Register at the Play Console with a company Google account. Organisation registration requires company
+        details and, since 2023, identity verification. <b>The same Google account also covers Firebase and Google Maps
+        (items 11 and 15)</b> — so choosing which company address owns it is a decision worth making once, carefully.</dd>
+      <dt>Cost</dt>
+      <dd><b>$25 one-time</b>, for the lifetime of the account.</dd>
+      <dt>Lead time</dt>
+      <dd>1–3 days including verification.</dd>
+    </dl>
+  </div>
+
+  <!-- 10 -->
+  <div class="item crit" id="m2">
+    <h4><span class="n">10</span> Apple Developer Program <span class="badge b-crit">Longest lead time in the project</span></h4>
+    <p class="who">Registered by: company · Annual renewal</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The paid membership required to publish an iOS app on the App Store.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Any employee using an iPhone needs the app from the App Store. Apple permits no alternative route for normal
+        distribution.</dd>
+      <dt>If we do not have it</dt>
+      <dd>No iPhone users can be supported at all. Depending on the workforce this could exclude a large share of
+        staff. There is no workaround comparable to the Android installer route.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Enrol as an <b>organisation</b>, not an individual — organisation enrolment requires a <b>D-U-N-S number</b>,
+        a company identifier issued by Dun &amp; Bradstreet. If the company does not already have one, it must be
+        requested first, and that alone can take a week or more. <b>Register the account under a company Apple ID,
+        never a personal one</b> — recovering an App Store account from a departed employee is extremely difficult.</dd>
+      <dt>Cost</dt>
+      <dd><b>$99 per year</b>, recurring. If the membership lapses, the app is removed from the store.</dd>
+      <dt>Lead time</dt>
+      <dd><b>1–2 weeks</b>, occasionally longer. This is the longest lead time on the list and it is entirely
+        independent of development. If an iOS app is likely at any point, begin enrolment now — the cost of starting
+        early is $99; the cost of starting late is a two-week delay to launch.</dd>
+    </dl>
+  </div>
+
+  <!-- 11 -->
+  <div class="item" id="m3">
+    <h4><span class="n">11</span> Firebase project (push notifications) <span class="badge b-high">Needed for mobile</span></h4>
+    <p class="who">Created by: development team, under the company Google account</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>Google's free messaging service, the standard route for delivering push notifications to both Android and
+        iPhone.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Notifications are what make a mobile app useful rather than merely available: check-in reminders, leave
+        approvals, shift changes.</dd>
+      <dt>If we do not have it</dt>
+      <dd>The app still works fully, but only tells employees anything when they open it. Most of the practical benefit
+        of having an app rather than a website is lost.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Created free in the Firebase console using the same company Google account as item 9. Apple push additionally
+        requires a key generated from the Apple Developer account in item 10.</dd>
+      <dt>Cost</dt>
+      <dd><b>Free.</b> Cloud Messaging has no charge at any volume this project will reach.</dd>
+      <dt>Lead time</dt>
+      <dd>Under an hour, once the Google account exists.</dd>
+    </dl>
+  </div>
+
+  <!-- 12 -->
+  <div class="item" id="m4">
+    <h4><span class="n">12</span> File and photo storage <span class="badge b-med">Recommended</span></h4>
+    <p class="who">Purchased by: IT · Monthly</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>Dedicated storage for employee photographs, documents and any check-in photos, held separately from the
+        application server.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Image files grow steadily and are best kept off the main server so they can be backed up and served
+        independently.</dd>
+      <dt>If we do not have it</dt>
+      <dd>Files are stored on the application server itself, which works perfectly well at small scale. The
+        consequences arrive later: the server disk fills, backups become large and slow, and moving to a bigger server
+        becomes harder. Not urgent, but easier to arrange at the start than to retrofit.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Any object storage service — Amazon S3, Backblaze B2, Cloudflare R2, or equivalent. The application supports
+        this through configuration; no rework is needed.</dd>
+      <dt>Cost</dt>
+      <dd>Roughly <b>$1–5/month</b> at expected volumes.</dd>
+      <dt>Lead time</dt>
+      <dd>Same day.</dd>
+    </dl>
+  </div>
+
+  <!-- 13 -->
+  <div class="item" id="m5">
+    <h4><span class="n">13</span> App store listing assets <span class="badge b-high">Required to publish</span></h4>
+    <p class="who">Produced by: Marketing with development team · One-off</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>The material both stores demand before they will accept an app: an icon, screenshots at several device sizes,
+        a short and long description, a category, a support email address and a link to the privacy policy.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Neither store will publish without them. They are submission requirements, not marketing extras.</dd>
+      <dt>If we do not have it</dt>
+      <dd>Submission is rejected. This regularly delays launches by a week or two because it is treated as an
+        afterthought — the app is finished, and then someone has to write descriptions and produce screenshots at exact
+        pixel dimensions. Prepare it during development, not after.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Screenshots are produced by the development team from the finished app; text and icon by Marketing using the
+        branding from item 6. Note that the <b>privacy policy from item 7 is a mandatory field</b> — the two items are
+        linked.</dd>
+      <dt>Cost</dt>
+      <dd><b>None</b> if produced internally.</dd>
+      <dt>Lead time</dt>
+      <dd>2–3 days, and can be prepared in advance.</dd>
+    </dl>
+  </div>
+
+  <!-- 14 -->
+  <div class="item crit" id="m6">
+    <h4><span class="n">14</span> App signing keys <span class="badge b-crit">Irreplaceable if lost</span></h4>
+    <p class="who">Generated by: development team · Held by: company, permanently</p>
+    <dl>
+      <dt>What it is</dt>
+      <dd>Cryptographic keys that prove each app update genuinely comes from us. Every release must be signed with the
+        same key as the original.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Both stores reject any update not signed with the original key.</dd>
+      <dt>If we do not have it</dt>
+      <dd><b>Losing the Android signing key means the app can never be updated again.</b> Not delayed — never. The only
+        remedy is publishing an entirely new app under a new listing and asking every employee to uninstall the old one
+        and install the replacement, losing all installs and reviews. This is a genuinely unrecoverable failure and it
+        has ended app products.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Generated free by the development team at first release. The essential part is <b>custody</b>: store the key
+        and its password in the company password manager, held by IT rather than by an individual developer, with a
+        second copy in a separate secure location. Google offers Play App Signing, where Google retains a backup — this
+        is strongly recommended and should be enabled at first upload.</dd>
+      <dt>Cost</dt>
+      <dd><b>None.</b></dd>
+      <dt>Lead time</dt>
+      <dd>Immediate. The custody arrangement is the part requiring a decision.</dd>
+    </dl>
+  </div>
+</section>
+
+<!-- ================= 4 ================= -->
+<section id="s4">
+  <h2><span class="num">4</span> Only if the corresponding feature is approved</h2>
+  <p class="lead">Eight items. <b>None are needed for the system to work.</b> Each is listed with the ongoing commitment
+    it creates, so the cost of a feature decision is visible before it is taken. Several can be declined with no
+    consequence at all.</p>
+
+  <!-- 15 -->
+  <div class="item opt" id="o1">
+    <h4><span class="n">15</span> Google Maps Platform <span class="badge b-low">Optional</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>A billed Google service for drawing interactive maps inside our own pages.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Only to show check-in locations as pins on a map embedded in the dashboard, rather than as a link.</dd>
+      <dt>If we do not have it</dt>
+      <dd><b>Nothing is lost operationally.</b> Location is still recorded, stored, exported to PDF and Excel, and
+        remains fully usable. Each record already carries a link that opens the exact position in Google Maps in a new
+        tab, which costs nothing and requires no account. The embedded map is a presentation upgrade only. There is also
+        a free alternative — OpenStreetMap with the Leaflet library — which requires no account and no billing, and is
+        the sensible first choice.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Requires a Google Cloud project with a <b>credit card on file</b>, even to use the free monthly allowance.</dd>
+      <dt>Cost</dt>
+      <dd>Free monthly allowance covers light use; beyond it, usage-based. Budget <b>$0–200/month</b>. Set a spending
+        cap on day one.</dd>
+      <dt>Lead time</dt>
+      <dd>Under an hour.</dd>
+    </dl>
+  </div>
+
+  <!-- 16 -->
+  <div class="item opt" id="o2">
+    <h4><span class="n">16</span> Face recognition service <span class="badge b-med">Only if approved</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>A cloud service (AWS Rekognition, Azure Face) that confirms a check-in photo matches the employee on record.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>To prevent one employee checking in on behalf of another.</dd>
+      <dt>If we do not have it</dt>
+      <dd><b>A simpler approach solves most of the problem at no cost.</b> Capture a photograph at check-in and store it
+        against the record for HR to review. This deters buddy-punching almost as effectively, because employees know a
+        photo exists, and it needs no external service, no recurring fee and no biometric consent process. Automatic
+        matching is a refinement, not a prerequisite — and it is our recommendation to start with photo capture and
+        review the need for matching later.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Cloud provider account with billing. <b>Legal review is mandatory first</b> — see item 22.</dd>
+      <dt>Cost</dt>
+      <dd>Roughly <b>$1 per 1,000 comparisons</b>. For 200 employees checking in twice daily, approximately
+        <b>$12/month</b>. Modest financially; the compliance burden is the real cost.</dd>
+      <dt>Lead time</dt>
+      <dd>Hours technically. <b>Weeks</b> once legal and consent processes are included.</dd>
+    </dl>
+  </div>
+
+  <!-- 17 -->
+  <div class="item opt" id="o3">
+    <h4><span class="n">17</span> AI provider account <span class="badge b-low">Optional</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>An API account with an AI provider such as Anthropic or OpenAI.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Only for proposed intelligent features — plain-language report queries, absence-pattern detection, automatic
+        summaries for managers.</dd>
+      <dt>If we do not have it</dt>
+      <dd>No effect whatsoever on any current or planned core function. These are enhancements to an already-complete
+        reporting capability.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Register and add a payment method. <b>Confirm first whether employee data may be sent to an external
+        provider</b> under company policy — often it may not, which settles the question before cost enters into it.</dd>
+      <dt>Cost</dt>
+      <dd>Usage-based, typically <b>$20–100/month</b> at this scale. Set a hard spending cap.</dd>
+      <dt>Lead time</dt>
+      <dd>Under an hour.</dd>
+    </dl>
+  </div>
+
+  <!-- 18 -->
+  <div class="item opt" id="o4">
+    <h4><span class="n">18</span> Fingerprint terminals and vendor SDK <span class="badge b-med">Only if approved</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>Physical biometric devices mounted at entrances, plus the manufacturer's software kit to read from them.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Only if the organisation wants fixed-point biometric attendance in addition to phone-based check-in.</dd>
+      <dt>If we do not have it</dt>
+      <dd>Nothing is lost — phone-based check-in with GPS already covers attendance, and covers field and remote staff
+        that fixed terminals cannot. Terminals suit factory or single-site environments where staff do not carry
+        phones.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Purchase hardware; obtain the SDK from the manufacturer. <b>Two warnings.</b> First, this creates genuine
+        vendor lock-in: each manufacturer's integration is different, and switching brands means rebuilding the
+        integration. Second, devices sit on the internal network and must reach our server, which needs IT network
+        configuration — frequently the hardest part of such projects, and consistently underestimated.</dd>
+      <dt>Cost</dt>
+      <dd><b>$100–500 per device</b>, plus integration effort per manufacturer.</dd>
+      <dt>Lead time</dt>
+      <dd>2–6 weeks including procurement, delivery and network configuration.</dd>
+    </dl>
+  </div>
+
+  <!-- 19 -->
+  <div class="item opt" id="o5">
+    <h4><span class="n">19</span> SMS or WhatsApp messaging <span class="badge b-med">Only if approved</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>A service such as Twilio for SMS, or an approved Business Solution Provider for WhatsApp.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>To reach employees who do not use email regularly — common among field, factory and shift staff.</dd>
+      <dt>If we do not have it</dt>
+      <dd>Email (item 4) and push notifications (item 11) cover most needs. SMS matters mainly where staff have no
+        company email address, which is worth checking against the actual workforce before committing.</dd>
+      <dt>How to obtain it</dt>
+      <dd>SMS is straightforward: register, add billing, begin. <b>WhatsApp is not.</b> It requires a verified Meta
+        Business account, an approved provider, and message templates individually submitted for approval — a process of
+        weeks with a real chance of rejection. Do not plan a launch date around WhatsApp availability.</dd>
+      <dt>Cost</dt>
+      <dd>SMS roughly <b>$0.01–0.10 per message</b>, varying sharply by country. WhatsApp is priced per conversation.
+        At scale this becomes the largest recurring cost on the list — 200 employees × 2 messages daily is
+        approximately <b>$120/month</b> at mid-range rates.</dd>
+      <dt>Lead time</dt>
+      <dd>SMS: 1–2 days. WhatsApp: <b>2–6 weeks</b>.</dd>
+    </dl>
+  </div>
+
+  <!-- 20 -->
+  <div class="item opt" id="o6">
+    <h4><span class="n">20</span> Single sign-on consent <span class="badge b-low">Optional</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>Permission and configuration allowing staff to sign in with their existing Microsoft 365 or Google Workspace
+        account instead of a separate password.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Removes one more password to forget, and means access ends automatically when someone leaves the company —
+        a genuine security benefit.</dd>
+      <dt>If we do not have it</dt>
+      <dd>The system's own login works fully. The cost is administrative: HR must create and later disable accounts
+        manually, and there is a risk of a departed employee's access lingering. Grows more valuable as headcount
+        rises.</dd>
+      <dt>How to obtain it</dt>
+      <dd>No purchase — the company already owns the directory. It needs an IT administrator to register the
+        application and grant consent. The blocker is usually approval time, not cost.</dd>
+      <dt>Cost</dt>
+      <dd><b>None</b> beyond existing licences.</dd>
+      <dt>Lead time</dt>
+      <dd>Hours of technical work, once IT approval is granted.</dd>
+    </dl>
+  </div>
+
+  <!-- 21 -->
+  <div class="item opt" id="o7">
+    <h4><span class="n">21</span> Payroll or tax advisor <span class="badge b-med">Only if payroll is approved</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>A qualified accountant or payroll specialist for the country of operation.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Payroll calculation depends on tax bands, statutory deductions, overtime law and contribution rules that
+        differ by country and change annually.</dd>
+      <dt>If we do not have it</dt>
+      <dd><b>Payroll must not be built.</b> The development team can build the calculation engine but cannot supply the
+        rules, and cannot verify the output is lawful. Incorrect payroll creates liability far exceeding the value of
+        the feature. The strongly recommended alternative is to <b>export verified attendance and approved overtime
+        into whatever payroll system the company already uses</b> — this delivers most of the benefit, carries none of
+        the risk, and is a fraction of the effort.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Engage the company's existing accountant, who already knows the rules that apply.</dd>
+      <dt>Cost</dt>
+      <dd>Professional fees, plus an annual review as rates change. The recurring commitment is easy to overlook.</dd>
+      <dt>Lead time</dt>
+      <dd>Weeks, and continuing.</dd>
+    </dl>
+  </div>
+
+  <!-- 22 -->
+  <div class="item opt crit" id="o8">
+    <h4><span class="n">22</span> Legal and compliance review <span class="badge b-crit">Mandatory for biometrics</span></h4>
+    <dl>
+      <dt>What it is</dt>
+      <dd>Formal legal advice on collecting employee location and, if approved, biometric data.</dd>
+      <dt>Why this project needs it</dt>
+      <dd>Face and fingerprint data are treated as <b>special category</b> personal data almost everywhere, with
+        stricter rules than ordinary employee records — explicit consent, defined retention periods, and in some
+        jurisdictions statutory damages per individual for breaches.</dd>
+      <dt>If we do not have it</dt>
+      <dd>For location alone, the privacy notice in item 7 is generally sufficient. <b>For biometrics it is not.</b>
+        Several jurisdictions allow employees to claim substantial per-person damages for non-compliant biometric
+        collection, without needing to show any harm. For a two-hundred-person workforce that is a material corporate
+        exposure, and it is created by a feature the system does not need.</dd>
+      <dt>How to obtain it</dt>
+      <dd>Company legal counsel or an employment-law specialist. Commission this <b>before</b> committing to items 16 or
+        18, not after building them.</dd>
+      <dt>Cost</dt>
+      <dd>Professional fees.</dd>
+      <dt>Lead time</dt>
+      <dd>2–4 weeks. Should gate the decision, not follow it.</dd>
+    </dl>
+  </div>
+</section>
+
+<!-- ================= 5 ================= -->
+<section id="s5">
+  <h2><span class="num">5</span> Cost summary</h2>
+  <p class="lead">Indicative figures for budgeting. All require confirmation at the point of purchase.</p>
+
+  <h3>5.1 &nbsp;Minimum to launch the web system</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Item</th><th>One-off</th><th>Recurring</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>1 · Domain</td><td>—</td><td>$0–20 / year</td><td>Free if a company domain exists</td></tr>
+      <tr><td>2 · Hosting</td><td>—</td><td>$3–40 / month</td><td>Virtual server recommended</td></tr>
+      <tr><td>3 · SSL certificate</td><td>—</td><td>$0</td><td>Free with almost all hosts</td></tr>
+      <tr><td>4 · Email sending</td><td>—</td><td>$0–25 / month</td><td>Free if Workspace or 365 is owned</td></tr>
+      <tr><td>5 · Backup storage</td><td>—</td><td>$0–5 / month</td><td>Often included with hosting</td></tr>
+      <tr><td>6 · Branding</td><td>$0</td><td>—</td><td>Internal</td></tr>
+      <tr><td>7 · Privacy policy</td><td>$0</td><td>—</td><td>Internal</td></tr>
+      <tr><td>8 · Template licence</td><td>$0–60</td><td>—</td><td>May already be owned</td></tr>
+      <tr style="background:#fff7f2"><td><b>Total</b></td><td><b>$0–60</b></td><td><b>$3–90 / month + $0–20 / year</b></td><td>Realistic case sits near the low end</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note ok">
+    <b>The realistic figure is lower than the range suggests.</b> If the company already has a domain and Microsoft 365
+    or Google Workspace — which most do — items 1, 4 and much of 5 cost nothing. The genuine new spend to put this
+    system live is typically <b>hosting alone, around $10–20 per month</b>.
+  </div>
+
+  <h3>5.2 &nbsp;Adding the mobile application</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Item</th><th>One-off</th><th>Recurring</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td>9 · Google Play Console</td><td>$25</td><td>—</td><td>Lifetime</td></tr>
+      <tr><td>10 · Apple Developer</td><td>—</td><td>$99 / year</td><td>App is removed if it lapses</td></tr>
+      <tr><td>11 · Firebase</td><td>$0</td><td>$0</td><td>Free at our volumes</td></tr>
+      <tr><td>12 · File storage</td><td>—</td><td>$1–5 / month</td><td>Optional at first</td></tr>
+      <tr><td>13 · Listing assets</td><td>$0</td><td>—</td><td>Internal</td></tr>
+      <tr><td>14 · Signing keys</td><td>$0</td><td>—</td><td>Custody, not cost</td></tr>
+      <tr style="background:#fff7f2"><td><b>Total</b></td><td><b>$25</b></td><td><b>$99 / year + $1–5 / month</b></td><td>iOS only needed if iPhones are supported</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h3>5.3 &nbsp;Optional features, if approved</h3>
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th>Item</th><th>Indicative recurring</th><th>Recommendation</th></tr></thead>
+    <tbody>
+      <tr><td>15 · Google Maps</td><td>$0–200 / month</td><td>Use free OpenStreetMap instead</td></tr>
+      <tr><td>16 · Face recognition</td><td>~$12 / month + legal</td><td>Start with photo capture — no cost, no consent burden</td></tr>
+      <tr><td>17 · AI provider</td><td>$20–100 / month</td><td>Defer; confirm data policy first</td></tr>
+      <tr><td>18 · Fingerprint terminals</td><td>$100–500 per device</td><td>Only for fixed-site workforces</td></tr>
+      <tr><td>19 · SMS / WhatsApp</td><td>~$120 / month at scale</td><td>Largest recurring cost — check email coverage first</td></tr>
+      <tr><td>20 · Single sign-on</td><td>$0</td><td>Worth doing — free and improves security</td></tr>
+      <tr><td>21 · Payroll advisor</td><td>Professional fees</td><td>Export to existing payroll instead</td></tr>
+      <tr><td>22 · Legal review</td><td>Professional fees</td><td>Mandatory before items 16 or 18</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note warn">
+    <b>Note for budgeting.</b> Items 15, 16, 17 and 19 are usage-priced, meaning cost rises with headcount and cannot be
+    fixed in advance. Every one of them supports setting a hard spending cap. Set the cap when the account is created,
+    not after the first unexpected invoice.
+  </div>
+</section>
+
+<!-- ================= 6 ================= -->
+<section id="s6">
+  <h2><span class="num">6</span> Action checklist</h2>
+  <p class="lead">In dependency order. The first row governs the rest — several later items are created under the
+    account chosen there.</p>
+
+  <div class="tbl-wrap">
+  <table>
+    <thead><tr><th style="width:34px"></th><th>Action</th><th>Owner</th><th>Target date</th></tr></thead>
+    <tbody>
+      <tr><td><span class="box"></span></td><td><b>Decide the company email address that will own every account</b></td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Confirm whether a company domain exists, or purchase one</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Choose and purchase hosting; confirm PHP 8.2+, MySQL and free SSL are included</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Enable SSL and verify the padlock appears</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td><b>Supply email sending credentials — unblocks features already built</b></td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Add sender-authentication records to the domain</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Confirm automated backups are running and test a restore</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Obtain company logo and brand colours from Marketing</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Draft the employee privacy notice; send to Legal</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td><b>Locate the interface template purchase receipt and licence key</b></td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td><b>Begin Apple Developer enrolment if iOS is likely — longest lead time</b></td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Register the Google Play Console account</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Create the Firebase project under the company Google account</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Store app signing keys in the company password manager; enable Play App Signing</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Prepare store listing text, icon and screenshots</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Decide which optional items in §4 are approved, if any</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+      <tr><td><span class="box"></span></td><td>Commission legal review before approving items 16 or 18</td><td class="blank">____________</td><td class="blank">__________</td></tr>
+    </tbody>
+  </table>
+  </div>
+
+  <div class="note crit">
+    <b>Two items should start this week, because neither waits on development.</b><br>
+    <b>Email credentials</b> — the quickest win available. Features that are already built and paid for are inert
+    purely because no sending service is configured. Often resolved in under an hour with credentials the company
+    already owns.<br>
+    <b>Apple Developer enrolment</b> — one to two weeks, driven by external verification we cannot accelerate. If an
+    iPhone app is at all likely, $99 spent now removes a two-week delay later.
+  </div>
+
+  <div class="note ok">
+    <b>The overall position is favourable.</b> Of 22 items, eight cost nothing, six are internal effort only, and the
+    genuine recurring spend to launch is around $10–20 per month. No item on this list represents a significant
+    financial commitment, and none creates dependence on a vendor who could disrupt the service.
+  </div>
+</section>
+
+</div>
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    Employment Management Portal — Required Accounts &amp; Services: Procurement Guide<br>
+    Costs and lead times are indicative and require confirmation at purchase · Verified 29 July 2026<br>
+    Companion documents: Third-Party Dependency Register · Master Feature Catalogue · Recommended Feature Set
+  </div>
+</footer>
+
+</body>
+</html>

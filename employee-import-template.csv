@@ -1,0 +1,3 @@
+employee_code,first_name,last_name,email,phone,gender,hire_date,office,department,designation,manager_code
+EMP-0101,Jane,Doe,jane.doe@yourcompany.com,+1 212 555 0142,female,2024-03-01,Head Office,Engineering,Software Engineer,
+,John,Smith,john.smith@yourcompany.com,,male,2025-11-17,Head Office,Engineering,,EMP-0101

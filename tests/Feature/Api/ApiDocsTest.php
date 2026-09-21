@@ -15,7 +15,17 @@ use Tests\TestCase;
  */
 class ApiDocsTest extends TestCase
 {
-    protected const DOC = __DIR__ . '/../../../../API-Reference_v1.md';
+    /**
+     * The reference, at the root of this repository.
+     *
+     * Three levels up rather than four: until the split the Laravel app sat in
+     * an `hrms/` subdirectory and this file was above it. Now the application
+     * root and the repository root are the same directory. If this path is
+     * ever wrong the test says so by name -- test_the_reference_exists fails
+     * first, before the two that would otherwise report every endpoint as
+     * undocumented.
+     */
+    protected const DOC = __DIR__ . '/../../../API-Reference_v1.md';
 
     /** Every registered api/v1 route, as method + path. */
     protected function routes(): array
