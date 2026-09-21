@@ -1,0 +1,76 @@
+# Employment Management Portal — cron on managed/shared webspace
+#
+# This file replaces BOTH deploy/emp-scheduler.cron and deploy/emp-worker.service.
+# Use it only where there is no root: IONOS webspace, cPanel and the like. On a
+# server you own, use the other two — a daemon drains the queue in seconds where
+# these entries take up to five minutes.
+#
+# On IONOS these are entered through Hosting → Cron Jobs in the panel rather than
+# by copying this file anywhere. The schedules below are what to type in.
+#
+# ---------------------------------------------------------------------------
+# The two platform limits this works around
+# ---------------------------------------------------------------------------
+#
+#   * A job may not repeat more often than every 5 minutes.
+#   * Any run still going at 60 seconds is killed.
+#
+# The first is why the scheduler runs at */5 rather than the * * * * * that
+# deploy/emp-scheduler.cron uses. It costs nothing here: every task in
+# routes/console.php already falls on a 5-minute boundary —
+#
+#   attendance:remind-checkout   every 15 min   :00 :15 :30 :45
+#   attendance:close-day         hourly         :00
+#   reports:send                 hourly         :00
+#   leave:process                daily          01:30
+#   documents:check-expiry       daily          06:45
+#   attendance:report-late       daily          10:30
+#   db:backup --verify           daily          02:10
+#
+# — so a */5 cron fires schedule:run at every moment one of them is due. No
+# schedule was changed to fit this host, and none should be: moving one off a
+# 5-minute boundary would silently stop it running here.
+#
+# The second is why the queue entry carries --max-time=50. The worker exits
+# cleanly at 50 seconds and the next run picks up where it left off; without it
+# the platform kills mid-job at 60 and the job is left reserved until it times
+# out.
+#
+# ---------------------------------------------------------------------------
+# Set these two
+# ---------------------------------------------------------------------------
+#
+#   APP  the absolute path to the directory containing artisan
+#   PHP  the CLI binary, which is often NOT the same as the web PHP.
+#        Find it with:  which php8.3  ||  ls /usr/bin/php*
+#
+APP=/homepages/nn/dnnnnnnnnn/htdocs/emp
+PHP=/usr/bin/php8.3
+
+MAILTO=ops@example.com
+
+# ---------------------------------------------------------------------------
+# 1. The scheduler — every 5 minutes, on the boundary
+# ---------------------------------------------------------------------------
+*/5 * * * * cd $APP && $PHP artisan schedule:run >> storage/logs/scheduler.log 2>&1
+
+# ---------------------------------------------------------------------------
+# 2. The queue — offset by a minute so it never starts in the same second as
+#    the scheduler and compete for the same 60-second budget.
+#
+#    --stop-when-empty  exit once drained rather than idling to the kill
+#    --max-time=50      retire before the platform's 60-second cut
+#    --tries/--backoff  match deploy/emp-worker.service, so a job behaves the
+#                       same way on either host
+# ---------------------------------------------------------------------------
+1-56/5 * * * * cd $APP && $PHP artisan queue:work --stop-when-empty --max-time=50 --tries=3 --backoff=10,60,300 >> storage/logs/queue.log 2>&1
+
+# ---------------------------------------------------------------------------
+# Also set, in .env:
+#
+#   HOSTING_MODE=managed
+#
+# Without it `emp:preflight` judges this install as though a daemon were running
+# and fails the queue check the moment a job waits more than five minutes —
+# which on a 5-minute cron is simply normal.
+# ---------------------------------------------------------------------------
