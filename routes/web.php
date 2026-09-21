@@ -30,6 +30,7 @@ use App\Http\Controllers\Manager\TeamController as ManagerTeamController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\OfficeController;
 use App\Http\Controllers\PolicyController;
+use App\Http\Controllers\PolicyRuleController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RegularisationController;
 use App\Http\Controllers\RegularisationRequestController;
@@ -427,6 +428,19 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::middleware('permission:manage-settings')->group(function () {
         Route::get('settings/policies', [PolicyController::class, 'edit'])->name('policies.edit');
         Route::put('settings/policies', [PolicyController::class, 'update'])->name('policies.update');
+
+        // The conditional rule builder (A2.9, A6.6) — the part of the policy
+        // screen that can say "except in the Croydon depot". Same gate as the
+        // policies beside it, and no permission of its own: a rule decides who
+        // the system speaks to about everybody's attendance, which is the
+        // decision the rest of that screen already makes.
+        Route::get('settings/rules', [PolicyRuleController::class, 'index'])->name('rules.index');
+        Route::get('settings/rules/create', [PolicyRuleController::class, 'create'])->name('rules.create');
+        Route::post('settings/rules', [PolicyRuleController::class, 'store'])->name('rules.store');
+        Route::get('settings/rules/{rule}/edit', [PolicyRuleController::class, 'edit'])->name('rules.edit');
+        Route::put('settings/rules/{rule}', [PolicyRuleController::class, 'update'])->name('rules.update');
+        Route::post('settings/rules/{rule}/toggle', [PolicyRuleController::class, 'toggle'])->name('rules.toggle');
+        Route::delete('settings/rules/{rule}', [PolicyRuleController::class, 'destroy'])->name('rules.destroy');
         Route::get('activity', [ActivityLogController::class, 'index'])->name('activity.index');
 
         // Crashes the mobile app did not survive (B6.5). Same audience as the

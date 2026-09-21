@@ -8,6 +8,7 @@ use App\Models\Holiday;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
+use App\Models\PolicyRule;
 use Carbon\Carbon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,7 @@ class LeaveService
 {
     public function __construct(
         protected NotificationService $notifications,
+        protected RuleEngine $rules,
     ) {}
 
     /**
@@ -558,7 +560,65 @@ class LeaveService
             $this->notifications->leaveSubmitted($request);
         }
 
+        $this->runLeaveRules($employee, $request);
+
         return $request;
+    }
+
+    /**
+     * Hand a leave request to the company's conditional rules (A2.9).
+     *
+     * Called after the request is committed and after the approval
+     * notification, for the same reason the punch side runs last: a rule
+     * describes what was recorded, and one that ran inside the transaction
+     * could announce a request that then rolled back. The engine swallows
+     * everything already; this second catch is deliberate belt and braces,
+     * because the cost of being wrong here is an employee who cannot book
+     * leave at all.
+     *
+     * `notice_days` is the figure no column holds and every rule about
+     * short-notice leave needs: whole days between today and the first day
+     * off, measured in the company's own timezone because "today" is the
+     * client's, not the server's. It is **negative** when the leave has
+     * already started — backdated sick leave, most often — which is exactly
+     * the case `at_most 0` is written to catch.
+     *
+     * `summary` is the sentence the notification carries. Built here rather
+     * than in the engine because this is the layer that knows a leave request
+     * from a punch.
+     */
+    protected function runLeaveRules(Employee $employee, LeaveRequest $request): void
+    {
+        try {
+            $timezone = $employee->company?->tz() ?? config('app.timezone');
+            $today = Carbon::now($timezone)->startOfDay();
+
+            $this->rules->fire(
+                trigger: PolicyRule::TRIGGER_LEAVE,
+                companyId: $employee->company_id,
+                employee: $employee,
+                context: [
+                    'leave_type_id' => $request->leave_type_id,
+                    'days'          => (float) $request->days,
+                    // Signed: diffInDays() without the third argument is an
+                    // absolute value, and a rule asking for "booked after it
+                    // started" would then match a fortnight's notice too.
+                    'notice_days'   => (int) $today->diffInDays($request->start_date->copy()->startOfDay(), false),
+                    'department_id' => $employee->department_id,
+                    'summary'       => sprintf(
+                        '%s requested %s day(s) of %s from %s to %s.',
+                        $employee->full_name,
+                        $this->format((float) $request->days),
+                        $request->leaveType?->name ?? 'leave',
+                        $request->start_date->format('M j, Y'),
+                        $request->end_date->format('M j, Y'),
+                    ),
+                ],
+                subject: $request,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

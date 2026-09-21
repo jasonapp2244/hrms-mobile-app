@@ -29,6 +29,17 @@ class ActivityLog extends Model
     public const SETTINGS_CHANGED = 'settings_changed';
     public const ACCOUNT_CHANGED  = 'account_changed';
 
+    /**
+     * A policy rule matched something (A2.9).
+     *
+     * Here rather than in a log of its own because it is the same question
+     * the trail already answers — what happened, and what caused it — and a
+     * second list nobody opens is how a rule's history gets lost. The actor
+     * is the employee whose punch or request triggered it, not the
+     * administrator who wrote the rule: the rule is the subject.
+     */
+    public const RULE_FIRED       = 'rule_fired';
+
     /** Label and badge colour per event, for the screen. */
     public const EVENTS = [
         self::LOGIN              => ['label' => 'Signed in',            'class' => 'success'],
@@ -42,6 +53,7 @@ class ActivityLog extends Model
         self::PERMISSION_CHANGED => ['label' => 'Permissions changed',  'class' => 'warning'],
         self::SETTINGS_CHANGED   => ['label' => 'Settings changed',     'class' => 'info'],
         self::ACCOUNT_CHANGED    => ['label' => 'Account changed',      'class' => 'info'],
+        self::RULE_FIRED         => ['label' => 'Rule fired',           'class' => 'info'],
     ];
 
     /** Audit rows record when they happened, never when they were last touched. */

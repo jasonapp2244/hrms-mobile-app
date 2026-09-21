@@ -6,6 +6,7 @@ use App\Models\AttendanceLog;
 use App\Models\Company;
 use App\Models\Employee;
 use App\Models\Office;
+use App\Models\PolicyRule;
 use App\Models\Shift;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -15,6 +16,7 @@ class AttendanceService
 {
     public function __construct(
         protected LeaveService $leave,
+        protected RuleEngine $rules,
     ) {}
 
     /**
@@ -69,6 +71,8 @@ class AttendanceService
             'device_rooted'   => $meta['device_rooted'] ?? null,
             'device_emulator' => $meta['device_emulator'] ?? null,
         ]);
+
+        $this->runPunchRules($employee, $log, $now);
 
         return ['log' => $log, 'type' => $type, 'status' => $status];
     }
@@ -327,6 +331,8 @@ class AttendanceService
             ),
         ]);
 
+        $this->runPunchRules($employee, $log, $at);
+
         return ['log' => $log, 'type' => $type, 'duplicate' => false];
     }
 
@@ -467,7 +473,7 @@ class AttendanceService
     ): AttendanceLog {
         $workDate = $this->workDateFor($employee, $at);
 
-        return AttendanceLog::create([
+        $log = AttendanceLog::create([
             'company_id'  => $employee->company_id,
             'employee_id' => $employee->id,
             'office_id'   => $office->id,
@@ -482,6 +488,10 @@ class AttendanceService
             'ip_address'  => request()?->ip(),
             'notes'       => $reason,
         ]);
+
+        $this->runPunchRules($employee, $log, $at);
+
+        return $log;
     }
 
     /**
@@ -559,6 +569,92 @@ class AttendanceService
     }
 
     /**
+     * Hand a punch to the company's conditional rules (A2.9).
+     *
+     * Called after the row is written, never before: a rule reads what was
+     * recorded, and a rule that ran first could describe a punch that then
+     * failed to save. The engine already swallows everything, and this catch is
+     * the second one on purpose — the cost of a mistake here is an employee who
+     * cannot clock in, so it is worth being wrong twice in the safe direction.
+     *
+     * `summary` is the sentence the notification carries. Built here rather
+     * than in the engine because this is the layer that knows a punch from a
+     * leave request; the engine only knows it was handed a sentence.
+     */
+    protected function runPunchRules(Employee $employee, AttendanceLog $log, Carbon $at): void
+    {
+        try {
+            $this->rules->fire(
+                trigger: PolicyRule::TRIGGER_PUNCH,
+                companyId: $employee->company_id,
+                employee: $employee,
+                context: [
+                    'status'        => $log->status,
+                    'type'          => $log->type,
+                    'source'        => $log->source,
+                    'office_id'     => $log->office_id,
+                    'department_id' => $employee->department_id,
+                    'minutes_late'  => $this->lateMinutes($employee, $at, $log->work_date?->toDateString()),
+                    'summary'       => sprintf(
+                        '%s clocked %s at %s and was recorded as %s.',
+                        $employee->full_name,
+                        $log->type === 'in' ? 'in' : 'out',
+                        $at->format('H:i'),
+                        str_replace('_', ' ', (string) $log->status),
+                    ),
+                ],
+                subject: $log,
+            );
+        } catch (\Throwable $e) {
+            report($e);
+        }
+    }
+
+    /**
+     * How many minutes past the grace window an arrival was, or zero.
+     *
+     * Zero for a punch that was not late and for every clock-out, so a rule
+     * asking `minutes_late at_least 20` cannot match somebody leaving. It reads
+     * the same start `determineStatus` does — through `graceStart()`, which is
+     * why that is a method rather than four lines inlined in one place: two
+     * copies of this arithmetic would drift the first time a shift gained a
+     * setting, and the pair of them are what decides whether somebody is marked
+     * late and by how much.
+     */
+    public function lateMinutes(Employee $employee, Carbon $at, ?string $workDate = null): int
+    {
+        $start = $this->graceStart($employee, $at, $workDate);
+
+        return $at->greaterThan($start) ? (int) $start->diffInMinutes($at) : 0;
+    }
+
+    /**
+     * The moment an arrival stops being on time: shift start plus its grace.
+     *
+     * Shared by `determineStatus` and `lateMinutes` so the boundary and the
+     * distance past it can never disagree.
+     */
+    protected function graceStart(Employee $employee, Carbon $now, ?string $workDate = null): Carbon
+    {
+        $shift = $employee->shiftOn($workDate ?? $now->toDateString());
+        $company = $employee->company;
+
+        $startTime = $shift->start_time ?? $this->dayPolicy($company, 'default_day_start');
+        $grace = (int) ($shift->late_grace_minutes ?? $this->dayPolicy($company, 'default_day_grace_minutes'));
+
+        $start = Carbon::parse($now->toDateString() . ' ' . $startTime, $now->timezone)
+            ->addMinutes($grace);
+
+        // Arriving after midnight for a shift that began last night: the start
+        // to measure against is yesterday's, not tonight's.
+        if (($shift?->crossesMidnight() ?? false) && $now->hour < Shift::NIGHT_CUTOFF_HOUR) {
+            $start->subDay();
+        }
+
+        return $start;
+    }
+
+    /**
      * A default-day value, for a punch with no shift behind it.
      *
      * Null-safe on the company because an employee row can outlive the company
@@ -590,26 +686,16 @@ class AttendanceService
         // No shift for this day: an unplanned day, or a rostered day off that
         // somebody worked anyway. The company says what an ordinary day looks
         // like — these were literals until 2026-09-21, which made them the one
-        // rule in this service that no client could correct.
-        $company = $employee->company;
-
-        $startTime = $shift->start_time ?? $this->dayPolicy($company, 'default_day_start');
-        $endTime   = $shift->end_time ?? $this->dayPolicy($company, 'default_day_end');
-        $grace     = (int) ($shift->late_grace_minutes ?? $this->dayPolicy($company, 'default_day_grace_minutes'));
+        // rule in this service that no client could correct. The start and its
+        // grace are read inside graceStart(); only the end is needed here.
+        $endTime   = $shift->end_time ?? $this->dayPolicy($employee->company, 'default_day_end');
         $overnight = $shift?->crossesMidnight() ?? false;
         $small     = $now->hour < Shift::NIGHT_CUTOFF_HOUR;
 
         if ($type === 'in') {
-            $start = Carbon::parse($now->toDateString() . ' ' . $startTime, $now->timezone)
-                ->addMinutes($grace);
-
-            // Arriving after midnight for a shift that began last night: the
-            // start to measure against is yesterday's, not tonight's.
-            if ($overnight && $small) {
-                $start->subDay();
-            }
-
-            return $now->greaterThan($start) ? 'late' : 'ontime';
+            // Shift start plus its grace, overnight included — shared with
+            // lateMinutes() so the boundary and the distance past it agree.
+            return $now->greaterThan($this->graceStart($employee, $now, $workDate)) ? 'late' : 'ontime';
         }
 
         // type === 'out'

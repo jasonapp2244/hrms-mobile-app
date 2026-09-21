@@ -168,6 +168,9 @@
 						<li class="{{ request()->routeIs('policies.*') ? 'active' : '' }}">
 							<a href="{{ route('policies.edit') }}"><i class="ti ti-calendar-cog"></i><span>Working Week &amp; Policies</span></a>
 						</li>
+						<li class="{{ request()->routeIs('rules.*') ? 'active' : '' }}">
+							<a href="{{ route('rules.index') }}"><i class="ti ti-arrows-split-2"></i><span>Policy Rules</span></a>
+						</li>
 						<li class="{{ request()->routeIs('activity.*') ? 'active' : '' }}">
 							<a href="{{ route('activity.index') }}"><i class="ti ti-list-check"></i><span>Activity Log</span></a>
 						</li>

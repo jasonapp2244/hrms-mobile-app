@@ -193,4 +193,23 @@
 
   <button type="submit" class="btn btn-primary"><i class="ti ti-device-floppy me-1"></i>Save Policies</button>
 </form>
+
+{{-- Every setting above applies one value to the whole company. The rule
+     builder is where the exceptions live, and it is a separate screen because
+     a rule is a row rather than a field on this form. --}}
+<div class="card mt-3">
+  <div class="card-body d-md-flex align-items-center justify-content-between gap-3">
+    <div>
+      <h5 class="mb-1">Policy Rules</h5>
+      <p class="text-muted mb-0">
+        For the things a single setting cannot say — <em>&ldquo;when anyone in Ops clocks in more
+        than twenty minutes late, notify their manager&rdquo;</em>. Rules notify and record; they
+        never change a punch or decide a leave request.
+      </p>
+    </div>
+    <a href="{{ route('rules.index') }}" class="btn btn-outline-primary text-nowrap mt-2 mt-md-0">
+      <i class="ti ti-arrows-split-2 me-1"></i>Manage Rules
+    </a>
+  </div>
+</div>
 @endsection
