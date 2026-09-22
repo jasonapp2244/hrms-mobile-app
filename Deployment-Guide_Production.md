@@ -162,11 +162,13 @@ nothing else on the server.
 ```bash
 sudo mkdir -p /var/www
 sudo chown -R www-data:www-data /var/www
-sudo -u www-data git clone https://github.com/jasonapp2244/hr_-and_attendance_management_web_application.git /var/www/emp-repo
+sudo -u www-data git clone https://github.com/jasonapp2244/hrms-mobile-app.git /var/www/emp-repo
 
-# The Laravel app is the hrms/ subfolder of the repository. The symlink name
-# is what nginx and the systemd unit refer to, and stays 'emp' either way.
-sudo ln -s /var/www/emp-repo/hrms /var/www/emp
+# The Laravel app IS the repository root — there is no hrms/ subfolder any more,
+# since the backend was split out of the combined repository. The symlink is kept
+# because nginx and the systemd unit refer to 'emp' by name, and changing those
+# is a bigger change than keeping one symlink.
+sudo ln -s /var/www/emp-repo /var/www/emp
 
 cd /var/www/emp
 sudo -u www-data composer install --no-dev --optimize-autoloader
@@ -508,6 +510,64 @@ bash deploy/deploy.sh
 Preflight will still warn that backups are unverified. That warning is correct
 and should stay visible — it is the standing reminder of what this host costs
 you.
+
+---
+
+## 8b. Moving a server that was installed from the combined repository
+
+Do this **once**, on any install created before the backend was split out. Skip it
+on a fresh install — section 3 already clones the right repository.
+
+`deploy.sh` fast-forwards, deliberately, so that a deploy replays what was
+reviewed. It cannot fast-forward onto this repository: the history was rewritten
+to purge a 59 MB archive that had a `.env` inside it, so every commit has a new
+hash and the two histories share no commit. A `git remote set-url` followed by a
+pull will fail, and should.
+
+Clone alongside, carry the two things git does not hold, then swap the symlink:
+
+```bash
+cd /var/www
+sudo -u www-data git clone https://github.com/jasonapp2244/hrms-mobile-app.git emp-repo-new
+
+# .env and the storage tree are the install, not the code. Note the paths lose
+# the hrms/ level: the Laravel app is the repository root now.
+sudo -u www-data cp    /var/www/emp-repo/hrms/.env            /var/www/emp-repo-new/.env
+sudo -u www-data cp -a /var/www/emp-repo/hrms/storage/app/.   /var/www/emp-repo-new/storage/app/
+
+cd /var/www/emp-repo-new
+sudo -u www-data composer install --no-dev --optimize-autoloader
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo chmod -R 775 storage bootstrap/cache
+
+# Nothing is live until this line, and it is one atomic operation.
+sudo ln -sfn /var/www/emp-repo-new /var/www/emp
+sudo systemctl reload php8.3-fpm nginx
+```
+
+Then run the deploy once against the new checkout to rebuild caches and confirm
+preflight is clean:
+
+```bash
+cd /var/www/emp-repo-new
+sudo bash deploy/deploy.sh
+```
+
+Keep the old `emp-repo` until the site has been through a working day. It costs
+nothing and it is the only way back if something in the install — not the code —
+turns out to have lived somewhere nobody documented.
+
+The cron and systemd units refer to `/var/www/emp`, which is the symlink, so they
+need no change. If your install has no symlink and nginx points straight at the
+checkout, point it at the new one and reload before deleting the old.
+
+**On the managed webspace this is a panel change, and it is the dangerous one.**
+The document root was `<checkout>/hrms/public`; with the app at the repository
+root it becomes `<checkout>/public`. Change it in the panel in the same sitting
+as the clone — a document root left one level high serves `.env` to anyone who
+guesses the path, which is how this repository came to have a `.env` in its
+history in the first place. Verify after the change by asking for it:
+`curl -sI https://hrams.devonlinetestserver.com/.env` must not return 200.
 
 ---
 
