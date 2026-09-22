@@ -524,34 +524,56 @@ to purge a 59 MB archive that had a `.env` inside it, so every commit has a new
 hash and the two histories share no commit. A `git remote set-url` followed by a
 pull will fail, and should.
 
-Clone alongside, carry the two things git does not hold, then swap the symlink:
+It is one command. Clone the new repository somewhere outside the install, and
+run the migration script it carries against the site:
 
 ```bash
-cd /var/www
-sudo -u www-data git clone https://github.com/jasonapp2244/hrms-mobile-app.git emp-repo-new
-
-# .env and the storage tree are the install, not the code. Note the paths lose
-# the hrms/ level: the Laravel app is the repository root now.
-sudo -u www-data cp    /var/www/emp-repo/hrms/.env            /var/www/emp-repo-new/.env
-sudo -u www-data cp -a /var/www/emp-repo/hrms/storage/app/.   /var/www/emp-repo-new/storage/app/
-
-cd /var/www/emp-repo-new
-sudo -u www-data composer install --no-dev --optimize-autoloader
-sudo chown -R www-data:www-data storage bootstrap/cache
-sudo chmod -R 775 storage bootstrap/cache
-
-# Nothing is live until this line, and it is one atomic operation.
-sudo ln -sfn /var/www/emp-repo-new /var/www/emp
-sudo systemctl reload php8.3-fpm nginx
+git clone https://github.com/jasonapp2244/hrms-mobile-app.git ~/hrms-new
+bash ~/hrms-new/deploy/migrate-to-split-repo.sh /path/to/the/site
 ```
 
-Then run the deploy once against the new checkout to rebuild caches and confirm
-preflight is clean:
+On the managed webspace that is, exactly:
 
 ```bash
-cd /var/www/emp-repo-new
-sudo bash deploy/deploy.sh
+cd ~
+git clone https://github.com/jasonapp2244/hrms-mobile-app.git hrms-new
+bash ~/hrms-new/deploy/migrate-to-split-repo.sh \
+     /home/devonlinetestserver-hrams/htdocs/hrams.devonlinetestserver.com
 ```
+
+Prefix with `sudo` only where you have root; the script detects which host it is
+on, the same way `deploy.sh` does.
+
+**The application directory keeps its exact path.** That is the whole design: the
+document root, the cron entries and anything else naming a path keep working, and
+there is no panel setting to get wrong. Only the *contents* of that directory are
+replaced, and the directory itself is never removed, because a document root that
+disappears even for a second upsets some panel hosts.
+
+What it does, in order — everything expensive while the site is still serving:
+
+1. Finds the application (`./`, `./hrms`, `./emp`), refuses if there is no `.env`,
+   refuses if `APP_ENV` is not `production` unless you say `ALLOW_NON_PRODUCTION=1`.
+2. Copies `.env` and carries `storage/app` and `storage/backups` into the new
+   checkout — those are the install, not the code, and a clone has only the empty
+   skeleton.
+3. `composer install --no-dev`.
+4. Takes a **verified** database backup with the old code still running. A
+   `mysqldump` that did not finish stops everything before a single file moves.
+5. *Only now* goes into maintenance mode, swaps the directory contents, retires
+   the old repository's `.git` by renaming it, migrates, rebuilds caches, relinks
+   storage, restarts the worker, runs preflight, brings the site back up.
+
+The old install is moved intact to `pre-split-<date>/` beside the application, and
+the rollback is one command, printed at the end and again on any failure:
+
+```bash
+rm -rf <app> && mv <app>/../pre-split-<date> <app> && cd <app> && php artisan up
+```
+
+Keep it until the site has been through a working day.
+
+Every release after this one is the ordinary deploy — section 9.
 
 Keep the old `emp-repo` until the site has been through a working day. It costs
 nothing and it is the only way back if something in the install — not the code —
