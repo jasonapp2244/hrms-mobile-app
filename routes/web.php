@@ -4,6 +4,7 @@ use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\CrashReportController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\AttendanceHistoryController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\TwoFactorController;
@@ -238,6 +239,19 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     Route::prefix('attendance')->name('attendance.')->group(function () {
         Route::get('/', [AttendanceController::class, 'index'])->middleware('permission:view-attendance')->name('index');
         Route::get('logs', [AttendanceController::class, 'logs'])->middleware('permission:view-attendance')->name('logs');
+
+        // Attendance history (A4.20). The register and one person's days inside
+        // it — read-only, and on `view-attendance` for the same reason the log
+        // is: it shows facts that are already on that screen, arranged the way
+        // somebody asks about them. Export re-checks `export-reports` in the
+        // controller rather than on the route, because both actions serve HTML
+        // and a file from the same URL.
+        //
+        // Declared above nothing in particular today, but kept literal-first
+        // by habit: the group gains a `{log}` wildcard the moment somebody adds
+        // a GET for one, and `history` would be swallowed by it.
+        Route::get('history', [AttendanceHistoryController::class, 'index'])->middleware('permission:view-attendance')->name('history');
+        Route::get('history/{employee}', [AttendanceHistoryController::class, 'show'])->middleware('permission:view-attendance')->name('history.show');
         // The live board (A4.19). Same permission as the log — it shows the same
         // facts, one moment's worth rather than a history.
         Route::get('board', [AttendanceController::class, 'board'])->middleware('permission:view-attendance')->name('board');

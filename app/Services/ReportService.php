@@ -8,6 +8,7 @@ use App\Models\Employee;
 use App\Models\LeaveBalance;
 use App\Models\LeaveRequest;
 use App\Models\LeaveType;
+use App\Support\Clock;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
@@ -124,7 +125,7 @@ class ReportService
     /** Minutes as "7h 45m" — hours are how overtime is discussed and paid. */
     protected function asHours(int $minutes): string
     {
-        return intdiv($minutes, 60) . 'h ' . ($minutes % 60) . 'm';
+        return Clock::duration($minutes);
     }
 
     /**
@@ -719,9 +720,13 @@ class ReportService
      * for hours without asking for payroll's fixed set of columns.
      *
      * @param  EloquentCollection<int, Employee>  $employees
-     * @return array<int, array{days_worked: int, regular: int, overtime: int, total: int}>
+     * Break minutes and early check-outs ride along because this loop already
+     * has the day's punches in hand — counting them anywhere else would mean
+     * reading every punch in the window a second time.
+     *
+     * @return array<int, array{days_worked: int, regular: int, overtime: int, total: int, break_minutes: int, early_leave: int}>
      */
-    protected function hoursByEmployee(EloquentCollection $employees, string $from, string $to): array
+    public function hoursByEmployee(EloquentCollection $employees, string $from, string $to): array
     {
         // employeeStats loads only what it needs; the schedule side has to be
         // pulled in here or every employee-day fires its own query for the shift.
@@ -742,6 +747,8 @@ class ReportService
             $total = 0;
             $overtime = 0;
             $daysWorked = 0;
+            $breakMinutes = 0;
+            $earlyLeave = 0;
 
             foreach ($byDate as $date => $dayLogs) {
                 $result = $this->attendance->overtimeFor($employee, $date, $dayLogs);
@@ -752,13 +759,27 @@ class ReportService
                 if ($result['worked'] > 0) {
                     $daysWorked++;
                 }
+
+                // What was actually punched, so several breaks in a day sum and
+                // one left open at check-out is discarded. Not the shift's
+                // nominal break — that is already inside `worked`.
+                $breakMinutes += $this->attendance->punchedBreakMinutes($dayLogs);
+
+                // Days, not punches, for the same reason lateDayKeys() counts
+                // days: somebody who steps out and comes back leaves twice, and
+                // only the last one of the day is the time they went home.
+                if ($dayLogs->last(fn (AttendanceLog $log) => $log->type === 'out')?->status === 'early_leave') {
+                    $earlyLeave++;
+                }
             }
 
             $out[$employee->id] = [
-                'days_worked' => $daysWorked,
-                'regular'     => $total - $overtime,
-                'overtime'    => $overtime,
-                'total'       => $total,
+                'days_worked'   => $daysWorked,
+                'regular'       => $total - $overtime,
+                'overtime'      => $overtime,
+                'total'         => $total,
+                'break_minutes' => $breakMinutes,
+                'early_leave'   => $earlyLeave,
             ];
         }
 
@@ -769,7 +790,7 @@ class ReportService
      * Per-employee attendance stats for the period, keyed by employee id.
      * @return Collection<int,array>
      */
-    protected function employeeStats(int $companyId, string $from, string $to, ?int $officeId = null, ?array $employeeIds = null): Collection
+    public function employeeStats(int $companyId, string $from, string $to, ?int $officeId = null, ?array $employeeIds = null): Collection
     {
         $employees = Employee::with(['department', 'office'])
             ->where('company_id', $companyId)->active()
@@ -817,6 +838,69 @@ class ReportService
                 'ontime_pct'   => $ontimePct,
             ];
         })->keyBy(fn ($s) => $s['employee']->id);
+    }
+
+    /**
+     * One row per employee for the Attendance History screen.
+     *
+     * Composed rather than computed: `employeeStats()` already knows present,
+     * leave, absent and late **days** over a window, and `hoursByEmployee()`
+     * already walks each employee's days to pair punches into worked minutes.
+     * Both were protected and used only by the fixed reports; this screen is
+     * the second caller, which is the point at which they stop being private
+     * details of this class.
+     *
+     * Filtering happens on the employee list *before* either of them runs, so a
+     * search for one person does not read a whole company's punches.
+     *
+     * @param  array{office_id?: ?int, department_id?: ?int, q?: ?string}  $filters
+     * @return Collection<int, array{
+     *     employee: Employee, present_days: int, leave_days: int,
+     *     absent_days: int, late: int, ontime: int, ontime_pct: ?float,
+     *     worked_minutes: int, break_minutes: int, early_leave: int,
+     * }>
+     */
+    public function attendanceHistory(int $companyId, string $from, string $to, array $filters = []): Collection
+    {
+        $officeId     = $filters['office_id'] ?? null;
+        $departmentId = $filters['department_id'] ?? null;
+        $search       = $filters['q'] ?? null;
+
+        $ids = Employee::where('company_id', $companyId)
+            ->active()
+            ->when($officeId, fn ($q) => $q->where('office_id', $officeId))
+            ->when($departmentId, fn ($q) => $q->where('department_id', $departmentId))
+            ->when($search, function ($q) use ($search) {
+                $like = '%' . $search . '%';
+                $q->where(fn ($w) => $w
+                    ->where('first_name', 'like', $like)
+                    ->orWhere('last_name', 'like', $like)
+                    ->orWhere('employee_code', 'like', $like));
+            })
+            ->pluck('id')
+            ->all();
+
+        // Null would mean everybody. An empty array means nobody, which is the
+        // right answer to a search that matched no one.
+        $stats = $this->employeeStats($companyId, $from, $to, $officeId, $ids);
+
+        $employees = EloquentCollection::make($stats->pluck('employee')->all());
+
+        // employeeStats loads department and office; the screen also shows a
+        // job title.
+        $employees->load('designation');
+
+        $hours = $this->hoursByEmployee($employees, $from, $to);
+
+        return $stats->map(function (array $row) use ($hours) {
+            $h = $hours[$row['employee']->id] ?? [];
+
+            return $row + [
+                'worked_minutes' => $h['total'] ?? 0,
+                'break_minutes'  => $h['break_minutes'] ?? 0,
+                'early_leave'    => $h['early_leave'] ?? 0,
+            ];
+        })->values();
     }
 
     /** Late Arrivals report — employees ranked by number of late clock-ins. */

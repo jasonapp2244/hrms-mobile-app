@@ -27,6 +27,25 @@ class Clock
     }
 
     /** AM or PM for a 0–23 hour, in the caller's language. */
+    /**
+     * A length of time as "7h 45m".
+     *
+     * Hours are how worked time, overtime and breaks are all discussed and
+     * paid. The format was written out by hand in `ReportService` and was about
+     * to be written out again by the attendance history screens, so it lives
+     * here beside the one way to write a time of day.
+     *
+     * Negative minutes clamp to zero rather than rendering "-1h 59m". Every
+     * caller is showing a duration that cannot be negative, so a negative one
+     * is a bug upstream and printing it sideways only hides where.
+     */
+    public static function duration(int $minutes): string
+    {
+        $minutes = max(0, $minutes);
+
+        return intdiv($minutes, 60) . 'h ' . ($minutes % 60) . 'm';
+    }
+
     public static function meridiem(int $hour): string
     {
         return $hour < 12 ? __('time.am') : __('time.pm');

@@ -38,6 +38,8 @@
 								<li><a class="{{ request()->routeIs('attendance.index') ? 'active' : '' }}" href="{{ route('attendance.index') }}">Overview</a></li>
 								<li><a class="{{ request()->routeIs('attendance.board') ? 'active' : '' }}" href="{{ route('attendance.board') }}">Who Is In</a></li>
 								<li><a class="{{ request()->routeIs('attendance.logs') ? 'active' : '' }}" href="{{ route('attendance.logs') }}">Attendance Logs</a></li>
+								{{-- routeIs('attendance.history*') so the employee detail page keeps the parent open too. --}}
+								<li><a class="{{ request()->routeIs('attendance.history*') ? 'active' : '' }}" href="{{ route('attendance.history') }}">Attendance History</a></li>
 								@can('manage-attendance')
 								<li><a class="{{ request()->routeIs('attendance.regularisations*') ? 'active' : '' }}" href="{{ route('attendance.regularisations') }}">Corrections</a></li>
 								@endcan

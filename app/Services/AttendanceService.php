@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AttendanceLog;
 use App\Models\Company;
 use App\Models\Employee;
+use App\Models\Holiday;
 use App\Models\Office;
 use App\Models\PolicyRule;
 use App\Models\Shift;
@@ -522,6 +523,121 @@ class AttendanceService
             ! $isWorkingDay => 'weekend',
             default         => 'absent',
         };
+    }
+
+    /**
+     * One row per day for one employee, across a date range.
+     *
+     * The shape somebody actually asks their attendance in — did I get in, when
+     * did I go to lunch, how long was I here — and the third place it was about
+     * to be written. `Api\AttendanceController::history` built it inline, and
+     * `TeamAttendance::forDate` builds the transpose of it: one team across one
+     * date. A web screen with its own copy would have made three answers to
+     * "what was this day", which is the drift `dayStatus()` was lifted out of a
+     * controller to prevent. Both callers go through here now.
+     *
+     * Times come back as Carbon rather than formatted strings. The API renders
+     * them ISO8601 and a Blade table renders them as a wall clock, so a service
+     * that picked one would force the other to parse its own output.
+     *
+     * `break_minutes` is what was **punched**, so a day with three breaks sums
+     * them and one left open at check-out is discarded — see
+     * [punchedBreakMinutes]. It is not the shift's nominal break: that is a
+     * payroll question, and [overtimeFor] is what answers it.
+     *
+     * **Side effect worth knowing about:** the employee's `shiftAssignments`
+     * relation is replaced with only the rows inside the window, because
+     * [Employee::shiftOn] reads the loaded relation when there is one and would
+     * otherwise fire a query per day — 92 of them on a full-range detail page.
+     * Every date this method asks about is inside that window. A caller that
+     * goes on to ask `shiftOn()` about a date outside it must re-load the
+     * relation first.
+     *
+     * @return Collection<int, array{
+     *     date: string, weekday: string, status: string, late: bool,
+     *     early_leave: bool, first_in: ?Carbon, last_out: ?Carbon,
+     *     break_start: ?Carbon, break_end: ?Carbon, break_minutes: int,
+     *     worked_minutes: int, punches: int, holiday: ?string, shift: ?Shift,
+     *     remarks: ?string,
+     * }>
+     */
+    public function dayRows(Employee $employee, string $from, string $to): Collection
+    {
+        $employee->loadMissing(['department.shift', 'shiftOverride']);
+
+        // between(), never whereBetween() — trap 1. `date` is a date cast and
+        // every engine but MySQL stores it as a midnight timestamp, so the
+        // string comparison drops the last day of the range.
+        $assignments = $employee->shiftAssignments()
+            ->between($from, $to)
+            ->with('shift')
+            ->get();
+
+        $employee->setRelation('shiftAssignments', $assignments);
+
+        $logs = AttendanceLog::where('employee_id', $employee->id)
+            ->forDates($from, $to)
+            ->orderBy('scanned_at')
+            ->get()
+            ->groupBy(fn (AttendanceLog $log) => $log->work_date->toDateString());
+
+        // The calendar facts for the whole window in one pass each, rather than
+        // a query per day. namedBetween() in particular reads every holiday the
+        // company has, because a recurring one has to be projected onto the
+        // year — calling it inside the loop would read them all again daily.
+        $working  = array_flip($this->leave->workingDatesBetween($employee->company, $from, $to));
+        $holidays = $employee->company
+            ? Holiday::namedBetween($employee->company_id, $from, $to)
+            : [];
+        $onLeave = array_flip(
+            $this->leave->leaveDatesByEmployee($employee->company_id, $from, $to)[$employee->id] ?? []
+        );
+        $daysOff = $assignments->where('is_day_off', true)
+            ->map(fn ($a) => $a->date->toDateString())
+            ->flip();
+
+        $rows = collect();
+        $last = Carbon::parse($to);
+
+        for ($day = Carbon::parse($from); $day->lte($last); $day->addDay()) {
+            $date    = $day->toDateString();
+            $dayLogs = $logs->get($date, collect());
+
+            // First in and last out, not first and last row: there are four
+            // punch types and a break is neither (trap 6).
+            $firstIn    = $dayLogs->firstWhere('type', 'in');
+            $lastOut    = $dayLogs->last(fn (AttendanceLog $log) => $log->type === 'out');
+            $breakStart = $dayLogs->firstWhere('type', 'break_start');
+            $breakEnd   = $dayLogs->last(fn (AttendanceLog $log) => $log->type === 'break_end');
+
+            $shift = $employee->shiftOn($date);
+
+            $rows->push([
+                'date'    => $date,
+                'weekday' => $day->format('D'),
+                'status'  => $this->dayStatus(
+                    $dayLogs->isNotEmpty(),
+                    isset($onLeave[$date]),
+                    isset($holidays[$date]),
+                    $daysOff->has($date),
+                    isset($working[$date]),
+                ),
+                'late'           => $firstIn?->status === 'late',
+                'early_leave'    => $lastOut?->status === 'early_leave',
+                'first_in'       => $firstIn?->scanned_at,
+                'last_out'       => $lastOut?->scanned_at,
+                'break_start'    => $breakStart?->scanned_at,
+                'break_end'      => $breakEnd?->scanned_at,
+                'break_minutes'  => $this->punchedBreakMinutes($dayLogs),
+                'worked_minutes' => $this->workedMinutes($dayLogs, null, $shift),
+                'punches'        => $dayLogs->count(),
+                'holiday'        => $holidays[$date] ?? null,
+                'shift'          => $shift,
+                'remarks'        => $dayLogs->pluck('notes')->filter()->first(),
+            ]);
+        }
+
+        return $rows;
     }
 
     /**

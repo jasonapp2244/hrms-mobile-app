@@ -213,6 +213,18 @@ class CrossCompanyIsolationTest extends TestCase
         );
     }
 
+    public function test_an_admin_cannot_open_another_companys_attendance_history(): void
+    {
+        // Route-model binding resolves an employee by id and knows nothing
+        // about companies, so this screen is only scoped by the check in its
+        // own controller. That check is the whole guard, which is why it is
+        // pinned here rather than only in AttendanceHistoryTest.
+        $this->assertRefused(
+            $this->actingAs($this->ourAdmin)->get(route('attendance.history.show', $this->theirs['employee'])),
+            'attendance.history.show',
+        );
+    }
+
     public function test_an_admin_cannot_list_another_companys_employee_documents(): void
     {
         $this->assertRefused(

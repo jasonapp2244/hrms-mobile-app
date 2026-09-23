@@ -379,62 +379,29 @@ class AttendanceController extends ApiController
             ]));
         }
 
-        $logs = AttendanceLog::with('office')
-            ->where('employee_id', $employee->id)
-            ->whereDate('work_date', '>=', $from)
-            ->whereDate('work_date', '<=', $to)
-            ->orderBy('scanned_at')
-            ->get()
-            ->groupBy(fn (AttendanceLog $log) => $log->work_date->toDateString());
+        // One definition of what a day was, shared with the web's Attendance
+        // History screen. This loop used to live here, and `TeamAttendance`
+        // holds the transpose of it; a third copy was one screen away.
+        $rows = $this->attendance->dayRows($employee, $from, $to);
 
-        // The calendar facts for the whole window in one pass, rather than a
-        // query per day.
-        $working  = array_flip($this->leave->workingDatesBetween($employee->company, $from, $to));
-        $holidays = $employee->company
-            ? Holiday::namedBetween($employee->company_id, $from, $to)
-            : [];
-        $onLeave  = array_flip(
-            $this->leave->leaveDatesByEmployee($employee->company_id, $from, $to)[$employee->id] ?? []
-        );
-        $daysOff = $employee->shiftAssignments()
-            ->whereDate('date', '>=', $from)->whereDate('date', '<=', $to)
-            ->where('is_day_off', true)
-            ->pluck('date')
-            ->map(fn ($d) => $d instanceof Carbon ? $d->toDateString() : (string) $d)
-            ->flip();
-
-        $days = [];
-
-        for ($day = Carbon::parse($to); $day->gte(Carbon::parse($from)); $day->subDay()) {
-            $date      = $day->toDateString();
-            $dayLogs   = $logs->get($date, collect());
-            $firstIn   = $dayLogs->firstWhere('type', 'in');
-            $lastOut   = $dayLogs->last(fn ($log) => $log->type === 'out');
-
-            $days[] = [
-                'date'    => $date,
-                'weekday' => $day->format('D'),
-                'status'  => $this->attendance->dayStatus(
-                    $dayLogs->isNotEmpty(),
-                    isset($onLeave[$date]), isset($holidays[$date]),
-                    $daysOff->has($date), isset($working[$date]),
-                ),
-                'late'           => $firstIn?->status === 'late',
-                'first_in'       => $firstIn ? $this->attendance->wallClock($firstIn->scanned_at, $timezone)->toIso8601String() : null,
-                'last_out'       => $lastOut ? $this->attendance->wallClock($lastOut->scanned_at, $timezone)->toIso8601String() : null,
-                // With that day's shift, so a paid break (A5.7) stays on the
-                // clock here as well. The rest of the policy is not applied to
-                // a history row: this number is "how long I was at work", and
-                // the payroll figure it feeds is computed by overtimeFor.
-                'worked_minutes' => $this->attendance->workedMinutes(
-                    $dayLogs, null, $employee->shiftOn($date),
-                ),
-                'punches'        => $dayLogs->count(),
-                'holiday'        => $holidays[$date] ?? null,
-            ];
-        }
-
-        $rows = collect($days);
+        // Newest first — the question is "did I make it in today", and the
+        // answer to that is at the top. dayRows() reads forwards because a
+        // running total has to.
+        $days = $rows->reverse()->values()->map(fn (array $row) => [
+            'date'     => $row['date'],
+            'weekday'  => $row['weekday'],
+            'status'   => $row['status'],
+            'late'     => $row['late'],
+            'first_in' => $row['first_in']
+                ? $this->attendance->wallClock($row['first_in'], $timezone)->toIso8601String()
+                : null,
+            'last_out' => $row['last_out']
+                ? $this->attendance->wallClock($row['last_out'], $timezone)->toIso8601String()
+                : null,
+            'worked_minutes' => $row['worked_minutes'],
+            'punches'        => $row['punches'],
+            'holiday'        => $row['holiday'],
+        ])->all();
 
         return $this->ok([
             'from'  => $from,
