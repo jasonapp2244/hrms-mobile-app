@@ -78,6 +78,11 @@ class RegularisationController extends ApiController
             // app where that line is — a handset a few hours ahead of the
             // company otherwise offered a date this controller then refused.
             'today'    => now($timezone)->toDateString(),
+            // And the time of day there. The form opens on "now", and the
+            // handset's own clock is the wrong now: a phone a few hours ahead
+            // of the company proposed a time that had not happened yet, which
+            // this controller then refused.
+            'server_time' => now($timezone)->toIso8601String(),
             'requests' => collect($page->items())
                 ->map(fn (AttendanceRegularisation $r) => $this->payload($r, $timezone))
                 ->values(),

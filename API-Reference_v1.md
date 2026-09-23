@@ -756,6 +756,8 @@ same void-and-re-enter path HR uses by hand, so it carries the same audit trail.
 ```json
 {
   "ok": true,
+  "today": "2026-08-04",
+  "server_time": "2026-08-04T10:15:00-04:00",
   "requests": [
     { "id": 7, "type": "out", "work_date": "2026-08-03",
       "requested_at": "2026-08-03T18:00:00-04:00",
@@ -772,6 +774,12 @@ same void-and-re-enter path HR uses by hand, so it carries the same audit trail.
   ]
 }
 ```
+
+`today` and `server_time` are the **company's** date and wall clock, and are
+where a new request's form should open. A correction cannot be raised for a time
+that has not happened, and the handset's own clock does not know where that line
+is — a phone a few hours ahead of the company would propose a time this endpoint
+then refuses.
 
 `recent_punches` is the last 30, newest first, and is why this list ships them:
 `/attendance/history` answers in day-shaped rows and carries no punch ids, so

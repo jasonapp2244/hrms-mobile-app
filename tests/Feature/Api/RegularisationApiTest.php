@@ -401,4 +401,25 @@ class RegularisationApiTest extends TestCase
 
         Carbon::setTestNow();
     }
+
+    /**
+     * The time of day too, with the company's offset on it.
+     *
+     * The date alone left the form opening at the handset's own hour on the
+     * company's day — 23:30 on a phone in London against a New York company at
+     * 18:30, a time that had not happened yet and that this controller refuses.
+     */
+    public function test_the_list_names_the_company_s_time_of_day(): void
+    {
+        $this->company->update(['timezone' => 'America/New_York']);
+
+        // 02:30 UTC on the 15th is 22:30 on the 14th in New York.
+        Carbon::setTestNow('2026-09-15 02:30:00');
+
+        $this->getJson('/api/v1/attendance/regularisations')
+            ->assertOk()
+            ->assertJsonPath('server_time', '2026-09-14T22:30:00-04:00');
+
+        Carbon::setTestNow();
+    }
 }
