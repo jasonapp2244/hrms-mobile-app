@@ -258,12 +258,63 @@ class HrAttendanceHistoryApiTest extends TestCase
 
         // Newest first.
         $res->assertJsonPath('days.0.date', '2026-08-05')
+            ->assertJsonPath('days.0.break_count', 1)
             ->assertJsonPath('days.0.break_minutes', 0)
             ->assertJsonPath('days.0.worked_minutes', 480)
             ->assertJsonPath('days.0.break_end', null)
             ->assertJsonPath('days.1.date', '2026-08-04')
+            ->assertJsonPath('days.1.break_count', 2)
             ->assertJsonPath('days.1.break_minutes', 60)
             ->assertJsonPath('days.1.worked_minutes', 420);
+    }
+
+    /**
+     * The count is what stops the envelope reading as a single long break.
+     *
+     * Three breaks, the last never ended: `break_start` is 11:00 and
+     * `break_end` is 13:45 because they are the first and the last, and the
+     * 2h45m between them is not a break — 60 minutes of it is. Without
+     * `break_count` there is nothing in the row that says so, and the open
+     * break at 16:30 does not appear at all, because `break_end` is not null.
+     */
+    public function test_the_break_count_distinguishes_an_envelope_from_a_break(): void
+    {
+        $this->day('2026-08-04', [
+            ['in', '09:00:00'],
+            ['break_start', '11:00:00'], ['break_end', '11:15:00'],
+            ['break_start', '13:00:00'], ['break_end', '13:45:00'],
+            ['break_start', '16:30:00'],
+            ['out', '17:00:00'],
+        ]);
+
+        Sanctum::actingAs($this->hr);
+
+        $res = $this->getJson($this->url([
+            'period' => 'custom', 'from' => '2026-08-04', 'to' => '2026-08-04',
+        ]))->assertOk();
+
+        // Started three, charged for two — the open one has no known length.
+        $res->assertJsonPath('days.0.break_count', 3)
+            ->assertJsonPath('days.0.break_minutes', 60)
+            ->assertJsonPath('days.0.worked_minutes', 420)
+            ->assertJsonPath('days.0.punches', 7);
+
+        $this->assertStringContainsString('T11:00:00', $res->json('days.0.break_start'));
+        $this->assertStringContainsString('T13:45:00', $res->json('days.0.break_end'));
+    }
+
+    public function test_a_day_with_no_break_reports_a_count_of_zero(): void
+    {
+        $this->day('2026-08-04', [['in', '09:00:00'], ['out', '17:00:00']]);
+
+        Sanctum::actingAs($this->hr);
+
+        $this->getJson($this->url([
+            'period' => 'custom', 'from' => '2026-08-04', 'to' => '2026-08-04',
+        ]))->assertOk()
+            ->assertJsonPath('days.0.break_count', 0)
+            ->assertJsonPath('days.0.break_start', null)
+            ->assertJsonPath('days.0.break_end', null);
     }
 
     public function test_late_and_early_are_flagged_and_totalled(): void
@@ -371,10 +422,49 @@ class HrAttendanceHistoryApiTest extends TestCase
             'period' => 'custom', 'from' => '2026-08-03', 'to' => '2026-08-04',
         ]))->assertOk();
 
-        $this->assertSame(
-            $days->json('totals.break_minutes'),
-            $register->json('people.0.attendance.break_minutes'),
-        );
+        // Every field, not just the breaks. An earlier version of this test
+        // compared break_minutes alone and passed while worked_minutes was an
+        // hour a day out: the register was reporting payroll's settled figure,
+        // which charges the shift's nominal break on a day nobody punched one,
+        // under the same label the day rows use for what was actually punched.
+        foreach ([
+            'present_days', 'late_days', 'early_leave_days',
+            'worked_minutes', 'break_minutes',
+        ] as $key) {
+            $this->assertSame(
+                $days->json("totals.$key"),
+                $register->json("people.0.attendance.$key"),
+                "register and day rows disagree on $key",
+            );
+        }
+    }
+
+    /**
+     * The register must not quietly switch to payroll's break policy.
+     *
+     * 04 Aug runs 09:45 to 17:00 with no break punched at all. Payroll charges
+     * the shift's 60m nominal break for it; an attendance record shows the 435
+     * minutes the badge recorded. This is the exact day that made the two
+     * screens disagree, so it is asserted on its own rather than only through
+     * the totals above.
+     */
+    public function test_a_day_with_no_punched_break_is_not_charged_a_nominal_one(): void
+    {
+        $this->day('2026-08-04', [['in', '09:45:00', 'late'], ['out', '17:00:00']]);
+
+        Sanctum::actingAs($this->hr);
+
+        $window = ['period' => 'custom', 'from' => '2026-08-04', 'to' => '2026-08-04'];
+
+        $this->getJson($this->url($window))
+            ->assertOk()
+            ->assertJsonPath('days.0.break_minutes', 0)
+            ->assertJsonPath('days.0.worked_minutes', 435);
+
+        $this->getJson('/api/v1/hr/employees?' . http_build_query($window))
+            ->assertOk()
+            ->assertJsonPath('people.0.attendance.break_minutes', 0)
+            ->assertJsonPath('people.0.attendance.worked_minutes', 435);
     }
 
     public function test_a_person_with_no_punches_gets_zeros_not_nulls(): void

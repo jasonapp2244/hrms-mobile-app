@@ -607,8 +607,15 @@ class AttendanceService
             // punch types and a break is neither (trap 6).
             $firstIn    = $dayLogs->firstWhere('type', 'in');
             $lastOut    = $dayLogs->last(fn (AttendanceLog $log) => $log->type === 'out');
+            // The FIRST start and the LAST end, so on a day with several breaks
+            // the pair is the envelope round all of them and not one break.
+            // `break_count` is what tells the two apart: 11:00-13:45 spanning
+            // 2h45m while `break_minutes` says 60 is not broken arithmetic, it
+            // is three breaks, and a reader cannot know that from the times
+            // alone. Same reasoning as the punch count beside in and out.
             $breakStart = $dayLogs->firstWhere('type', 'break_start');
             $breakEnd   = $dayLogs->last(fn (AttendanceLog $log) => $log->type === 'break_end');
+            $breakCount = $dayLogs->where('type', 'break_start')->count();
 
             $shift = $employee->shiftOn($date);
 
@@ -628,6 +635,7 @@ class AttendanceService
                 'last_out'       => $lastOut?->scanned_at,
                 'break_start'    => $breakStart?->scanned_at,
                 'break_end'      => $breakEnd?->scanned_at,
+                'break_count'    => $breakCount,
                 'break_minutes'  => $this->punchedBreakMinutes($dayLogs),
                 'worked_minutes' => $this->workedMinutes($dayLogs, null, $shift),
                 'punches'        => $dayLogs->count(),

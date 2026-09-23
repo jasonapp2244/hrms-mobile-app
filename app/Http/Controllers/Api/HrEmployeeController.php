@@ -200,7 +200,13 @@ class HrEmployeeController extends ApiController
                     ->unique()->count(),
                 'late_days'        => $this->attendance->lateDayKeys($ins)->count(),
                 'early_leave_days' => $hours[$id]['early_leave'] ?? 0,
-                'worked_minutes'   => $hours[$id]['total'] ?? 0,
+                // `worked_as_punched`, not `total`. This line sits directly
+                // above the tap that opens the day rows, and it prints the
+                // punched break total beside it — a settled figure here would
+                // charge a nominal break the rows below never show, so the two
+                // screens would differ by an hour a day and the break minutes
+                // on this very line would not account for the gap.
+                'worked_minutes'   => $hours[$id]['worked_as_punched'] ?? 0,
                 'break_minutes'    => $hours[$id]['break_minutes'] ?? 0,
             ];
         }
@@ -303,6 +309,7 @@ class HrEmployeeController extends ApiController
             'last_out'       => $this->wall($row['last_out'], $timezone),
             'break_start'    => $this->wall($row['break_start'], $timezone),
             'break_end'      => $this->wall($row['break_end'], $timezone),
+            'break_count'    => $row['break_count'],
             'break_minutes'  => $row['break_minutes'],
             'worked_minutes' => $row['worked_minutes'],
             'punches'        => $row['punches'],

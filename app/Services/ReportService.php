@@ -724,7 +724,17 @@ class ReportService
      * has the day's punches in hand — counting them anywhere else would mean
      * reading every punch in the window a second time.
      *
-     * @return array<int, array{days_worked: int, regular: int, overtime: int, total: int, break_minutes: int, early_leave: int}>
+     * `worked_as_punched` rides along for the same reason, but it is a
+     * different number from `total` and deliberately so. `total` is the
+     * settled, payroll figure: it charges the shift's nominal break on a long
+     * day nobody punched a break on, because payroll pays for a lunch whether
+     * or not the badge recorded it. `worked_as_punched` charges only breaks
+     * that were actually punched, which is what a day-by-day attendance record
+     * shows and the only figure that reconciles with the break times printed
+     * beside it. Reporting one under the other's label is what made the HR
+     * register and the day rows disagree by an hour a day.
+     *
+     * @return array<int, array{days_worked: int, regular: int, overtime: int, total: int, worked_as_punched: int, break_minutes: int, early_leave: int}>
      */
     public function hoursByEmployee(EloquentCollection $employees, string $from, string $to): array
     {
@@ -749,6 +759,7 @@ class ReportService
             $daysWorked = 0;
             $breakMinutes = 0;
             $earlyLeave = 0;
+            $asPunched = 0;
 
             foreach ($byDate as $date => $dayLogs) {
                 $result = $this->attendance->overtimeFor($employee, $date, $dayLogs);
@@ -765,6 +776,15 @@ class ReportService
                 // nominal break — that is already inside `worked`.
                 $breakMinutes += $this->attendance->punchedBreakMinutes($dayLogs);
 
+                // The same day as dayRows() reports it. `shiftOn` reads the
+                // relations loaded above, so this costs no query; passing the
+                // shift is what makes a paid break stay paid here too.
+                $asPunched += $this->attendance->workedMinutes(
+                    $dayLogs,
+                    null,
+                    $employee->shiftOn($date),
+                );
+
                 // Days, not punches, for the same reason lateDayKeys() counts
                 // days: somebody who steps out and comes back leaves twice, and
                 // only the last one of the day is the time they went home.
@@ -774,12 +794,13 @@ class ReportService
             }
 
             $out[$employee->id] = [
-                'days_worked'   => $daysWorked,
-                'regular'       => $total - $overtime,
-                'overtime'      => $overtime,
-                'total'         => $total,
-                'break_minutes' => $breakMinutes,
-                'early_leave'   => $earlyLeave,
+                'days_worked'       => $daysWorked,
+                'regular'           => $total - $overtime,
+                'overtime'          => $overtime,
+                'total'             => $total,
+                'worked_as_punched' => $asPunched,
+                'break_minutes'     => $breakMinutes,
+                'early_leave'       => $earlyLeave,
             ];
         }
 
