@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
 use App\Models\LeaveRequest;
+use App\Services\AttendanceService;
 use App\Services\LeaveService;
+use App\Services\ReportService;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * The employee register, on the phone (client requirement, 2026-09-22).
@@ -39,8 +44,20 @@ class HrEmployeeController extends ApiController
     /** How many days of attendance the detail view summarises. */
     protected const ATTENDANCE_WINDOW_DAYS = 30;
 
+    /**
+     * The furthest back one history call will reach.
+     *
+     * The same 92 as `Api\AttendanceController::MAX_HISTORY_DAYS`, and the same
+     * number deliberately: a second, larger ceiling for HR would mean a second
+     * `range_too_large` message to translate and a second rule for the app to
+     * learn, to buy a window nobody asked for. A month and a week both fit.
+     */
+    protected const MAX_HISTORY_DAYS = 92;
+
     public function __construct(
         protected LeaveService $leave,
+        protected AttendanceService $attendance,
+        protected ReportService $reports,
     ) {}
 
     /**
@@ -62,6 +79,14 @@ class HrEmployeeController extends ApiController
             'status'        => 'nullable|in:active,inactive,terminated,all',
             'page'          => 'nullable|integer|min:1',
         ]);
+
+        // The same period vocabulary the detail view speaks, so one control in
+        // the app drives both. The company's zone, not the caller's: a register
+        // read from a phone in Karachi still reports the employer's month.
+        [$period, $from, $to, $today] = $this->attendanceWindow(
+            $request,
+            $request->user()?->company?->tz() ?? config('app.timezone'),
+        );
 
         $query = Employee::with(['department', 'designation', 'office'])
             ->where('company_id', $companyId)
@@ -99,12 +124,88 @@ class HrEmployeeController extends ApiController
 
         $page = $query->paginate($this->perPage('hr_employees'));
 
+        // The register carries a line of attendance per person, and it is
+        // computed for **this page only**. A company-wide pass would read every
+        // punch in the window to draw twenty rows, and the nineteen pages
+        // nobody scrolled to would be paid for on every search.
+        $people  = collect($page->items());
+        $summary = $this->registerAttendance($people, $from, $to);
+
         return $this->ok([
-            'people' => collect($page->items())
-                ->map(fn (Employee $person) => $this->summary($person))
+            'people' => $people
+                ->map(fn (Employee $person) => $this->summary($person) + [
+                    'attendance' => $summary[$person->id] ?? null,
+                ])
                 ->values(),
-            'meta' => $this->pageMeta($page),
+            'period' => $period,
+            'from'   => $from,
+            'to'     => $to,
+            'today'  => $today,
+            'meta'   => $this->pageMeta($page),
         ]);
+    }
+
+    /**
+     * Present days, late days and hours for the people on one page.
+     *
+     * Two queries for the whole page rather than two per person. `lateDayKeys`
+     * counts **days**, not punches — three check-ins on one late morning is one
+     * late day, and the rest of the app has always counted it that way.
+     *
+     * `employeeStats()` would have answered most of this, but it filters to
+     * active employees and this register deliberately shows leavers: a row for
+     * somebody who left in March would have come back blank rather than with
+     * the March they worked.
+     *
+     * @param  Collection<int, Employee>  $people
+     * @return array<int, array{present_days: int, late_days: int, early_leave_days: int, worked_minutes: int, break_minutes: int}>
+     */
+    protected function registerAttendance(Collection $people, string $from, string $to): array
+    {
+        if ($people->isEmpty()) {
+            return [];
+        }
+
+        $ids = $people->pluck('id')->all();
+
+        // forDates(), never whereBetween() — trap 1. `work_date` is a date cast
+        // and every engine but MySQL stores it as a midnight timestamp, so the
+        // string comparison drops the last day of the range.
+        // The column list is not arbitrary: `lateDayKeys()` filters on `type`
+        // and sorts on `scanned_at`, so a narrower select silently drops every
+        // row and reports nobody late. Narrowed at all because this reads a
+        // page of employees across up to 92 days.
+        $arrivals = AttendanceLog::whereIn('employee_id', $ids)
+            ->forDates($from, $to)
+            ->where('type', 'in')
+            ->get(['id', 'employee_id', 'work_date', 'status', 'type', 'scanned_at'])
+            ->groupBy('employee_id');
+
+        $hours = $this->reports->hoursByEmployee(
+            EloquentCollection::make($people->all()),
+            $from,
+            $to,
+        );
+
+        $out = [];
+
+        foreach ($ids as $id) {
+            $ins = $arrivals->get($id, collect());
+
+            $out[$id] = [
+                'present_days' => $ins->pluck('work_date')
+                    ->map(fn ($date) => $date instanceof \DateTimeInterface
+                        ? $date->format('Y-m-d')
+                        : (string) $date)
+                    ->unique()->count(),
+                'late_days'        => $this->attendance->lateDayKeys($ins)->count(),
+                'early_leave_days' => $hours[$id]['early_leave'] ?? 0,
+                'worked_minutes'   => $hours[$id]['total'] ?? 0,
+                'break_minutes'    => $hours[$id]['break_minutes'] ?? 0,
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -159,6 +260,143 @@ class HrEmployeeController extends ApiController
             ])->values(),
             'meta' => $this->pageMeta($page),
         ]);
+    }
+
+    /**
+     * One employee's attendance, day by day.
+     *
+     * The counts on the detail view answer "roughly how is this person doing".
+     * This answers the question HR actually rings up about — *what happened on
+     * the 14th* — and it is the reason `attendanceSummary()` below no longer
+     * has to end with "the full history is on the web".
+     *
+     * Nothing here computes attendance. `dayRows()` is the one definition of
+     * what a day was, shared with `/attendance/history` and with the web's
+     * Attendance History screen, so the three cannot disagree about a break
+     * left open or a day nobody clocked out of.
+     *
+     * **The window is resolved here, not on the handset.** A phone is wherever
+     * its owner is and attendance is judged in the company's zone, so a "this
+     * month" worked out on the device is a different month for part of every
+     * day. The app sends `period` and reads `from`, `to` and `today` back out
+     * of the reply — see [attendanceWindow].
+     */
+    public function attendance(Request $request, Employee $employee): JsonResponse
+    {
+        $this->authoriseCompany($employee);
+
+        $timezone = $this->timezone($employee);
+        [$period, $from, $to, $today] = $this->attendanceWindow($request, $timezone);
+
+        // Newest first, like /attendance/history: the question is nearly always
+        // about a day that has just happened. dayRows() reads forwards because
+        // a running total has to.
+        $rows = $this->attendance->dayRows($employee, $from, $to)->reverse()->values();
+
+        $days = $rows->map(fn (array $row) => [
+            'date'           => $row['date'],
+            'weekday'        => $row['weekday'],
+            'status'         => $row['status'],
+            'late'           => $row['late'],
+            'early_leave'    => $row['early_leave'],
+            'first_in'       => $this->wall($row['first_in'], $timezone),
+            'last_out'       => $this->wall($row['last_out'], $timezone),
+            'break_start'    => $this->wall($row['break_start'], $timezone),
+            'break_end'      => $this->wall($row['break_end'], $timezone),
+            'break_minutes'  => $row['break_minutes'],
+            'worked_minutes' => $row['worked_minutes'],
+            'punches'        => $row['punches'],
+            'holiday'        => $row['holiday'],
+            'shift'          => $row['shift']?->name,
+            'remarks'        => $row['remarks'],
+        ])->all();
+
+        return $this->ok([
+            'employee' => $this->summary($employee),
+            'period'   => $period,
+            'from'     => $from,
+            'to'       => $to,
+            // The company's today, for a picker that must not offer a day the
+            // server would then refuse. The handset's own clock is a different
+            // date for part of every day.
+            'today'    => $today,
+            'days'     => $days,
+            'totals'   => [
+                'present_days'     => $rows->where('status', 'present')->count(),
+                'absent_days'      => $rows->where('status', 'absent')->count(),
+                'leave_days'       => $rows->where('status', 'leave')->count(),
+                'late_days'        => $rows->where('late', true)->count(),
+                'early_leave_days' => $rows->where('early_leave', true)->count(),
+                'worked_minutes'   => $rows->sum('worked_minutes'),
+                'break_minutes'    => $rows->sum('break_minutes'),
+            ],
+        ]);
+    }
+
+    /**
+     * The window an attendance view works over, named by the server.
+     *
+     * `period` is the app's whole vocabulary for this. It sends a word and gets
+     * dates back; it never works one out. Trap 30 is the record of what happens
+     * otherwise, and it has been paid for four times.
+     *
+     * `custom` is the one period that carries dates, and they are still clamped
+     * here: a window ending tomorrow reads as a day nobody attended, and one
+     * long enough to be a report is refused rather than served slowly.
+     *
+     * Refusals are thrown rather than returned so the callers stay readable —
+     * `bootstrap/app.php` passes an `HttpResponseException` through untouched.
+     *
+     * @return array{0: string, 1: string, 2: string, 3: string}  period, from, to, today
+     */
+    protected function attendanceWindow(Request $request, string $timezone): array
+    {
+        // Read with ?? null throughout: validate() returns an array without a
+        // key the caller never sent, so reading it directly is a 500 rather
+        // than the fallback it looks like (trap 2).
+        $data = $request->validate([
+            'period' => 'nullable|in:daily,weekly,monthly,custom',
+            'from'   => 'nullable|date_format:Y-m-d',
+            'to'     => 'nullable|date_format:Y-m-d',
+        ]);
+
+        $now    = Carbon::now($timezone);
+        $today  = $now->toDateString();
+        $period = ($data['period'] ?? null) ?: 'daily';
+        $recent = $now->copy()->subDays(self::ATTENDANCE_WINDOW_DAYS - 1)->toDateString();
+
+        [$from, $to] = match ($period) {
+            'weekly'  => [$now->copy()->startOfWeek()->toDateString(), $today],
+            'monthly' => [$now->copy()->startOfMonth()->toDateString(), $today],
+            'custom'  => [($data['from'] ?? null) ?: $recent, ($data['to'] ?? null) ?: $today],
+            default   => [$recent, $today],
+        };
+
+        // A day that has not happened cannot be an absence, and calling it one
+        // is a lie the employee cannot answer.
+        if ($to > $today) {
+            $to = $today;
+        }
+
+        if ($from > $to) {
+            throw new HttpResponseException(
+                $this->fail('invalid_range', __('api.invalid_range')),
+            );
+        }
+
+        if (Carbon::parse($from)->diffInDays(Carbon::parse($to)) >= self::MAX_HISTORY_DAYS) {
+            throw new HttpResponseException($this->fail('range_too_large', __('api.range_too_large', [
+                'days' => self::MAX_HISTORY_DAYS,
+            ])));
+        }
+
+        return [$period, $from, $to, $today];
+    }
+
+    /** A stored scan time as the wall clock it actually was, or null. */
+    protected function wall(?Carbon $at, string $timezone): ?string
+    {
+        return $at ? $this->attendance->wallClock($at, $timezone)->toIso8601String() : null;
     }
 
     /**
@@ -280,10 +518,10 @@ class HrEmployeeController extends ApiController
     /**
      * The last month of attendance, counted rather than listed.
      *
-     * A phone cannot usefully show thirty rows of punches, and HR looking
-     * somebody up wants the shape rather than the detail: how many days they
-     * were in, how often late, how often they left early. The full history is
-     * on the web where it can be read properly.
+     * A phone cannot usefully open on thirty rows of punches, and HR looking
+     * somebody up wants the shape first: how many days they were in, how often
+     * late, how often they left early. The detail is one tap away —
+     * [attendance] answers the same window day by day.
      *
      * Counted from `work_date`, never from `scanned_at` — a night shift's
      * punches belong to the day the shift started, and counting by timestamp

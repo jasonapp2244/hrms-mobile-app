@@ -220,6 +220,8 @@ Route::middleware('auth:sanctum')->group(function () {
             ->name('api.hr.employees.show');
         Route::get('employees/{employee}/leave', [HrEmployeeController::class, 'leave'])
             ->name('api.hr.employees.leave');
+        Route::get('employees/{employee}/attendance', [HrEmployeeController::class, 'attendance'])
+            ->name('api.hr.employees.attendance');
     });
 
     Route::get('schedule', [ScheduleController::class, 'index'])->name('api.schedule');
