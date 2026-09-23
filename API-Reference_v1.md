@@ -1687,6 +1687,9 @@ rather than listed**, and whether the person can sign in at all.
 }
 ```
 
+`emergency_contact` is **always an object**. A part nobody filled in is left
+out, so a person with no contact on file is `{}` — never `null`, and never `[]`.
+
 A leave type the employee has never touched still appears, at its full
 entitlement: "no balance row" and "nothing taken" look identical on a phone and
 only one of them is true.

@@ -192,6 +192,33 @@ class HrEmployeeRegisterTest extends TestCase
             ->assertJsonPath('employee.emergency_contact.phone', '+44 7700 900002');
     }
 
+    /**
+     * No contact on file is `{}`, never `[]`.
+     *
+     * Every fixture above has a contact, which is how this went unseen: PHP
+     * encodes an empty array as a JSON list, the app parses the key as a map,
+     * and opening the record of anybody without one — found on a handset,
+     * most of the demo staff — threw in the parser and left HR on a spinner.
+     * The raw body is checked because `assertJsonPath` decodes `{}` and `[]`
+     * to the same empty PHP array and cannot tell them apart.
+     */
+    public function test_no_emergency_contact_is_an_empty_object_not_a_list(): void
+    {
+        $this->staff->update([
+            'emergency_contact_name'  => null,
+            'emergency_contact_phone' => null,
+        ]);
+
+        Sanctum::actingAs($this->hr);
+
+        $body = $this->getJson("/api/v1/hr/employees/{$this->staff->id}")
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('"emergency_contact":{}', $body);
+        $this->assertStringNotContainsString('"emergency_contact":[]', $body);
+    }
+
     public function test_the_directory_still_refuses_what_it_always_refused(): void
     {
         // The other half of the same decision, pinned here because this is the

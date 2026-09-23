@@ -470,7 +470,11 @@ class HrEmployeeController extends ApiController
             'national_id'    => $employee->national_id,
             'blood_group'    => $employee->blood_group,
 
-            'emergency_contact' => array_filter([
+            // Cast to an object, or a person with none of the three filled in
+            // goes out as `[]`: PHP encodes an empty array as a JSON list. The
+            // app reads this key as a map, so every such record — most staff —
+            // died in the parser and HR looked at a spinner that never stopped.
+            'emergency_contact' => (object) array_filter([
                 'name'     => $employee->emergency_contact_name,
                 'phone'    => $employee->emergency_contact_phone,
                 'relation' => $employee->emergency_contact_relation,
