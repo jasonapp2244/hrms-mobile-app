@@ -48,19 +48,24 @@ class HrLeaveController extends ApiController
     {
         $companyId = $this->companyScope();
 
+        // Narrowed in SQL, not filtered in PHP after the fact.
+        //
+        // This used to paginate every pending request and then drop the ones
+        // still with a line manager. The page is bounded, so that looked free
+        // — but the rows it dropped had already used up the page. A company
+        // with 20 requests sitting with managers pushed HR's own onto page
+        // two, and the app reads `pending` and never asks for page two, so the
+        // desk read "Nothing waiting" while somebody waited.
+        //
+        // `awaitingHr()` is the scope beside `isAwaitingHr()` on the model,
+        // and HrLeaveDeskTest holds the two to each other.
         $page = LeaveRequest::with(['employee.department', 'employee.office', 'leaveType', 'managerApprover'])
             ->where('company_id', $companyId)
-            ->pending()
+            ->awaitingHr()
             ->orderBy('start_date')
             ->paginate($this->perPage('hr_leave'));
 
-        // Filtered in PHP rather than SQL because "awaiting HR" is a state the
-        // model computes from two columns, and duplicating that as a where
-        // clause is how the two come to disagree. The page is already bounded,
-        // so the cost is a pass over at most per_page rows.
-        $pending = collect($page->items())
-            ->filter(fn (LeaveRequest $r) => $r->isAwaitingHr())
-            ->values();
+        $pending = collect($page->items());
 
         return $this->ok([
             'pending'       => $pending->map(fn (LeaveRequest $r) => $this->payload($r))->values(),

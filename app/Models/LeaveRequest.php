@@ -202,6 +202,30 @@ class LeaveRequest extends Model
         return $query->where('status', 'pending');
     }
 
+    /**
+     * The SQL half of [isAwaitingHr()], for the queue that has to paginate.
+     *
+     * Kept deliberately beside it: two expressions of one rule is how they come
+     * to disagree, so `HrLeaveDeskTest` asserts they agree across every shape a
+     * request can take, and that test is the reason this may be trusted.
+     *
+     * The `doesntHave` arm mirrors the `?->` in `isAwaitingHr()`, which reads a
+     * missing employee as "nobody is above this person". No row in this
+     * database can reach it — `employee_id` is NOT NULL and deleting an
+     * employee cascades their requests away — so it is there to keep the two
+     * expressions identical rather than to catch a case, and the guard test
+     * says as much.
+     */
+    public function scopeAwaitingHr($query)
+    {
+        return $query->where('status', 'pending')
+            ->where(function ($q) {
+                $q->whereNotNull('manager_approved_at')
+                  ->orWhereDoesntHave('employee')
+                  ->orWhereHas('employee', fn ($e) => $e->whereNull('manager_id'));
+            });
+    }
+
     public function scopeApproved($query)
     {
         return $query->where('status', 'approved');

@@ -214,6 +214,98 @@ class HrLeaveDeskTest extends TestCase
             ->assertJsonPath('pending_count', 1);
     }
 
+    public function test_a_full_page_of_manager_requests_does_not_hide_hrs_own(): void
+    {
+        // The queue is paginated. If the page is drawn from every pending
+        // request and then filtered down to HR's, a company busy enough to
+        // fill a page with requests still sitting with their line managers
+        // pushes HR's own work onto page two — and the app, which reads
+        // `pending` and never asks for page two, shows "Nothing waiting"
+        // while somebody waits for an answer.
+        //
+        // `hr_leave` is 20 a page, and these sort first because the queue is
+        // ordered by start date.
+        $lead = $this->employee('EMP-9999', 'Mia', 'Manager');
+        $reports = $this->employee('EMP-9998', 'Ray', 'Reports');
+        $reports->update(['manager_id' => $lead->id]);
+
+        foreach (range(1, 20) as $i) {
+            LeaveRequest::create([
+                'company_id'          => $this->company->id,
+                'employee_id'         => $reports->id,
+                'leave_type_id'       => $this->type->id,
+                'start_date'          => '2026-10-' . str_pad((string) $i, 2, '0', STR_PAD_LEFT),
+                'end_date'            => '2026-10-' . str_pad((string) $i, 2, '0', STR_PAD_LEFT),
+                'days'                => 1,
+                'status'              => 'pending',
+                'manager_approved_at' => null,
+            ]);
+        }
+
+        // Starts in November, so it is last in the ordering and lands on page
+        // two of the unfiltered query.
+        $this->awaitingHr();
+
+        Sanctum::actingAs($this->hr);
+
+        $this->getJson('/api/v1/hr/leave/approvals')
+            ->assertOk()
+            ->assertJsonPath('pending_count', 1)
+            ->assertJsonPath('meta.total', 1);
+    }
+
+    public function test_the_awaiting_hr_scope_agrees_with_the_predicate(): void
+    {
+        // scopeAwaitingHr() and isAwaitingHr() are one rule written twice, once
+        // for SQL and once for PHP. The comment on the scope says this test is
+        // the reason it may be trusted, so it has to cover every shape a
+        // request can take rather than the happy one.
+        $noManager = $this->employee('EMP-7001', 'Solo', 'Worker');
+
+        $lead = $this->employee('EMP-7002', 'Mia', 'Manager');
+        $managed = $this->employee('EMP-7003', 'Ray', 'Reports');
+        $managed->update(['manager_id' => $lead->id]);
+
+        $cases = [
+            'no manager, not seconded'   => [$noManager, null, 'pending'],
+            'no manager, seconded'       => [$noManager, now(), 'pending'],
+            'has manager, not seconded'  => [$managed, null, 'pending'],
+            'has manager, seconded'      => [$managed, now(), 'pending'],
+            'already approved'           => [$managed, now(), 'approved'],
+            'already rejected'           => [$managed, now(), 'rejected'],
+        ];
+
+        $made = [];
+        foreach ($cases as $label => [$employee, $seconded, $status]) {
+            $made[$label] = LeaveRequest::create([
+                'company_id'          => $this->company->id,
+                'employee_id'         => $employee->id,
+                'leave_type_id'       => $this->type->id,
+                'start_date'          => '2026-12-01',
+                'end_date'            => '2026-12-01',
+                'days'                => 1,
+                'status'              => $status,
+                'manager_approved_at' => $seconded,
+            ]);
+        }
+
+        $inScope = LeaveRequest::awaitingHr()->pluck('id')->all();
+
+        foreach ($made as $label => $request) {
+            $this->assertSame(
+                $request->fresh()->isAwaitingHr(),
+                in_array($request->id, $inScope, true),
+                "scopeAwaitingHr() and isAwaitingHr() disagree about: {$label}",
+            );
+        }
+
+        // A request with no employee is not covered, because the schema will
+        // not make one: employee_id is NOT NULL, and deleting an employee
+        // cascades their requests away rather than orphaning them. The scope's
+        // doesntHave arm is there to mirror the predicate's null-safe read of
+        // the relation, not to catch a row this database can hold.
+    }
+
     public function test_another_companys_request_is_not_in_the_queue(): void
     {
         $other = Company::create(['name' => 'Other', 'timezone' => 'UTC', 'currency' => 'USD']);
