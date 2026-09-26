@@ -346,6 +346,7 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
     // controller, where `manage-roles` gates the elevated ones.
     Route::middleware('permission:manage-employees')->group(function () {
         Route::post('employees/{employee}/account', [EmployeeAccountController::class, 'store'])->name('employees.account.store');
+        Route::post('employees/{employee}/account/link', [EmployeeAccountController::class, 'link'])->name('employees.account.link');
         Route::post('employees/{employee}/account/password', [EmployeeAccountController::class, 'resetPassword'])->name('employees.account.password');
         Route::post('employees/{employee}/account/role', [EmployeeAccountController::class, 'updateRole'])->name('employees.account.role');
         Route::post('employees/{employee}/account/toggle', [EmployeeAccountController::class, 'toggleActive'])->name('employees.account.toggle');

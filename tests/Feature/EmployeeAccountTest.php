@@ -344,4 +344,177 @@ class EmployeeAccountTest extends TestCase
         $response->assertSee('value="employee"', false);
         $response->assertDontSee('value="admin"', false);
     }
+
+    // ================= linking an existing login =================
+
+    public function test_an_admin_can_link_an_existing_hr_login_and_the_app_then_works(): void
+    {
+        $hrLogin = $this->staff('hr');
+        $employee = $this->employee();
+
+        \Laravel\Sanctum\Sanctum::actingAs($hrLogin);
+        $this->getJson('/api/v1/attendance/history')->assertForbidden();
+
+        $this->actingAs($this->staff('admin'))
+            ->post(route('employees.account.link', $employee), ['user_id' => $hrLogin->id])
+            ->assertSessionHas('success');
+
+        $this->assertSame($hrLogin->id, $employee->fresh()->user_id);
+        $this->assertDatabaseHas('activity_logs', [
+            'event'      => ActivityLog::ACCOUNT_CHANGED,
+            'subject_id' => $hrLogin->id,
+        ]);
+
+        \Laravel\Sanctum\Sanctum::actingAs($hrLogin->fresh());
+        $this->getJson('/api/v1/attendance/history')->assertOk();
+    }
+
+    public function test_hr_can_link_an_employee_login(): void
+    {
+        $login = $this->staff('employee');
+        $employee = $this->employee();
+
+        $this->actingAs($this->staff('hr'))
+            ->post(route('employees.account.link', $employee), ['user_id' => $login->id])
+            ->assertSessionHas('success');
+
+        $this->assertSame($login->id, $employee->fresh()->user_id);
+    }
+
+    public function test_hr_cannot_link_an_admin_or_hr_login(): void
+    {
+        foreach (['admin', 'hr'] as $role) {
+            $login = $this->staff($role);
+            $employee = $this->employee();
+
+            $this->actingAs($this->staff('hr'))
+                ->post(route('employees.account.link', $employee), ['user_id' => $login->id])
+                ->assertSessionHas('error');
+
+            $this->assertNull($employee->fresh()->user_id);
+        }
+    }
+
+    public function test_a_login_already_behind_one_employee_cannot_be_linked_to_another(): void
+    {
+        $login = $this->staff('employee');
+        $this->employee(['user_id' => $login->id]);
+        $second = $this->employee();
+
+        $this->actingAs($this->staff('admin'))
+            ->post(route('employees.account.link', $second), ['user_id' => $login->id])
+            ->assertSessionHas('error');
+
+        $this->assertNull($second->fresh()->user_id);
+    }
+
+    public function test_an_employee_who_already_has_a_login_cannot_be_relinked(): void
+    {
+        $existing = $this->staff('employee');
+        $employee = $this->employee(['user_id' => $existing->id]);
+
+        $this->actingAs($this->staff('admin'))
+            ->post(route('employees.account.link', $employee), ['user_id' => $this->staff('employee')->id])
+            ->assertSessionHas('error');
+
+        $this->assertSame($existing->id, $employee->fresh()->user_id);
+    }
+
+    public function test_a_login_from_another_company_cannot_be_linked(): void
+    {
+        $other = Company::create(['name' => 'Other', 'timezone' => 'UTC', 'currency' => 'USD']);
+        $login = $this->staff('employee');
+        $login->update(['company_id' => $other->id]);
+        $employee = $this->employee();
+
+        $this->actingAs($this->staff('admin'))
+            ->post(route('employees.account.link', $employee), ['user_id' => $login->id])
+            ->assertSessionHas('error');
+
+        $this->assertNull($employee->fresh()->user_id);
+    }
+
+    public function test_an_employee_of_another_company_cannot_be_touched(): void
+    {
+        $other = Company::create(['name' => 'Other', 'timezone' => 'UTC', 'currency' => 'USD']);
+        $foreign = $this->employee(['company_id' => $other->id]);
+
+        $this->actingAs($this->staff('admin'))
+            ->post(route('employees.account.link', $foreign), ['user_id' => $this->staff('employee')->id])
+            ->assertForbidden();
+
+        $this->actingAs($this->staff('admin'))
+            ->post(route('employees.account.store', $foreign), ['email' => 'x@acme.test', 'role' => 'employee'])
+            ->assertForbidden();
+    }
+
+    public function test_an_employee_cannot_link_anything(): void
+    {
+        $employee = $this->employee();
+
+        $this->actingAs($this->staff('employee'))
+            ->post(route('employees.account.link', $employee), ['user_id' => $this->staff('hr')->id])
+            ->assertForbidden();
+
+        $this->assertNull($employee->fresh()->user_id);
+    }
+
+    public function test_the_employee_page_offers_only_linkable_logins(): void
+    {
+        $free = $this->staff('employee');
+        $taken = $this->staff('employee');
+        $this->employee(['user_id' => $taken->id]);
+        $adminLogin = $this->staff('admin');
+        $employee = $this->employee();
+
+        $response = $this->actingAs($this->staff('hr'))
+            ->get(route('employees.show', $employee))
+            ->assertOk()
+            ->assertSee('Or link an existing login');
+
+        $response->assertSee($free->email);
+        $response->assertDontSee($taken->email);
+        $response->assertDontSee($adminLogin->email);
+    }
+
+    // ================= emp:link-accounts =================
+
+    public function test_the_command_changes_nothing_without_apply(): void
+    {
+        $login = $this->staff('hr');
+        $employee = $this->employee(['email' => $login->email]);
+
+        $this->artisan('emp:link-accounts')->assertSuccessful();
+
+        $this->assertNull($employee->fresh()->user_id);
+    }
+
+    public function test_the_command_links_an_exact_email_match_in_the_same_company(): void
+    {
+        $login = $this->staff('hr');
+        $employee = $this->employee(['email' => '  ' . strtoupper($login->email) . ' ']);
+
+        $this->artisan('emp:link-accounts', ['--apply' => true])->assertSuccessful();
+
+        $this->assertSame($login->id, $employee->fresh()->user_id);
+    }
+
+    public function test_the_command_skips_ambiguous_and_cross_company_matches(): void
+    {
+        $shared = $this->staff('hr');
+        $a = $this->employee(['email' => $shared->email]);
+        // employees.email is unique, so the only way two records can claim one
+        // login is a spelling that differs by case alone.
+        $b = $this->employee(['email' => strtoupper($shared->email)]);
+
+        $other = Company::create(['name' => 'Other', 'timezone' => 'UTC', 'currency' => 'USD']);
+        $abroad = $this->staff('employee');
+        $foreign = $this->employee(['email' => $abroad->email, 'company_id' => $other->id]);
+
+        $this->artisan('emp:link-accounts', ['--apply' => true])->assertSuccessful();
+
+        $this->assertNull($a->fresh()->user_id);
+        $this->assertNull($b->fresh()->user_id);
+        $this->assertNull($foreign->fresh()->user_id);
+    }
 }

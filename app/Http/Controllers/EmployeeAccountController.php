@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -60,6 +61,8 @@ class EmployeeAccountController extends Controller
     /** Create the login and link it to the employee. */
     public function store(Request $request, Employee $employee)
     {
+        $this->assertSameCompany($employee);
+
         if ($employee->user_id) {
             return back()->with('error', 'This employee already has a sign-in account.');
         }
@@ -108,9 +111,102 @@ class EmployeeAccountController extends Controller
             ->with('generated_password', $generated);
     }
 
+    /**
+     * Attach a login that already exists to this employee record.
+     *
+     * `store()` only ever mints a new login, so an account created on its own —
+     * the HR or admin user set up before anybody entered their employee row —
+     * could never be joined to one short of tinker, and on the phone that
+     * account then had no Clock, History, Leave or Schedule.
+     *
+     * Everything is checked again inside a locked transaction: two people
+     * linking at once must not both succeed and leave one login behind two
+     * people, which would let one person punch as another.
+     */
+    public function link(Request $request, Employee $employee)
+    {
+        $this->assertSameCompany($employee);
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', Rule::exists('users', 'id')],
+        ]);
+
+        $actor = $request->user();
+
+        $error = DB::transaction(function () use ($employee, $data, $actor) {
+            $employee = Employee::whereKey($employee->id)->lockForUpdate()->first();
+            $user = User::whereKey($data['user_id'])->lockForUpdate()->first();
+
+            if ($employee->user_id) {
+                return 'This employee already has a sign-in account.';
+            }
+
+            // Not "the same company as the actor" alone: a login with no company
+            // at all would otherwise be linkable into any company's record.
+            if ($user->company_id === null || (int) $user->company_id !== (int) $employee->company_id) {
+                return 'That login belongs to a different company.';
+            }
+
+            if (Employee::where('user_id', $user->id)->exists()) {
+                return 'That login is already linked to another employee.';
+            }
+
+            // Same split as store(): someone who may not grant HR or admin must
+            // not be able to take over such a login by attaching it to a record.
+            if (self::holdsElevatedRole($user) && ! $actor->can('manage-roles')) {
+                return 'Only an administrator can link an HR or admin login.';
+            }
+
+            $employee->update(['user_id' => $user->id]);
+
+            ActivityLog::record(
+                event: ActivityLog::ACCOUNT_CHANGED,
+                description: "Linked the existing login {$user->email} to {$employee->full_name}",
+                subject: $user,
+            );
+
+            return null;
+        });
+
+        if ($error) {
+            return back()->with('error', $error);
+        }
+
+        return back()->with('success', "{$employee->full_name} is now linked to that login and can use the mobile app.");
+    }
+
+    /**
+     * Logins of this company that no employee record points at yet — the
+     * choices for link(). Elevated ones are left out for anybody who could not
+     * link them anyway.
+     *
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    public static function linkableFor(?User $actor, Employee $employee)
+    {
+        if (! $actor || $employee->user_id) {
+            return collect();
+        }
+
+        return User::query()
+            ->where('company_id', $employee->company_id)
+            ->whereNotIn('id', Employee::whereNotNull('user_id')->select('user_id'))
+            ->with('roles')
+            ->orderBy('name')
+            ->get()
+            ->reject(fn (User $user) => self::holdsElevatedRole($user) && ! $actor->can('manage-roles'))
+            ->values();
+    }
+
+    private static function holdsElevatedRole(User $user): bool
+    {
+        return $user->hasAnyRole(self::ELEVATED_ROLES);
+    }
+
     /** Issue a new password for an existing login. */
     public function resetPassword(Request $request, Employee $employee)
     {
+        $this->assertSameCompany($employee);
         $user = $this->accountFor($employee);
 
         $data = $request->validate([
@@ -135,6 +231,7 @@ class EmployeeAccountController extends Controller
     /** Change which role the login holds. */
     public function updateRole(Request $request, Employee $employee)
     {
+        $this->assertSameCompany($employee);
         $user = $this->accountFor($employee);
         $allowed = self::assignableBy($request->user());
 
@@ -171,6 +268,7 @@ class EmployeeAccountController extends Controller
      */
     public function toggleActive(Request $request, Employee $employee)
     {
+        $this->assertSameCompany($employee);
         $user = $this->accountFor($employee);
 
         if ($user->is($request->user())) {
@@ -192,6 +290,15 @@ class EmployeeAccountController extends Controller
                 ? "{$employee->full_name} can sign in again."
                 : "{$employee->full_name} can no longer sign in."
         );
+    }
+
+    /**
+     * Refuse an employee of another company. The route binds any employee id,
+     * and `EmployeeController` guards its own screens the same way.
+     */
+    private function assertSameCompany(Employee $employee): void
+    {
+        abort_unless((int) $employee->company_id === $this->companyId(), 403);
     }
 
     /** The linked account, or a 404 — every action here needs one to exist. */

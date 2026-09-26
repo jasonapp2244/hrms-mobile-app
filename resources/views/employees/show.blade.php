@@ -173,6 +173,27 @@
             </div>
             <button class="btn btn-primary btn-sm w-100"><i class="ti ti-user-plus me-1"></i>Create sign-in account</button>
           </form>
+
+          {{-- For a login that already exists without a record behind it —
+               typically an HR or admin user set up before their employee row. --}}
+          @php($linkable = \App\Http\Controllers\EmployeeAccountController::linkableFor(auth()->user(), $employee))
+          @if($linkable->isNotEmpty())
+            <hr class="my-3">
+            <form method="POST" action="{{ route('employees.account.link', $employee) }}">
+              @csrf
+              <label class="form-label small mb-1">Or link an existing login</label>
+              <select name="user_id" class="form-select form-select-sm mb-2 @error('user_id') is-invalid @enderror" required>
+                <option value="">Choose a login…</option>
+                @foreach($linkable as $login)
+                  <option value="{{ $login->id }}" @selected(old('user_id') == $login->id)>
+                    {{ $login->name }} — {{ $login->email }}{{ $login->roles->isNotEmpty() ? ' (' . \App\Http\Controllers\EmployeeAccountController::roleLabel($login->roles->first()->name) . ')' : '' }}
+                  </option>
+                @endforeach
+              </select>
+              @error('user_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+              <button class="btn btn-outline-primary btn-sm w-100"><i class="ti ti-link me-1"></i>Link login</button>
+            </form>
+          @endif
         @else
           <ul class="list-group list-group-flush mb-3">
             <li class="list-group-item d-flex justify-content-between align-items-center px-0">
