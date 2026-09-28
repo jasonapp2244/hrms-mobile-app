@@ -103,7 +103,10 @@
 						<th>Time</th>
 						<th>Date</th>
 						<th>Source</th>
-						<th>Location</th>
+						{{-- Location column hidden, client request 2026-09-29: location
+						     is not shown anywhere for now. Restore this <th> and the <td>
+						     below together.
+						<th>Location</th> --}}
 						<th>IP Address</th>
 							@can('manage-attendance')<th class="text-end">Actions</th>@endcan
 					</tr>
@@ -123,25 +126,10 @@
 								<span class="badge bg-danger ms-1"
 									title="Voided by {{ $log->voided_by_label ?? 'unknown' }} on {{ $log->voided_at?->format('d M Y H:i') }} — {{ $log->void_reason }}">Voided</span>
 							@endif
-						</td>
-						<td><span class="badge bg-{{ $log->status=='late'?'warning':($log->status=='ontime'?'success':'secondary') }}">{{ $log->status }}</span></td>
-						<td>{{ $log->scanned_at->format('h:i A') }}</td>
-						<td>{{ $log->work_date->format('m/d/Y') }}</td>
-						<td>{{ $log->source }}</td>
-						<td>
-							@if($log->latitude && $log->longitude)
-								{{-- A GPS badge, not a map link (client request, 2026-09-29).
-								     The coordinates stay one hover away. --}}
-								<span class="badge bg-info-transparent text-info"
-									title="{{ $log->latitude }}, {{ $log->longitude }}">
-									<i class="ti ti-current-location me-1"></i>GPS
-								</span>
-							@else
-								<span class="badge bg-light text-muted" title="Location not shared by the employee's device">—</span>
-							@endif
-							{{-- B2.7. Beside the pin rather than in a column of its own,
-							     because it qualifies the pin: a mocked fix is a map link
-							     that means nothing. Never blocks the punch — it marks the
+							{{-- B2.7. A fraud signal, not a location, so it stays while
+							     the Location column is hidden — it lived in that cell,
+							     and without it the Flagged filter would list rows with
+							     no reason given. Never blocks the punch; it marks the
 							     rows a person should look at, and one flagged punch is
 							     usually nothing. A pattern is the thing. --}}
 							@if($log->looksTampered())
@@ -153,6 +141,21 @@
 								</div>
 							@endif
 						</td>
+						<td><span class="badge bg-{{ $log->status=='late'?'warning':($log->status=='ontime'?'success':'secondary') }}">{{ $log->status }}</span></td>
+						<td>{{ $log->scanned_at->format('h:i A') }}</td>
+						<td>{{ $log->work_date->format('m/d/Y') }}</td>
+						<td>{{ $log->source }}</td>
+						{{-- Location cell hidden with its <th> above.
+						<td>
+							@if($log->latitude && $log->longitude)
+								<span class="badge bg-info-transparent text-info"
+									title="{{ $log->latitude }}, {{ $log->longitude }}">
+									<i class="ti ti-current-location me-1"></i>GPS
+								</span>
+							@else
+								<span class="badge bg-light text-muted" title="Location not shared by the employee's device">—</span>
+							@endif
+						</td> --}}
 						<td><small class="text-muted">{{ $log->ip_address ?? '—' }}</small></td>
 						@can('manage-attendance')
 						<td class="text-end">
@@ -172,7 +175,7 @@
 					</tr>
 					@empty
 					<tr>
-						<td colspan="@can('manage-attendance')11@else 10 @endcan" class="text-center text-muted py-4">No attendance logs found.</td>
+						<td colspan="@can('manage-attendance')10@else 9 @endcan" class="text-center text-muted py-4">No attendance logs found.</td>
 					</tr>
 					@endforelse
 				</tbody>

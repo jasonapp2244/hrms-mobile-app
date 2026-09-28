@@ -404,19 +404,35 @@ class AttendanceCorrectionTest extends TestCase
      * suspicious would fill the filter with the entire history of the company
      * and make it useless on its first use.
      */
-    public function test_a_located_punch_shows_a_gps_badge_and_no_map_link(): void
+    public function test_the_register_shows_no_location_but_keeps_the_fraud_flag(): void
     {
-        // Client request, 2026-09-29: no map links anywhere. The coordinates
-        // are still one hover away on the badge.
-        $this->punch('in', '2026-08-03 09:00:00', ['latitude' => 40.7128, 'longitude' => -74.0060]);
+        // Client request, 2026-09-29: location is not shown anywhere for now —
+        // not in the markup either, so a Blade comment rather than an HTML one.
+        // The flag a handset raised for a faked fix is fraud evidence rather
+        // than a location, and it stays: it lived in the hidden cell.
+        $this->punch('in', '2026-08-03 09:00:00', [
+            'latitude' => 40.7128, 'longitude' => -74.0060, 'location_mocked' => true,
+        ]);
 
         $this->actingAs($this->hr)
             ->get(route('attendance.logs'))
             ->assertOk()
-            ->assertSee('ti-current-location', false)
-            ->assertSee('40.7128', false)
+            ->assertDontSee('<th>Location</th>', false)
+            ->assertDontSee('40.7128', false)
+            ->assertDontSee('ti-current-location', false)
             ->assertDontSee('google.com/maps', false)
-            ->assertDontSee('View map');
+            ->assertSee('Mock location');
+    }
+
+    public function test_the_export_leaves_location_out_and_stays_in_step(): void
+    {
+        $log = $this->punch('in', '2026-08-03 09:00:00', ['latitude' => 40.7128, 'longitude' => -74.0060]);
+        $export = new \App\Exports\AttendanceExport(collect([$log->load('employee', 'office')]));
+
+        $this->assertNotContains('Location', $export->headings());
+        // One value per heading, or every column after Source reads one off.
+        $this->assertCount(count($export->headings()), $export->map($log));
+        $this->assertNotContains('40.7128, -74.006', $export->map($log));
     }
 
     public function test_a_punch_that_reported_nothing_is_not_flagged(): void

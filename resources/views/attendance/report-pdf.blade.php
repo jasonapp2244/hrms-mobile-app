@@ -51,7 +51,7 @@
 		<thead>
 			<tr>
 				<th>Employee</th><th>Code</th><th>Office</th><th>Type</th>
-				<th>Status</th><th>Time</th><th>Date</th><th>Source</th><th>Location</th><th>IP</th>
+				<th>Status</th><th>Time</th><th>Date</th><th>Source</th>{{-- <th>Location</th> hidden, client request 2026-09-29 --}}<th>IP</th>
 			</tr>
 		</thead>
 		<tbody>
@@ -68,11 +68,11 @@
 				<td>{{ $log->scanned_at->format('h:i A') }}</td>
 				<td>{{ $log->work_date->format('m/d/Y') }}</td>
 				<td>{{ $log->source }}</td>
-					<td>@if($log->latitude && $log->longitude){{ $log->latitude }}, {{ $log->longitude }}@else—@endif</td>
+					{{-- <td>@if($log->latitude && $log->longitude){{ $log->latitude }}, {{ $log->longitude }}@else—@endif</td> --}}
 					<td>{{ $log->ip_address ?? '—' }}</td>
 			</tr>
 			@empty
-			<tr><td colspan="10" style="text-align:center;padding:16px;color:#9ca3af;">No attendance records for this period.</td></tr>
+			<tr><td colspan="9" style="text-align:center;padding:16px;color:#9ca3af;">No attendance records for this period.</td></tr>
 			@endforelse
 		</tbody>
 	</table>

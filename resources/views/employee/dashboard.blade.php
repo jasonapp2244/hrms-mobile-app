@@ -156,7 +156,7 @@
 			<div id="result" class="mt-3"></div>
 
 			<div class="alert alert-info mt-4 mb-0 text-start" style="font-size:12.5px">
-				<i class="ti ti-current-location me-1"></i>
+				<i class="ti ti-info-circle me-1"></i>
 				Your time is recorded on our server. If your browser allows it, your location is
 				also saved for HR — you are never blocked, so WFH and remote staff can check in from anywhere.
 			</div>

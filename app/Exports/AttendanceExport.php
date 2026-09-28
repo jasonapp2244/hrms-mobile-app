@@ -22,7 +22,9 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
 
     public function headings(): array
     {
-        return ['Employee', 'Code', 'Office', 'Type', 'Status', 'Time', 'Date', 'Source', 'Location', 'IP Address'];
+        // 'Location' is left out, client request 2026-09-29 — location is not
+        // shown anywhere for now. Restore it here and in map() together.
+        return ['Employee', 'Code', 'Office', 'Type', 'Status', 'Time', 'Date', 'Source', 'IP Address'];
     }
 
     public function map($log): array
@@ -36,7 +38,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
             Clock::time($log->scanned_at),
             $log->work_date->format('m/d/Y'),
             $log->source,
-            ($log->latitude && $log->longitude) ? $log->latitude . ', ' . $log->longitude : '—',
+            // ($log->latitude && $log->longitude) ? $log->latitude . ', ' . $log->longitude : '—',
             $log->ip_address ?? '—',
         ];
     }

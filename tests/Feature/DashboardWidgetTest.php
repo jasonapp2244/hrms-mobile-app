@@ -194,9 +194,9 @@ class DashboardWidgetTest extends TestCase
 
     public function test_recent_punches_carry_no_map_link(): void
     {
-        // Client request, 2026-09-29: the map link on each recent punch is not
-        // wanted on the dashboard. A punch with no fix still says so, and the IP
-        // stays. No page links to a map any more; the attendance log shows a GPS badge.
+        // Client request, 2026-09-29: no map link and no location on a recent
+        // punch, not even "no location" — location is hidden everywhere for now.
+        // The IP stays.
         $located = $this->employee('Ann');
         $unlocated = $this->employee('Bo');
         $now = now()->format('Y-m-d H:i:s');
@@ -216,7 +216,7 @@ class DashboardWidgetTest extends TestCase
             ->assertSee('Recent Punches')
             ->assertSee('Ann Test')
             ->assertDontSee('google.com/maps', false)
-            ->assertSee('no location')
+            ->assertDontSee('no location')
             ->assertSee('203.0.113.7');
     }
 
