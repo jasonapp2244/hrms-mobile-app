@@ -57,9 +57,24 @@
               <th>Environment</th>
               <td>{{ app()->environment() }}</td>
             </tr>
+            {{-- The company's zone is the one that matters: shifts, "today",
+                 reports and the phone all follow it. This row used to print the
+                 server's own UTC clock under the bare label "Timezone", which
+                 read as though the system ran on UTC. --}}
+            @php $settingsCompany = auth()->user()->company; @endphp
             <tr>
-              <th>Timezone</th>
-              <td>{{ config('app.timezone') }}</td>
+              <th>Company timezone</th>
+              <td>
+                {{ $settingsCompany?->tz() ?? config('app.timezone') }}
+                @if($settingsCompany)
+                  <span class="text-muted">· now {{ now($settingsCompany->tz())->format('h:i A') }}</span>
+                  <a href="{{ route('company.index') }}" class="ms-1">Change</a>
+                @endif
+              </td>
+            </tr>
+            <tr>
+              <th>Server clock</th>
+              <td class="text-muted">{{ config('app.timezone') }} — times are converted to the company's zone</td>
             </tr>
             <tr>
               <th>Laravel Version</th>

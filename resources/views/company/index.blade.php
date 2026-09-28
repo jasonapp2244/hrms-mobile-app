@@ -52,8 +52,24 @@
           <textarea name="address" class="form-control" rows="3">{{ old('address', $company->address) }}</textarea>
         </div>
         <div class="col-md-6">
-          <label class="form-label">Timezone <span class="text-danger">*</span></label>
-          <input type="text" name="timezone" class="form-control" value="{{ old('timezone', $company->timezone) }}" required>
+          <label class="form-label" for="company-timezone">Timezone <span class="text-danger">*</span></label>
+          {{-- US zones first, by name; every other zone below. This decides
+               what "09:00" means for every shift, what "today" is for every
+               report, and the time printed on every punch, web and phone. --}}
+          @php $selectedTz = old('timezone', $company->timezone ?: \App\Support\Timezones::DEFAULT); @endphp
+          <select name="timezone" id="company-timezone" class="form-select" required>
+            @foreach(\App\Support\Timezones::grouped() as $group => $zones)
+              <optgroup label="{{ $group }}">
+                @foreach($zones as $id => $label)
+                  <option value="{{ $id }}" @selected($selectedTz === $id)>{{ $label }}</option>
+                @endforeach
+              </optgroup>
+            @endforeach
+          </select>
+          <div class="form-text">
+            Local time there now: <strong id="company-timezone-now">{{ now($company->tz())->format('D j M, h:i A') }}</strong>.
+            Shifts, "today", reports and the phone all follow this.
+          </div>
         </div>
         <div class="col-md-6">
           <label class="form-label">Currency <span class="text-danger">*</span></label>
@@ -72,3 +88,28 @@
   </div>
 </div>
 @endsection
+
+@push('scripts')
+<script>
+  // Shows the clock in the zone being picked, before anything is saved, so
+  // "is this the right one?" has an answer on the form itself.
+  (function () {
+    var select = document.getElementById('company-timezone');
+    var out = document.getElementById('company-timezone-now');
+    if (!select || !out || !window.Intl) return;
+
+    function show() {
+      try {
+        out.textContent = new Intl.DateTimeFormat('en-US', {
+          timeZone: select.value, weekday: 'short', day: 'numeric', month: 'short',
+          hour: '2-digit', minute: '2-digit', hour12: true
+        }).format(new Date());
+      } catch (e) {
+        // An old browser that does not know the zone keeps the server's line.
+      }
+    }
+
+    select.addEventListener('change', show);
+  })();
+</script>
+@endpush

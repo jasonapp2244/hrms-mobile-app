@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Company;
 use App\Models\User;
+use App\Support\Timezones;
 use Database\Seeders\RolePermissionSeeder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -248,13 +249,15 @@ class Install extends Command
         $given = $this->option('timezone');
 
         while (true) {
-            $timezone = $given ?: $this->ask('Company timezone (this decides what "09:00" means)', 'UTC');
+            // US Eastern by default: the client is in the United States, and
+            // UTC is five hours off every shift they will set.
+            $timezone = $given ?: $this->ask('Company timezone (this decides what "09:00" means)', Timezones::DEFAULT);
 
             if (in_array($timezone, $valid, true)) {
                 return $timezone;
             }
 
-            $this->error("  '{$timezone}' is not an IANA timezone. Examples: America/New_York, Europe/London, Asia/Karachi");
+            $this->error("  '{$timezone}' is not an IANA timezone. US: America/New_York, America/Chicago, America/Denver, America/Phoenix, America/Los_Angeles. Elsewhere: Europe/London, Asia/Karachi");
 
             if ($given) {
                 // Given on the command line and wrong. Looping on the same bad
