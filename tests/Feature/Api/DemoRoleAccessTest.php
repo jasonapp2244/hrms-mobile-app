@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Models\Employee;
 use App\Models\User;
 use Database\Seeders\DemoDataSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -161,5 +162,35 @@ class DemoRoleAccessTest extends TestCase
             'jessica.davis@acme.test',
             'david.wilson@acme.test',
         ])->count());
+    }
+
+    public function test_re_seeding_relinks_a_demo_employee_whose_login_was_cut_loose(): void
+    {
+        // Found on staging: hr@emp.test landed on "no employee record, nothing
+        // to clock" while EMP-0006 Hana Ruiz sat in the directory. `user_id`
+        // is `nullOnDelete`, so a demo user deleted and recreated leaves its
+        // row with no login, and firstOrCreate finds the row and changes
+        // nothing. A re-seed has to repair that, or it cannot be the fix.
+        Employee::whereIn('employee_code', ['EMP-0002', 'EMP-0006'])->update(['user_id' => null]);
+
+        $this->seed(DemoDataSeeder::class);
+
+        $this->assertSame('EMP-0006', User::where('email', 'hr@emp.test')->firstOrFail()->employee?->employee_code);
+        $this->assertSame('EMP-0002', User::where('email', 'emily.johnson@acme.test')->firstOrFail()->employee?->employee_code);
+
+        $this->as('hr@emp.test');
+        $this->getJson('/api/v1/attendance/today')->assertOk();
+    }
+
+    public function test_re_seeding_leaves_a_link_made_by_hand_alone(): void
+    {
+        // Gaps only, like the reporting line: a row somebody pointed at a
+        // different login in the UI stays pointed there.
+        $other = User::where('email', 'admin@emp.test')->firstOrFail();
+        Employee::where('employee_code', 'EMP-0006')->update(['user_id' => $other->id]);
+
+        $this->seed(DemoDataSeeder::class);
+
+        $this->assertSame($other->id, Employee::where('employee_code', 'EMP-0006')->value('user_id'));
     }
 }

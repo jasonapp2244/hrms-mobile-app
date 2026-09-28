@@ -140,7 +140,7 @@ class DemoDataSeeder extends Seeder
             );
             $empUser->assignRole('employee');
 
-            Employee::firstOrCreate(
+            $employee = Employee::firstOrCreate(
                 ['employee_code' => 'EMP-' . str_pad($i + 1, 4, '0', STR_PAD_LEFT)],
                 [
                     'company_id' => $company->id,
@@ -156,6 +156,7 @@ class DemoDataSeeder extends Seeder
                     'status' => 'active',
                 ]
             );
+            $this->relinkIfCutLoose($employee, $empUser);
         }
 
         // HR is an employee too, and without this the demo cannot show it.
@@ -189,6 +190,7 @@ class DemoDataSeeder extends Seeder
                 'status'         => 'active',
             ]
         );
+        $this->relinkIfCutLoose($hrEmployee, $hr);
 
         // Reporting line, so the approval chain is demonstrable out of the box:
         // the first employee leads the rest. The manager role is held *in
@@ -215,5 +217,26 @@ class DemoDataSeeder extends Seeder
                 ->where('employee_code', '!=', 'EMP-0006')
                 ->update(['manager_id' => $lead->id]);
         }
+    }
+
+    /**
+     * Give a demo employee row its login back if it has lost it.
+     *
+     * `employees.user_id` is `nullOnDelete`, so deleting a demo user and letting
+     * the seeder recreate it leaves the old row with no login — and
+     * firstOrCreate finds that row and changes nothing. That is how staging
+     * ended up with hr@emp.test on "no employee record, nothing to clock" while
+     * EMP-0006 sat in the directory.
+     *
+     * Gaps only, like the reporting line: a row already linked to somebody is
+     * left alone, and so is a user who is already somebody else's employee.
+     */
+    private function relinkIfCutLoose(Employee $employee, User $user): void
+    {
+        if ($employee->user_id !== null || Employee::where('user_id', $user->id)->exists()) {
+            return;
+        }
+
+        $employee->update(['user_id' => $user->id]);
     }
 }

@@ -537,6 +537,15 @@ to nobody; admin still deliberately has none, because that refusal is a designed
 screen. `tests/Feature/Api/DemoRoleAccessTest` pins what each of the four roles
 gets on the phone, and removing the new record fails exactly the three HR tests.*
 
+*2026-09-25, the same symptom again on staging, from a different cause: the
+record existed but had lost its login. `employees.user_id` is `nullOnDelete`, so
+a demo user deleted and recreated leaves EMP-0006 with no `user_id`, and
+`firstOrCreate` finds the row and changes nothing — a re-seed could not repair
+it. `DemoDataSeeder::relinkIfCutLoose` now fills that gap and only that gap: a
+row linked to somebody else, or a user already somebody's employee, is left
+alone. Two tests; the relink one fails against the old seeder. Staging needs a
+deploy and `db:seed --class=DemoDataSeeder --force` to pick it up.*
+
 *`composer audit` is clean as of that date. Three advisories were open against
 this project and are now closed: `maatwebsite/excel` 3.1.69 → 3.1.70 (high —
 exports written outside the configured disk on a caller-controlled filename,

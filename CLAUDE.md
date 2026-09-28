@@ -27,7 +27,7 @@ as a background task does not persist, it exits.
 
 ```bash
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1561 tests, ~300s, SQLite in memory
+php artisan test             # 1618 tests, ~320s, SQLite in memory
 ```
 
 The Laravel application is the **root of this repository**. It used to sit in an
