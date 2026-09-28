@@ -192,6 +192,34 @@ class DashboardWidgetTest extends TestCase
         $this->actingAs($this->hr)->get(route('dashboard'))->assertOk()->assertSee('HR Dashboard');
     }
 
+    public function test_recent_punches_carry_no_map_link(): void
+    {
+        // Client request, 2026-09-29: the map link on each recent punch is not
+        // wanted on the dashboard. A punch with no fix still says so, and the IP
+        // stays; the attendance log keeps its own "View map" for whoever needs it.
+        $located = $this->employee('Ann');
+        $unlocated = $this->employee('Bo');
+        $now = now()->format('Y-m-d H:i:s');
+
+        foreach ([[$located, 40.7128, -74.0060], [$unlocated, null, null]] as [$who, $lat, $lng]) {
+            AttendanceLog::create([
+                'company_id' => $this->company->id, 'employee_id' => $who->id,
+                'office_id' => $this->office->id, 'type' => 'in',
+                'scanned_at' => Carbon::parse($now), 'work_date' => Carbon::parse($now)->toDateString(),
+                'status' => 'ontime', 'source' => 'button',
+                'latitude' => $lat, 'longitude' => $lng, 'ip_address' => '203.0.113.7',
+            ]);
+        }
+
+        $this->actingAs($this->admin)->get(route('dashboard'))
+            ->assertOk()
+            ->assertSee('Recent Punches')
+            ->assertSee('Ann Test')
+            ->assertDontSee('google.com/maps', false)
+            ->assertSee('no location')
+            ->assertSee('203.0.113.7');
+    }
+
     // -------------------------------------------------------------------------
     // A8.6 — this week against last
     // -------------------------------------------------------------------------
