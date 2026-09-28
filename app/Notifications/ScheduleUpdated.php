@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Notifications\Messages\PushMessage;
+use App\Support\AppRoute;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -83,7 +84,7 @@ class ScheduleUpdated extends Notification implements ShouldQueue
     }
 
     /** Tapping it opens the schedule tab rather than just the app. */
-    public function toFcm(object $notifiable): PushMessage
+    public function toPush(object $notifiable): PushMessage
     {
         return new PushMessage(
             title: $this->headline(),

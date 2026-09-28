@@ -546,6 +546,16 @@ row linked to somebody else, or a user already somebody's employee, is left
 alone. Two tests; the relink one fails against the old seeder. Staging needs a
 deploy and `db:seed --class=DemoDataSeeder --force` to pick it up.*
 
+*2026-09-28, push switched on for the first time (Firebase `kemp-805c6`) and
+**no push had ever worked.** Four notifications — leave submitted, leave
+decided, missing checkout, schedule updated — called `AppRoute` without
+importing it, so every `toPush()` died with "class not found" inside the queue
+worker, after the bell and the email had already gone. `ScheduleUpdated` also
+named its method `toFcm()`, which `FcmChannel` never calls, so that one was
+skipped without even failing. The push tests used a stand-in notification and
+built none of the real ones. They now send all eight real classes through the
+channel, and a scan fails any class that lists `'fcm'` without a `toPush()`.*
+
 *`composer audit` is clean as of that date. Three advisories were open against
 this project and are now closed: `maatwebsite/excel` 3.1.69 → 3.1.70 (high —
 exports written outside the configured disk on a caller-controlled filename,

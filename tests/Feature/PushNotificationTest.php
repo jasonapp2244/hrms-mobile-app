@@ -206,6 +206,85 @@ class PushNotificationTest extends TestCase
         }
     }
 
+    // ================= the real notifications =================
+
+    /**
+     * Every notification that lists the push channel, built for real and sent.
+     *
+     * The tests above use a stand-in notification, and that is how staging
+     * shipped with no push at all: four classes called AppRoute without
+     * importing it, so every toPush() died on "class not found" inside the
+     * queue worker, and ScheduleUpdated named its method toFcm(), which the
+     * channel never calls. Nothing failed here because nothing here built one.
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('realPushNotifications')]
+    public function test_each_real_notification_reaches_the_handset(string $class, \Closure $make): void
+    {
+        $this->configurePush();
+        $this->fakeAccessToken();
+        $this->device();
+        Http::fake(['fcm.googleapis.com/*' => Http::response(['name' => 'projects/x/messages/1'])]);
+
+        $notification = $make();
+        $this->assertContains('fcm', $notification->via($this->user), "{$class} does not list the push channel.");
+
+        app(FcmChannel::class)->send($this->user, $notification);
+
+        Http::assertSentCount(1);
+        // The route is the one AppRoute assigns the type. For the two that
+        // deliberately open nowhere in particular that is null, sent as "" or
+        // left out — the app reads both as "no route".
+        Http::assertSent(function ($request) {
+            $data = $request['message']['data'] ?? [];
+
+            return filled($request['message']['notification']['title'] ?? null)
+                && filled($data['type'] ?? null)
+                && ($data['route'] ?? '') === (string) \App\Support\AppRoute::forType($data['type']);
+        });
+    }
+
+    public static function realPushNotifications(): array
+    {
+        $leave = static fn () => (new \App\Models\LeaveRequest())->forceFill([
+            'id' => 6, 'start_date' => '2026-10-06', 'end_date' => '2026-10-06',
+        ]);
+
+        return [
+            'leave submitted' => [\App\Notifications\LeaveRequestSubmitted::class,
+                fn () => new \App\Notifications\LeaveRequestSubmitted($leave())],
+            'leave passed to HR' => [\App\Notifications\LeaveRequestDecided::class,
+                fn () => new \App\Notifications\LeaveRequestDecided($leave(), 'manager_approved')],
+            'leave approved' => [\App\Notifications\LeaveRequestDecided::class,
+                fn () => new \App\Notifications\LeaveRequestDecided($leave(), 'approved')],
+            'missing checkout' => [\App\Notifications\MissingCheckoutReminder::class,
+                fn () => new \App\Notifications\MissingCheckoutReminder(
+                    (new \App\Models\AttendanceLog())->forceFill(['scanned_at' => '2026-10-06 09:02:00']),
+                    '2026-10-06',
+                )],
+            'schedule updated' => [\App\Notifications\ScheduleUpdated::class,
+                fn () => new \App\Notifications\ScheduleUpdated('2026-10-05', '2026-10-11', 5)],
+            'shift starting' => [\App\Notifications\ShiftStartingReminder::class,
+                fn () => new \App\Notifications\ShiftStartingReminder('2026-10-06', \Carbon\Carbon::parse('2026-10-06 09:00'))],
+            'announcement' => [\App\Notifications\CompanyAnnouncement::class,
+                fn () => new \App\Notifications\CompanyAnnouncement(1, 'Title', 'Body')],
+            'policy rule' => [\App\Notifications\PolicyRuleFired::class,
+                fn () => new \App\Notifications\PolicyRuleFired(1, 'Late arrival', 'Ann Lee clocked in late')],
+        ];
+    }
+
+    /** A class that lists the channel but spells the method differently is silently skipped. */
+    public function test_every_class_that_lists_the_push_channel_can_build_a_push(): void
+    {
+        foreach (glob(app_path('Notifications/*.php')) as $file) {
+            if (! str_contains(file_get_contents($file), "'fcm'")) {
+                continue;
+            }
+
+            $class = 'App\\Notifications\\' . basename($file, '.php');
+            $this->assertTrue(method_exists($class, 'toPush'), "{$class} lists 'fcm' but has no toPush().");
+        }
+    }
+
     // ================= helpers =================
 
     protected function fakeAccessToken(): void

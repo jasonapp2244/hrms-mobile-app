@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\AttendanceLog;
 use App\Notifications\Messages\PushMessage;
+use App\Support\AppRoute;
 use App\Support\Clock;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

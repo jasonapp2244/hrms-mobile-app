@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Models\LeaveRequest;
 use App\Notifications\Messages\PushMessage;
+use App\Support\AppRoute;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
