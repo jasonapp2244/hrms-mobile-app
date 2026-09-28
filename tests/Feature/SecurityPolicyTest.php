@@ -181,6 +181,22 @@ class SecurityPolicyTest extends TestCase
         $this->actingAs($this->staff)->get(route('activity.index'))->assertForbidden();
     }
 
+    public function test_the_trail_still_records_the_ip_but_does_not_show_it(): void
+    {
+        // Client request, 2026-09-29: no IP on screen anywhere for now. It is
+        // still written — the trail is evidence, and hiding a column must not
+        // quietly stop recording what it would have shown.
+        $entry = ActivityLog::record(ActivityLog::LOGIN, 'Signed in via web', $this->hr);
+        $this->assertNotNull($entry->ip_address);
+
+        $this->actingAs($this->admin)->get(route('activity.index'))
+            ->assertOk()
+            ->assertSee('Hana Ruiz')
+            ->assertDontSee('<th>IP</th>', false)
+            ->assertDontSee('Name or IP')
+            ->assertDontSee($entry->ip_address);
+    }
+
     public function test_the_trail_can_be_filtered_by_event(): void
     {
         ActivityLog::record(ActivityLog::LOGIN, 'in', $this->hr);

@@ -107,7 +107,7 @@
 						     is not shown anywhere for now. Restore this <th> and the <td>
 						     below together.
 						<th>Location</th> --}}
-						<th>IP Address</th>
+						{{-- <th>IP Address</th> hidden, client request 2026-09-29; restore with its <td>. --}}
 							@can('manage-attendance')<th class="text-end">Actions</th>@endcan
 					</tr>
 				</thead>
@@ -156,7 +156,7 @@
 								<span class="badge bg-light text-muted" title="Location not shared by the employee's device">—</span>
 							@endif
 						</td> --}}
-						<td><small class="text-muted">{{ $log->ip_address ?? '—' }}</small></td>
+						{{-- <td><small class="text-muted">{{ $log->ip_address ?? '—' }}</small></td> --}}
 						@can('manage-attendance')
 						<td class="text-end">
 							@if($log->isVoided())
@@ -175,7 +175,7 @@
 					</tr>
 					@empty
 					<tr>
-						<td colspan="@can('manage-attendance')10@else 9 @endcan" class="text-center text-muted py-4">No attendance logs found.</td>
+						<td colspan="@can('manage-attendance')9@else 8 @endcan" class="text-center text-muted py-4">No attendance logs found.</td>
 					</tr>
 					@endforelse
 				</tbody>

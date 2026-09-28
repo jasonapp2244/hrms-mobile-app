@@ -275,16 +275,17 @@
 							<div>
 								<h6 class="mb-0 fs-14">{{ $log->employee->full_name ?? 'Unknown' }}</h6>
 								<small class="text-muted">{{ strtoupper($log->type) }} · {{ $log->office->name ?? '' }}</small>
+								{{-- Location and IP hidden, client request 2026-09-29 — this
+								     line held nothing else, so it goes whole. Restore as a unit.
 								<div class="mt-1" style="font-size:11.5px;line-height:1.4">
-									{{-- Location hidden, client request 2026-09-29.
 									@unless($log->latitude && $log->longitude)
 										<span class="text-muted me-2"><i class="ti ti-current-location-off"></i> no location</span>
 									@endunless
-									--}}
 									@if($log->ip_address)
 										<span class="text-muted"><i class="ti ti-world"></i> {{ $log->ip_address }}</span>
 									@endif
 								</div>
+								--}}
 							</div>
 						</div>
 						<div class="text-end">

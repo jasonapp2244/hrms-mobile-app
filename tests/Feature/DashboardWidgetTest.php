@@ -195,8 +195,8 @@ class DashboardWidgetTest extends TestCase
     public function test_recent_punches_carry_no_map_link(): void
     {
         // Client request, 2026-09-29: no map link and no location on a recent
-        // punch, not even "no location" — location is hidden everywhere for now.
-        // The IP stays.
+        // punch, not even "no location", and no IP — both hidden everywhere for now.
+        // The name, type and office stay.
         $located = $this->employee('Ann');
         $unlocated = $this->employee('Bo');
         $now = now()->format('Y-m-d H:i:s');
@@ -217,7 +217,7 @@ class DashboardWidgetTest extends TestCase
             ->assertSee('Ann Test')
             ->assertDontSee('google.com/maps', false)
             ->assertDontSee('no location')
-            ->assertSee('203.0.113.7');
+            ->assertDontSee('203.0.113.7');
     }
 
     // -------------------------------------------------------------------------

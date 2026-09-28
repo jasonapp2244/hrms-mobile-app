@@ -47,7 +47,8 @@
         <input type="date" name="to" value="{{ request('to') }}" class="form-control">
       </div>
       <div class="col-md-2">
-        <label class="form-label">Name or IP</label>
+        {{-- Was "Name or IP"; IP is hidden for now, though the search still matches it. --}}
+        <label class="form-label">Name</label>
         <div class="input-group">
           <input type="text" name="q" value="{{ request('q') }}" class="form-control" placeholder="Search">
           <button class="btn btn-primary"><i class="ti ti-search"></i></button>
@@ -67,7 +68,8 @@
             <th>Event</th>
             <th>Who</th>
             <th>Detail</th>
-            <th>IP</th>
+            {{-- <th>IP</th> hidden, client request 2026-09-29; still recorded,
+                 restore with its <td> below. --}}
           </tr>
         </thead>
         <tbody>
@@ -82,10 +84,10 @@
               @endif
             </td>
             <td class="fs-13">{{ $log->description ?? '—' }}</td>
-            <td class="fs-13 text-muted">{{ $log->ip_address ?? '—' }}</td>
+            {{-- <td class="fs-13 text-muted">{{ $log->ip_address ?? '—' }}</td> --}}
           </tr>
           @empty
-          <tr><td colspan="5" class="text-center text-muted py-4">Nothing recorded for these filters.</td></tr>
+          <tr><td colspan="4" class="text-center text-muted py-4">Nothing recorded for these filters.</td></tr>
           @endforelse
         </tbody>
       </table>

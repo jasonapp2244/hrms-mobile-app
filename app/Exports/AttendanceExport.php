@@ -22,9 +22,9 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
 
     public function headings(): array
     {
-        // 'Location' is left out, client request 2026-09-29 — location is not
-        // shown anywhere for now. Restore it here and in map() together.
-        return ['Employee', 'Code', 'Office', 'Type', 'Status', 'Time', 'Date', 'Source', 'IP Address'];
+        // 'Location' and 'IP Address' are left out, client request 2026-09-29 —
+        // neither is shown anywhere for now. Restore here and in map() together.
+        return ['Employee', 'Code', 'Office', 'Type', 'Status', 'Time', 'Date', 'Source'];
     }
 
     public function map($log): array
@@ -39,7 +39,7 @@ class AttendanceExport implements FromCollection, WithHeadings, WithMapping, Sho
             $log->work_date->format('m/d/Y'),
             $log->source,
             // ($log->latitude && $log->longitude) ? $log->latitude . ', ' . $log->longitude : '—',
-            $log->ip_address ?? '—',
+            // $log->ip_address ?? '—',
         ];
     }
 
