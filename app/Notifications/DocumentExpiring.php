@@ -44,9 +44,11 @@ class DocumentExpiring extends Notification implements ShouldQueue
             return __('notifications.document_expiring.timing.none');
         }
 
-        $days = (int) now()->startOfDay()->diffInDays($expires->copy()->startOfDay(), absolute: true);
+        // Counted on the company's calendar, the frame expires_on is read in.
+        $today = \App\Models\Company::todayFor($this->document->company_id);
+        $days = (int) $today->diffInDays($expires->copy()->startOfDay(), absolute: true);
 
-        if ($expires->isPast()) {
+        if ($expires->lessThanOrEqualTo($today)) {
             return $days === 0
                 ? __('notifications.document_expiring.timing.expired_today')
                 : __('notifications.document_expiring.timing.expired_days', ['days' => $days]);

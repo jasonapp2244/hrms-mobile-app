@@ -30,6 +30,51 @@ class Company extends Model
     }
 
     /**
+     * The time at this company, now.
+     *
+     * The server runs on UTC, so a bare now() is five hours ahead of New York:
+     * from 8pm Eastern its "today" is already tomorrow, and on New Year's Eve
+     * its year is already next year. Anything that asks "what day is it" or
+     * "what year is it" for a company asks here.
+     */
+    public function localNow(): \Illuminate\Support\Carbon
+    {
+        return now($this->tz());
+    }
+
+    /** Today's date at this company, "Y-m-d". */
+    public function localToday(): string
+    {
+        return $this->localNow()->toDateString();
+    }
+
+    /**
+     * localNow() for a company known only by id — services take ids.
+     *
+     * Not memoised: a queue worker lives across many jobs and a company can
+     * change its zone on the Company page at any time, so a cached zone would
+     * be quietly wrong until the process restarted. It is a primary-key read.
+     */
+    /**
+     * The company's today as midnight in the app zone — the frame a date
+     * column is read back in — for comparing with one.
+     *
+     * $date->isPast() on a date column asks "has midnight UTC passed", which
+     * for a US company is evening the day before. Compare with this instead.
+     */
+    public static function todayFor(?int $companyId): \Illuminate\Support\Carbon
+    {
+        return \Illuminate\Support\Carbon::parse(static::localNowFor($companyId)->toDateString());
+    }
+
+    public static function localNowFor(?int $companyId): \Illuminate\Support\Carbon
+    {
+        $zone = $companyId === null ? null : static::whereKey($companyId)->value('timezone');
+
+        return now($zone && in_array($zone, timezone_identifiers_list(), true) ? $zone : config('app.timezone'));
+    }
+
+    /**
      * Attendance policy defaults, overridable per company via `settings`.
      *
      * Kept as settings rather than constants so a company can be corrected with

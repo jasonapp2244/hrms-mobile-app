@@ -27,7 +27,7 @@ class LeaveBalanceController extends Controller
     public function index(Request $request)
     {
         $companyId = $this->companyId();
-        $year = (int) $request->input('year', date('Y'));
+        $year = (int) $request->input('year', $this->companyNow()->year);
 
         $balances = LeaveBalance::with(['employee.department', 'leaveType'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))
@@ -45,7 +45,7 @@ class LeaveBalanceController extends Controller
             ->values();
 
         $types = LeaveType::where('company_id', $companyId)->orderBy('name')->get();
-        $years = range((int) date('Y') - 2, (int) date('Y') + 1);
+        $years = range((int) $this->companyNow()->year - 2, (int) $this->companyNow()->year + 1);
 
         // How many employee/type pairs have no row yet for this year, so the
         // provisioning button can say what it would actually do.
@@ -65,7 +65,7 @@ class LeaveBalanceController extends Controller
     public function generate(Request $request)
     {
         $companyId = $this->companyId();
-        $year = (int) $request->input('year', date('Y'));
+        $year = (int) $request->input('year', $this->companyNow()->year);
 
         $employees = Employee::where('company_id', $companyId)->active()->get();
         $types = LeaveType::where('company_id', $companyId)->active()->get();

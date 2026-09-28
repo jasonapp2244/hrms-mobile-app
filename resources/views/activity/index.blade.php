@@ -75,7 +75,7 @@
         <tbody>
           @forelse($logs as $log)
           <tr>
-            <td class="text-nowrap">{{ $log->created_at?->format('M j, Y H:i:s') }}</td>
+            <td class="text-nowrap">{{ \App\Support\Clock::local($log->created_at)?->format('M j, Y H:i:s') }}</td>
             <td><span class="badge bg-{{ $log->event_class }}">{{ $log->event_label }}</span></td>
             <td>
               {{ $log->actor_label ?? '—' }}

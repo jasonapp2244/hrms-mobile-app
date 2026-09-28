@@ -11,7 +11,7 @@
 {{-- Balances --}}
 <div class="card mb-3">
 	<div class="card-header d-flex align-items-center justify-content-between">
-		<h5 class="mb-0"><i class="ti ti-calendar-off me-1 text-primary"></i>My Balances <span class="text-muted small">{{ date('Y') }}</span></h5>
+		<h5 class="mb-0"><i class="ti ti-calendar-off me-1 text-primary"></i>My Balances <span class="text-muted small">{{ \App\Models\Company::localNowFor(auth()->user()?->company_id)->year }}</span></h5>
 		@if($types->isNotEmpty())
 			<button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#applyModal">
 				<i class="ti ti-plus me-1"></i>Apply for Leave

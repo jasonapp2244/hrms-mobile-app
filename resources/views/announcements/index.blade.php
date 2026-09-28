@@ -50,7 +50,7 @@
 							@if($a->is_published)
 								<span class="badge bg-success">Sent</span>
 								<div class="text-muted small mt-1">
-									{{ $a->published_at->format('M j, Y H:i') }}
+									{{ \App\Support\Clock::local($a->published_at)->format('M j, Y H:i') }}
 									&middot; {{ $a->recipients_count }} {{ $a->recipients_count === 1 ? 'person' : 'people' }}
 								</div>
 							@else

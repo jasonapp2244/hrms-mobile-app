@@ -546,6 +546,20 @@ row linked to somebody else, or a user already somebody's employee, is left
 alone. Two tests; the relink one fails against the old seeder. Staging needs a
 deploy and `db:seed --class=DemoDataSeeder --force` to pick it up.*
 
+*2026-09-29, a US client, and the company's timezone made to govern everything.
+The zone is chosen on the Company page (US zones first). An audit then found the
+server's UTC clock leaking through in four ways, all fixed and pinned by
+`CompanyTimezoneCorrectnessTest`, which runs a New York company at 10:00 and at
+21:30 — every other suite's company is UTC, where the mistakes cancel out:
+punches are stored as the company's wall clock, and the **manager panel
+converted them again**, printing every punch four hours early; "today",
+"this month" and "this year" defaults came from `now()`, so from 8pm Eastern the
+dashboard, leave lists, roster and calendar were on tomorrow; the late-arrivals
+digest ran at 10:30 UTC (06:30 in New York); and real-UTC stamps (created_at,
+approved_at, voided_at…) were printed without conversion. `Company::localNow()`,
+`Company::todayFor()`, `Controller::companyNow()/companyToday()` and
+`Clock::local()` are the one way each is done now.*
+
 *2026-09-28, push switched on for the first time (Firebase `kemp-805c6`) and
 **no push had ever worked.** Four notifications — leave submitted, leave
 decided, missing checkout, schedule updated — called `AppRoute` without

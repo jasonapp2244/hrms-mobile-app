@@ -1318,7 +1318,9 @@ class AttendanceService
      */
     public function daySummary(int $companyId, ?string $date = null): array
     {
-        $date ??= now()->toDateString();
+        // The company's today, not the server's: from 8pm Eastern a UTC today
+        // is tomorrow, and the tiles read zero until midnight.
+        $date ??= Company::localNowFor($companyId)->toDateString();
 
         $totalEmployees = Employee::where('company_id', $companyId)->active()->count();
 

@@ -36,7 +36,7 @@
     <div>
       <h5 class="mb-1"><span class="badge bg-success me-2">On</span>Two-factor is protecting this account</h5>
       <p class="text-muted mb-0">
-        Switched on {{ $user->two_factor_confirmed_at->format('M j, Y') }}.
+        Switched on {{ \App\Support\Clock::local($user->two_factor_confirmed_at)->format('M j, Y') }}.
         You will be asked for a code each time you sign in.
         {{ count($user->two_factor_recovery_codes ?? []) }} recovery code(s) left.
       </p>

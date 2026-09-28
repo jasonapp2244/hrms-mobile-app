@@ -97,7 +97,7 @@ class DashboardController extends Controller
             $data['expiries'] = EmployeeDocument::with('employee')
                 ->where('company_id', $companyId)
                 ->whereNotNull('expires_on')
-                ->whereDate('expires_on', '<=', now()->addDays(EmployeeDocument::WARN_DAYS)->toDateString())
+                ->whereDate('expires_on', '<=', $this->companyNow()->addDays(EmployeeDocument::WARN_DAYS)->toDateString())
                 ->orderBy('expires_on')
                 ->limit(5)
                 ->get();
@@ -163,7 +163,7 @@ class DashboardController extends Controller
      */
     protected function weekComparison(int $companyId): array
     {
-        $today = now();
+        $today = $this->companyNow();
         $thisStart = $today->copy()->startOfWeek();
         $lastStart = $thisStart->copy()->subWeek();
         $lastEnd   = $lastStart->copy()->addDays($thisStart->diffInDays($today));
@@ -233,14 +233,14 @@ class DashboardController extends Controller
         // per day and used a raw work_date comparison that dropped rows on any
         // engine storing a time component with the date.
         $counts = AttendanceLog::where('company_id', $companyId)
-            ->forDates(now()->subDays(6)->toDateString(), now()->toDateString())
+            ->forDates($this->companyNow()->subDays(6)->toDateString(), $this->companyNow()->toDateString())
             ->where('type', 'in')
             ->get(['employee_id', 'work_date'])
             ->groupBy(fn ($log) => $log->work_date->toDateString())
             ->map(fn ($logs) => $logs->pluck('employee_id')->unique()->count());
 
         return collect(range(6, 0))->map(function ($daysAgo) use ($counts) {
-            $day = now()->subDays($daysAgo);
+            $day = $this->companyNow()->subDays($daysAgo);
 
             return [
                 'label' => $day->format('D'),

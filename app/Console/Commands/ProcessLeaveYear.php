@@ -36,20 +36,24 @@ class ProcessLeaveYear extends Command
             ->when($this->option('company'), fn ($q, $id) => $q->whereKey($id))
             ->get();
 
-        $year = (int) ($this->option('year') ?: date('Y'));
-
-        // On the first few days of January, roll last year in as well — without
-        // being asked. That is the one date this has to happen and the one date
-        // nobody is watching. The window is days rather than a single date so a
-        // server down over New Year still catches it, and the roll is idempotent
-        // so the repeat costs nothing.
-        $carry = $this->option('carry-forward')
-            || (now()->month === 1 && now()->day <= 7);
-
         $accrued = 0;
         $created = 0;
 
         foreach ($companies as $company) {
+            // The company's year and the company's January. The server's UTC
+            // New Year arrives at 7pm on 31 December in New York, which rolled
+            // a US company's balances over before its year had ended.
+            $local = $company->localNow();
+            $year = (int) ($this->option('year') ?: $local->year);
+
+            // On the first few days of January, roll last year in as well —
+            // without being asked. That is the one date this has to happen and
+            // the one date nobody is watching. The window is days rather than a
+            // single date so a server down over New Year still catches it, and
+            // the roll is idempotent so the repeat costs nothing.
+            $carry = $this->option('carry-forward')
+                || ($local->month === 1 && $local->day <= 7);
+
             if ($this->option('dry-run')) {
                 $this->line("{$company->name}: would accrue and " . ($carry ? 'roll' : 'not roll') . ' balances.');
                 continue;

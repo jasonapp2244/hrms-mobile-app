@@ -74,8 +74,8 @@ class ReportController extends Controller
             'to'   => 'nullable|date_format:Y-m-d',
         ]);
 
-        $from = $dates['from'] ?? now()->startOfMonth()->toDateString();
-        $to   = $dates['to'] ?? now()->toDateString();
+        $from = $dates['from'] ?? $this->companyNow()->startOfMonth()->toDateString();
+        $to   = $dates['to'] ?? $this->companyNow()->toDateString();
         $officeId = $request->filled('office_id') ? (int) $request->office_id : null;
 
         $report = $type === 'custom'

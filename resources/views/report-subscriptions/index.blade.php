@@ -52,7 +52,7 @@
             <td><span class="badge bg-light text-dark text-uppercase">{{ $s->format }}</span></td>
             <td>{{ $s->office->name ?? 'All offices' }}</td>
             <td class="small">{{ implode(', ', $s->recipients) }}</td>
-            <td>{{ $s->last_sent_at ? $s->last_sent_at->format('M j, Y H:i') : '—' }}</td>
+            <td>{{ $s->last_sent_at ? \App\Support\Clock::local($s->last_sent_at)->format('M j, Y H:i') : '—' }}</td>
             <td>
               @if($s->is_active)
                 <span class="badge bg-success">Active</span>

@@ -89,11 +89,11 @@
 							     on, and printing it on a screen is the one way to make it
 							     guessable. --}}
 						</td>
-						<td>{{ $device->trusted_at?->format('M j, Y') ?? '—' }}</td>
+						<td>{{ \App\Support\Clock::local($device->trusted_at)?->format('M j, Y') ?? '—' }}</td>
 						<td>
 							@if($device->last_seen_at)
 								{{ $device->last_seen_at->diffForHumans() }}
-								<div class="text-muted small">{{ $device->last_seen_at->format('M j, Y H:i') }}</div>
+								<div class="text-muted small">{{ \App\Support\Clock::local($device->last_seen_at)->format('M j, Y H:i') }}</div>
 							@else
 								<span class="text-muted">—</span>
 							@endif
@@ -102,7 +102,7 @@
 							@if($device->isReleased())
 								<span class="badge bg-secondary">Released</span>
 								<div class="text-muted small">
-									{{ $device->released_at->format('M j, Y') }}
+									{{ \App\Support\Clock::local($device->released_at)->format('M j, Y') }}
 									@if($device->releasedBy) by {{ $device->releasedBy->name }}@endif
 								</div>
 							@else

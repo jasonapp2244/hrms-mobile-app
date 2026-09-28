@@ -6,7 +6,7 @@
 	<p class="lede">
 		How the {{ config('app.name') }} app and website handle information about you.
 	</p>
-	<p class="updated">Last updated {{ now()->format('j F Y') }}</p>
+	<p class="updated">Last updated {{ now($company?->tz() ?? config('app.timezone'))->format('j F Y') }}</p>
 
 	<div class="note">
 		<strong>Who holds your information.</strong>

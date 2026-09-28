@@ -113,7 +113,7 @@ class EmployeeController extends Controller
 
         return Excel::download(
             new TableExport($headings, $rows),
-            'employees_' . now()->toDateString() . '.xlsx',
+            'employees_' . $this->companyNow()->toDateString() . '.xlsx',
         );
     }
 

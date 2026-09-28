@@ -64,8 +64,8 @@
 						<td>{{ $employee->department?->name ?? '—' }}</td>
 						<td>{{ $employee->office?->name ?? '—' }}</td>
 						<td>@include('manager.partials.status-badge', ['status' => $row['status'], 'late' => $row['late']])</td>
-						<td>{{ $row['first_in'] ? $row['first_in']->timezone($timezone)->format('h:i A') : '—' }}</td>
-						<td>{{ $row['last_out'] ? $row['last_out']->timezone($timezone)->format('h:i A') : '—' }}</td>
+						<td>{{ $row['first_in'] ? \App\Support\Clock::time($row['first_in']) : '—' }}</td>
+						<td>{{ $row['last_out'] ? \App\Support\Clock::time($row['last_out']) : '—' }}</td>
 						<td>
 							@if($row['worked_minutes'] > 0)
 								{{ intdiv($row['worked_minutes'], 60) }}h {{ $row['worked_minutes'] % 60 }}m

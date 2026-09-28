@@ -83,16 +83,21 @@ class EmployeeDocument extends Model
         return self::TYPES[$this->type] ?? $this->type;
     }
 
+    /**
+     * On or before the company's today. (isPast() on a date column asked "has
+     * midnight UTC passed", which in New York is 8pm the evening before.)
+     */
     public function hasExpired(): bool
     {
-        return $this->expires_on !== null && $this->expires_on->isPast();
+        return $this->expires_on !== null
+            && $this->expires_on->lessThanOrEqualTo(Company::todayFor($this->company_id));
     }
 
     public function expiresSoon(): bool
     {
         return $this->expires_on !== null
             && ! $this->hasExpired()
-            && $this->expires_on->lessThanOrEqualTo(now()->addDays(self::WARN_DAYS));
+            && $this->expires_on->lessThanOrEqualTo(Company::todayFor($this->company_id)->addDays(self::WARN_DAYS));
     }
 
     /** For the badge on the list. */
@@ -123,7 +128,7 @@ class EmployeeDocument extends Model
     {
         return $query->where('company_id', $companyId)
             ->whereNotNull('expires_on')
-            ->whereDate('expires_on', '<=', now()->addDays(self::WARN_DAYS)->toDateString())
+            ->whereDate('expires_on', '<=', Company::todayFor($companyId)->addDays(self::WARN_DAYS)->toDateString())
             // Already told, and the date has not moved since. A nightly job that
             // re-sends every night is one people filter to a folder.
             ->where(fn ($q) => $q->whereNull('expiry_notified_at')

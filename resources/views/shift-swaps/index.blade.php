@@ -92,7 +92,7 @@
 						<td>
 							@if($s->approved_at)
 								{{ $s->approver?->name ?? 'System' }}
-								<div class="text-muted small">{{ $s->approved_at->format('M j, Y') }}</div>
+								<div class="text-muted small">{{ \App\Support\Clock::local($s->approved_at)->format('M j, Y') }}</div>
 							@else
 								<span class="text-muted">—</span>
 							@endif

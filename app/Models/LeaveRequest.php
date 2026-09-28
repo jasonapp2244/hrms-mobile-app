@@ -159,11 +159,19 @@ class LeaveRequest extends Model
         return $this->status === 'pending';
     }
 
-    /** Approved leave that has not started yet can still be withdrawn. */
+    /**
+     * Approved leave that has not started yet can still be withdrawn.
+     *
+     * "Started" is the company's calendar. start_date is a bare date read back
+     * as midnight UTC, so isFuture() flipped at 8pm Eastern the evening before
+     * and took the Withdraw button away from somebody whose leave was still
+     * tomorrow.
+     */
     public function isCancellable(): bool
     {
         return $this->status === 'pending'
-            || ($this->status === 'approved' && $this->start_date->isFuture());
+            || ($this->status === 'approved'
+                && $this->start_date->toDateString() > Company::localNowFor($this->company_id)->toDateString());
     }
 
     /**

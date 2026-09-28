@@ -145,7 +145,7 @@
 							@if(! $r->start_date->isSameDay($r->end_date))
 								<span class="text-muted">→</span> {{ $r->end_date->format('M j, Y') }}
 							@endif
-							<div class="text-muted small">submitted {{ $r->created_at?->format('M j, Y') }}</div>
+							<div class="text-muted small">submitted {{ \App\Support\Clock::local($r->created_at)?->format('M j, Y') }}</div>
 						</td>
 						<td>{{ rtrim(rtrim(number_format($r->days, 1), '0'), '.') }}</td>
 						<td>
@@ -174,7 +174,7 @@
 						<td>
 							@if($r->approved_at)
 								{{ $r->approver?->name ?? 'System' }}
-								<div class="text-muted small">{{ $r->approved_at->format('M j, Y') }}</div>
+								<div class="text-muted small">{{ \App\Support\Clock::local($r->approved_at)->format('M j, Y') }}</div>
 							@elseif($r->manager_approved_at)
 								{{-- Not decided yet, but the manager step is on the record. --}}
 								<span class="text-muted small">manager: {{ $r->managerApprover?->name ?? '—' }}</span>

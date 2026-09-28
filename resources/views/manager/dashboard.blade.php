@@ -113,7 +113,7 @@
 				<div class="d-flex align-items-center justify-content-between border-bottom py-2">
 					<div>
 						<span class="fw-medium">{{ $log->employee?->full_name }}</span>
-						<span class="text-muted fs-13">&middot; in at {{ $log->scanned_at->timezone($timezone)->format('h:i A') }}</span>
+						<span class="text-muted fs-13">&middot; in at {{ \App\Support\Clock::time($log->scanned_at) }}</span>
 					</div>
 					<span class="text-muted fs-13">{{ $log->work_date->format('D j M') }}</span>
 				</div>
@@ -187,8 +187,8 @@
 									<div class="fs-12 text-muted">{{ $row['employee']->employee_code }}</div>
 								</td>
 								<td>@include('manager.partials.status-badge', ['status' => $row['status'], 'late' => $row['late']])</td>
-								<td>{{ $row['first_in'] ? $row['first_in']->timezone($timezone)->format('h:i A') : '—' }}</td>
-								<td>{{ $row['last_out'] ? $row['last_out']->timezone($timezone)->format('h:i A') : '—' }}</td>
+								<td>{{ $row['first_in'] ? \App\Support\Clock::time($row['first_in']) : '—' }}</td>
+								<td>{{ $row['last_out'] ? \App\Support\Clock::time($row['last_out']) : '—' }}</td>
 							</tr>
 							@endforeach
 						</tbody>
@@ -212,7 +212,7 @@
 							{{ str_replace('_', ' ', $log->type) }}
 						</span>
 					</div>
-					<span class="text-muted fs-13">{{ $log->scanned_at->timezone($timezone)->format('D h:i A') }}</span>
+					<span class="text-muted fs-13">{{ $log->scanned_at->format('D') . ' ' . \App\Support\Clock::time($log->scanned_at) }}</span>
 				</div>
 				@empty
 				<p class="text-muted mb-0">No punches recorded yet.</p>

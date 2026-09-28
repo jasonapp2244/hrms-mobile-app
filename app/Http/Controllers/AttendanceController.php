@@ -171,8 +171,8 @@ class AttendanceController extends Controller
             'to'   => 'nullable|date_format:Y-m-d',
         ]);
 
-        $from = $dates['from'] ?? now()->startOfMonth()->toDateString();
-        $to   = $dates['to'] ?? now()->toDateString();
+        $from = $dates['from'] ?? $this->companyNow()->startOfMonth()->toDateString();
+        $to   = $dates['to'] ?? $this->companyNow()->toDateString();
 
         $logs = AttendanceLog::with(['employee', 'office'])
             ->whereHas('employee', fn ($q) => $q->where('company_id', $companyId))

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Support\AppRoute;
+use App\Support\Clock;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
@@ -92,8 +93,11 @@ class NotificationController extends ApiController
             // Derived rather than stored: `toDatabase()` has never recorded a
             // route, so a row written before B5.6 would otherwise have none.
             'route'      => AppRoute::forType($type),
-            'read_at'    => $notification->read_at?->toIso8601String(),
-            'created_at' => $notification->created_at?->toIso8601String(),
+            // On the company's clock, offset included — the same instant, with
+            // the digits the phone should print. In UTC, a notification at
+            // 21:30 in New York was dated the next day on the handset.
+            'read_at'    => Clock::local($notification->read_at)?->toIso8601String(),
+            'created_at' => Clock::local($notification->created_at)?->toIso8601String(),
         ];
     }
 }

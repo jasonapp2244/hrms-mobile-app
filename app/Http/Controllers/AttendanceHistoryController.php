@@ -183,12 +183,12 @@ class AttendanceHistoryController extends Controller
             'to'   => 'nullable|date_format:Y-m-d',
         ]);
 
-        $today = now()->toDateString();
+        $today = $this->companyNow()->toDateString();
 
         $default = match ($view) {
-            'weekly'  => [now()->startOfWeek()->toDateString(), now()->endOfWeek()->toDateString()],
-            'monthly' => [now()->startOfMonth()->toDateString(), now()->endOfMonth()->toDateString()],
-            default   => [now()->startOfMonth()->toDateString(), $today],
+            'weekly'  => [$this->companyNow()->startOfWeek()->toDateString(), $this->companyNow()->endOfWeek()->toDateString()],
+            'monthly' => [$this->companyNow()->startOfMonth()->toDateString(), $this->companyNow()->endOfMonth()->toDateString()],
+            default   => [$this->companyNow()->startOfMonth()->toDateString(), $today],
         };
 
         $from = ($dates['from'] ?? null) ?: $default[0];

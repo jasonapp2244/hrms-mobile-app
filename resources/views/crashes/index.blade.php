@@ -85,10 +85,10 @@
               @endif
             </td>
             <td class="fs-13 text-muted text-nowrap">
-              {{ $g->first_seen ? \Illuminate\Support\Carbon::parse($g->first_seen)->format('M j, Y H:i') : '—' }}
+              {{ $g->first_seen ? \App\Support\Clock::local(\Illuminate\Support\Carbon::parse($g->first_seen))->format('M j, Y H:i') : '—' }}
             </td>
             <td class="fs-13 text-nowrap">
-              {{ $g->last_seen ? \Illuminate\Support\Carbon::parse($g->last_seen)->format('M j, Y H:i') : '—' }}
+              {{ $g->last_seen ? \App\Support\Clock::local(\Illuminate\Support\Carbon::parse($g->last_seen))->format('M j, Y H:i') : '—' }}
             </td>
             <td class="text-end">
               <a href="{{ route('crashes.index', ['fingerprint' => $g->fingerprint]) }}"

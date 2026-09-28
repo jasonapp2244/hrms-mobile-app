@@ -65,8 +65,11 @@ Schedule::command('reports:send')
 // Late enough that the morning shift has arrived and the grace period has
 // passed, early enough to still be the morning. One digest per company per day
 // rather than an alert per person, which is a stream nobody reads.
+// Hourly at :30, and the command sends each company its digest only in the
+// hour it is 10:30 there. dailyAt('10:30') was 10:30 on the server's UTC clock
+// — 06:30 in New York, 03:30 in Los Angeles, before anybody had arrived.
 Schedule::command('attendance:report-late')
-    ->dailyAt('10:30')
+    ->hourlyAt(30)
     ->withoutOverlapping()
     ->onOneServer();
 

@@ -50,7 +50,7 @@ class LeaveController extends Controller
             ->paginate($this->perPage('leave'))
             ->withQueryString();
 
-        $today = now()->toDateString();
+        $today = $this->companyNow()->toDateString();
 
         // Split the pending pile by who owns it. "Awaiting HR" is the queue this
         // screen can actually clear; the rest is sitting with line managers.
@@ -67,8 +67,8 @@ class LeaveController extends Controller
             'upcoming'   => LeaveRequest::where('company_id', $companyId)->approved()
                                 ->where('start_date', '>', $today)->count(),
             'this_month' => LeaveRequest::where('company_id', $companyId)->approved()
-                                ->overlapping(now()->startOfMonth()->toDateString(),
-                                              now()->endOfMonth()->toDateString())->count(),
+                                ->overlapping($this->companyNow()->startOfMonth()->toDateString(),
+                                              $this->companyNow()->endOfMonth()->toDateString())->count(),
         ];
 
         $types       = LeaveType::where('company_id', $companyId)->orderBy('name')->get();
@@ -93,7 +93,7 @@ class LeaveController extends Controller
     {
         $companyId = $this->companyId();
 
-        $month = Carbon::parse($request->input('month', now()->format('Y-m')) . '-01')->startOfMonth();
+        $month = Carbon::parse($request->input('month', $this->companyNow()->format('Y-m')) . '-01')->startOfMonth();
         $start = $month->copy()->startOfMonth();
         $end   = $month->copy()->endOfMonth();
 

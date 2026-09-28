@@ -68,7 +68,7 @@
                       no date
                     @endif
                     @if($item->isDone())
-                      · done {{ $item->completed_at->format('M j') }}
+                      · done {{ \App\Support\Clock::local($item->completed_at)->format('M j') }}
                       @if($item->completedBy) by {{ $item->completedBy->name }} @endif
                     @endif
                   </div>

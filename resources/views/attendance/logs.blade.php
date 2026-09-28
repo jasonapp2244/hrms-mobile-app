@@ -124,7 +124,7 @@
 							<span class="badge bg-{{ $log->type=='in'?'success':'secondary' }}">{{ strtoupper($log->type) }}</span>
 							@if($log->isVoided())
 								<span class="badge bg-danger ms-1"
-									title="Voided by {{ $log->voided_by_label ?? 'unknown' }} on {{ $log->voided_at?->format('d M Y H:i') }} — {{ $log->void_reason }}">Voided</span>
+									title="Voided by {{ $log->voided_by_label ?? 'unknown' }} on {{ \App\Support\Clock::local($log->voided_at)?->format('d M Y H:i') }} — {{ $log->void_reason }}">Voided</span>
 							@endif
 							{{-- B2.7. A fraud signal, not a location, so it stays while
 							     the Location column is hidden — it lived in that cell,

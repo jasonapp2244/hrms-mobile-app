@@ -144,7 +144,7 @@
 							<tr>
 								<td>{{ $log->work_date->format('D j M') }}</td>
 								<td>{{ str_replace('_', ' ', $log->type) }}</td>
-								<td>{{ $log->scanned_at->timezone($timezone)->format('h:i A') }}</td>
+								<td>{{ \App\Support\Clock::time($log->scanned_at) }}</td>
 								<td>
 									@if($log->status === 'late')
 										<span class="badge bg-warning">Late</span>

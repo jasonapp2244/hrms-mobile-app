@@ -125,7 +125,7 @@ class LeaveService
      */
     public function onLeaveOn(int $companyId, ?string $date = null): \Illuminate\Support\Collection
     {
-        $date ??= now()->toDateString();
+        $date ??= Company::localNowFor($companyId)->toDateString();
 
         return LeaveRequest::with('leaveType', 'employee')
             ->where('company_id', $companyId)
@@ -193,7 +193,7 @@ class LeaveService
      */
     public function balanceFor(Employee $employee, LeaveType $type, ?int $year = null): LeaveBalance
     {
-        $year ??= (int) date('Y');
+        $year ??= Company::localNowFor($employee->company_id)->year;
 
         return LeaveBalance::firstOrCreate(
             [
@@ -228,7 +228,7 @@ class LeaveService
             return $allowance;
         }
 
-        $year ??= (int) date('Y');
+        $year ??= Company::localNowFor($employee->company_id)->year;
 
         $yearStart = Carbon::create($year, 1, 1)->startOfDay();
         $yearEnd   = Carbon::create($year, 12, 31)->endOfDay();
@@ -246,7 +246,10 @@ class LeaveService
         // A past year has finished accruing; the current one has only reached
         // today. Counting to the year end either way would grant December's
         // twelfth in January.
-        $upTo = now()->between($yearStart, $yearEnd) ? now() : $yearEnd;
+        // Today on the company's calendar, in the frame $yearStart and $yearEnd
+        // are in: a UTC today reaches next year on New York's New Year's Eve.
+        $today = Carbon::parse(Company::localNowFor($employee->company_id)->toDateString());
+        $upTo = $today->between($yearStart, $yearEnd) ? $today : $yearEnd;
 
         if ($upTo->lessThan($from)) {
             return 0.0;
@@ -276,7 +279,7 @@ class LeaveService
      */
     public function accrue(int $companyId, ?int $year = null): int
     {
-        $year ??= (int) date('Y');
+        $year ??= Company::localNowFor($companyId)->year;
 
         $types = LeaveType::where('company_id', $companyId)->active()
             ->where('accrual_mode', 'monthly')->get();

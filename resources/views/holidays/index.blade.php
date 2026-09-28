@@ -52,13 +52,18 @@
 				</thead>
 				<tbody>
 					@forelse($holidays as $row)
-					@php $h = $row['holiday']; $on = $row['observed_on']; @endphp
-					<tr class="{{ $on->isPast() ? 'text-muted' : '' }}">
+					@php
+						$h = $row['holiday']; $on = $row['observed_on'];
+						// The company's today, in the frame observed_on is read in —
+						// isPast()/isToday() asked the server's UTC clock.
+						$companyToday ??= \App\Models\Company::todayFor(auth()->user()?->company_id);
+					@endphp
+					<tr class="{{ $on->lt($companyToday) ? 'text-muted' : '' }}">
 						<td>{{ $on->format('M j, Y') }}</td>
 						<td>{{ $on->format('l') }}</td>
 						<td>
 							{{ $h->name }}
-							@if($on->isToday())<span class="badge bg-success ms-1">Today</span>@endif
+							@if($on->isSameDay($companyToday))<span class="badge bg-success ms-1">Today</span>@endif
 						</td>
 						<td>
 							@if($h->is_recurring)

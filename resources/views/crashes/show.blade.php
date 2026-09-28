@@ -52,7 +52,7 @@
         <tbody>
           @foreach($reports as $r)
           <tr>
-            <td class="text-nowrap">{{ $r->occurred_at?->format('M j, Y H:i:s') ?? '—' }}</td>
+            <td class="text-nowrap">{{ \App\Support\Clock::local($r->occurred_at)?->format('M j, Y H:i:s') ?? '—' }}</td>
             <td class="fs-13">
               {{-- No user at all is the interesting case, not a gap: it means the
                    app crashed before anybody signed in. --}}
@@ -66,7 +66,7 @@
                    collected; on iOS it is the OS build alone. --}}
               {{ $r->os_version ?? '—' }}
             </td>
-            <td class="fs-13 text-muted text-nowrap">{{ $r->created_at?->format('M j, H:i') ?? '—' }}</td>
+            <td class="fs-13 text-muted text-nowrap">{{ \App\Support\Clock::local($r->created_at)?->format('M j, H:i') ?? '—' }}</td>
           </tr>
           @endforeach
         </tbody>

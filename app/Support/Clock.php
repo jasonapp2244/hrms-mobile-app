@@ -26,6 +26,26 @@ class Clock
         return $at->format('h:i') . ' ' . self::meridiem((int) $at->format('G'));
     }
 
+    /**
+     * A real UTC moment, restated on the signed-in company's clock, for display.
+     *
+     * **Only for columns that hold UTC** — created_at, approved_at, voided_at,
+     * published_at and the rest written with now(). Never for scanned_at or
+     * work_date: punches are stored as the company's wall clock already, and
+     * converting them again is how the manager panel printed every punch four
+     * hours early.
+     */
+    public static function local(?CarbonInterface $utc): ?CarbonInterface
+    {
+        return $utc?->copy()->setTimezone(self::zone());
+    }
+
+    /** The signed-in user's company zone, or the app's when there is none. */
+    public static function zone(): string
+    {
+        return auth()->user()?->company?->tz() ?? config('app.timezone');
+    }
+
     /** AM or PM for a 0–23 hour, in the caller's language. */
     /**
      * A length of time as "7h 45m".

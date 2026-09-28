@@ -39,6 +39,32 @@ abstract class Controller
     }
 
     /**
+     * The time at the signed-in user's company, now.
+     *
+     * Every default date range, every "this month", every "today" on a screen
+     * starts here, not at now(): the server is on UTC, and for a US company a
+     * UTC "today" turns into tomorrow every evening.
+     */
+    protected function companyNow(): \Illuminate\Support\Carbon
+    {
+        return \App\Models\Company::localNowFor($this->companyId());
+    }
+
+    /**
+     * The company's today as midnight in the app zone — the frame a stored
+     * date is read back in.
+     *
+     * For comparing against date columns ($day->lt($today), isSameDay). The
+     * company's own midnight is a different instant (04:00 UTC in New York),
+     * so comparing a stored date to companyNow()->startOfDay() calls today
+     * "past".
+     */
+    protected function companyToday(): \Illuminate\Support\Carbon
+    {
+        return \Illuminate\Support\Carbon::parse($this->companyNow()->toDateString());
+    }
+
+    /**
      * How many rows a list shows at once.
      *
      * Twenty-three controllers carried a literal `paginate(n)` between them,

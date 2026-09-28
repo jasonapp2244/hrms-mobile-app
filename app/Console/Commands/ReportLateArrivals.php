@@ -30,6 +30,12 @@ class ReportLateArrivals extends Command
 
     protected $description = 'Send HR a digest of the day\'s late arrivals';
 
+    /**
+     * The local hour the digest goes out in. The morning shift has arrived and
+     * the grace period has passed; it is still the morning.
+     */
+    public const SEND_HOUR = 10;
+
     public function handle(AttendanceService $attendance): int
     {
         $companies = Company::query()
@@ -38,8 +44,17 @@ class ReportLateArrivals extends Command
 
         $sent = 0;
 
+        // The scheduler runs this every hour; each company is sent its digest in
+        // the one hour it is 10:xx there. Run by hand for a company or a date,
+        // it sends at once — that is somebody asking for it now.
+        $scheduled = ! $this->option('company') && ! $this->option('date');
+
         foreach ($companies as $company) {
-            $date = $this->option('date') ?: now($company->tz())->toDateString();
+            if ($scheduled && (int) $company->localNow()->format('G') !== self::SEND_HOUR) {
+                continue;
+            }
+
+            $date = $this->option('date') ?: $company->localToday();
 
             $late = AttendanceLog::with('employee.department')
                 ->where('company_id', $company->id)

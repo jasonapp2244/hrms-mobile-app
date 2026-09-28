@@ -6,7 +6,10 @@
 	// so every row has seven cells and the month sits where the eye expects it.
 	$gridStart = $month->copy()->startOfMonth()->startOfWeek(\Carbon\Carbon::SUNDAY);
 	$gridEnd   = $month->copy()->endOfMonth()->endOfWeek(\Carbon\Carbon::SATURDAY);
-	$today     = now()->toDateString();
+	// The company's today — the server's UTC one moved the highlight to
+	// tomorrow every evening.
+	$companyNow = \App\Models\Company::localNowFor(auth()->user()?->company_id);
+	$today      = $companyNow->toDateString();
 @endphp
 
 @section('content')
@@ -23,7 +26,7 @@
     <span class="fw-semibold px-2">{{ $month->format('F Y') }}</span>
     <a href="{{ route('leave.calendar', array_merge(request()->only('department_id'), ['month' => $month->copy()->addMonth()->format('Y-m')])) }}"
        class="btn btn-outline-secondary"><i class="ti ti-chevron-right"></i></a>
-    <a href="{{ route('leave.calendar', ['month' => now()->format('Y-m')]) }}" class="btn btn-outline-primary">Today</a>
+    <a href="{{ route('leave.calendar', ['month' => $companyNow->format('Y-m')]) }}" class="btn btn-outline-primary">Today</a>
   </div>
 </div>
 

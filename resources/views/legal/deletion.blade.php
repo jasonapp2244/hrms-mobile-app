@@ -7,7 +7,7 @@
 		How to ask for your account to be removed, and what happens to the records
 		attached to it.
 	</p>
-	<p class="updated">Last updated {{ now()->format('j F Y') }}</p>
+	<p class="updated">Last updated {{ now($company?->tz() ?? config('app.timezone'))->format('j F Y') }}</p>
 
 	<div class="note">
 		<strong>You cannot delete this account from inside the app, and that is

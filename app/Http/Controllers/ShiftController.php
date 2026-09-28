@@ -34,7 +34,7 @@ class ShiftController extends Controller
     {
         $companyId = $this->companyId();
 
-        $weekStart = ($request->filled('week') ? Carbon::parse($request->week) : Carbon::now())
+        $weekStart = ($request->filled('week') ? Carbon::parse($request->week) : $this->companyToday())
             ->startOfWeek(Carbon::MONDAY);
         $weekEnd = (clone $weekStart)->endOfWeek(Carbon::SUNDAY);
 
@@ -92,7 +92,7 @@ class ShiftController extends Controller
             'planning'    => $request->boolean('plan'),
             'plannedCount'   => $planned->count(),
             'unpublishedCount' => $planned->whereNull('published_at')->count(),
-            'today'       => Carbon::today(),
+            'today'       => $this->companyToday(),
         ]);
     }
 

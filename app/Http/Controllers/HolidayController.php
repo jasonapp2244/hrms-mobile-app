@@ -18,7 +18,7 @@ class HolidayController extends Controller
     public function index(Request $request)
     {
         $companyId = $this->companyId();
-        $year = (int) $request->input('year', date('Y'));
+        $year = (int) $request->input('year', $this->companyNow()->year);
 
         $holidays = Holiday::where('company_id', $companyId)
             ->get()
@@ -36,7 +36,7 @@ class HolidayController extends Controller
 
         // Year picker range: whatever is on record, plus a couple ahead so next
         // year can be entered before it starts.
-        $years = range((int) date('Y') - 2, (int) date('Y') + 2);
+        $years = range((int) $this->companyNow()->year - 2, (int) $this->companyNow()->year + 2);
 
         return view('holidays.index', compact('holidays', 'year', 'years'));
     }

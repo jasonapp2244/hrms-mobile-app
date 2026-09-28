@@ -49,9 +49,10 @@ class EmployeeChecklistItem extends Model
      */
     public function isOverdue(): bool
     {
+        // On or before the company's today, not "midnight UTC has passed".
         return ! $this->isDone()
             && $this->due_on !== null
-            && $this->due_on->isPast();
+            && $this->due_on->lessThanOrEqualTo(Company::todayFor($this->company_id));
     }
 
     public function scopeOutstanding($query)

@@ -29,7 +29,7 @@
 	<div class="meta">
 		<span><b>Period:</b> {{ \Carbon\Carbon::parse($from)->format('m/d/Y') }} – {{ \Carbon\Carbon::parse($to)->format('m/d/Y') }}</span>
 		<span><b>Office:</b> {{ $office->name ?? 'All Offices' }}</span>
-		<span><b>Generated:</b> {{ now()->format('m/d/Y, h:i A') }}</span>
+		<span><b>Generated:</b> {{ now(\App\Support\Clock::zone())->format('m/d/Y, h:i A') }}</span>
 	</div>
 
 	<table class="tiles">
