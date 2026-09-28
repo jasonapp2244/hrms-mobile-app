@@ -404,6 +404,21 @@ class AttendanceCorrectionTest extends TestCase
      * suspicious would fill the filter with the entire history of the company
      * and make it useless on its first use.
      */
+    public function test_a_located_punch_shows_a_gps_badge_and_no_map_link(): void
+    {
+        // Client request, 2026-09-29: no map links anywhere. The coordinates
+        // are still one hover away on the badge.
+        $this->punch('in', '2026-08-03 09:00:00', ['latitude' => 40.7128, 'longitude' => -74.0060]);
+
+        $this->actingAs($this->hr)
+            ->get(route('attendance.logs'))
+            ->assertOk()
+            ->assertSee('ti-current-location', false)
+            ->assertSee('40.7128', false)
+            ->assertDontSee('google.com/maps', false)
+            ->assertDontSee('View map');
+    }
+
     public function test_a_punch_that_reported_nothing_is_not_flagged(): void
     {
         $silent = $this->punch('in', '2026-08-03 09:00:00');

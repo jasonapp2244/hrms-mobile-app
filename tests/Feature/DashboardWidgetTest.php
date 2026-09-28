@@ -196,7 +196,7 @@ class DashboardWidgetTest extends TestCase
     {
         // Client request, 2026-09-29: the map link on each recent punch is not
         // wanted on the dashboard. A punch with no fix still says so, and the IP
-        // stays; the attendance log keeps its own "View map" for whoever needs it.
+        // stays. No page links to a map any more; the attendance log shows a GPS badge.
         $located = $this->employee('Ann');
         $unlocated = $this->employee('Bo');
         $now = now()->format('Y-m-d H:i:s');

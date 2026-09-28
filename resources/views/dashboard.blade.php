@@ -277,7 +277,7 @@
 								<small class="text-muted">{{ strtoupper($log->type) }} · {{ $log->office->name ?? '' }}</small>
 								<div class="mt-1" style="font-size:11.5px;line-height:1.4">
 									@unless($log->latitude && $log->longitude)
-										<span class="text-muted me-2"><i class="ti ti-map-pin-off"></i> no location</span>
+										<span class="text-muted me-2"><i class="ti ti-current-location-off"></i> no location</span>
 									@endunless
 									@if($log->ip_address)
 										<span class="text-muted"><i class="ti ti-world"></i> {{ $log->ip_address }}</span>

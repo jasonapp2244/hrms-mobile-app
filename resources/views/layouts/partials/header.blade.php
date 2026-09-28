@@ -32,12 +32,17 @@
 				<div class="d-flex align-items-center">
 					@include('layouts.partials.notification-bell')
 
-					<!-- Theme toggle -->
-					<div class="me-2">
-						<a href="javascript:void(0);" id="dark-mode-toggle" class="btn btn-menubar activate">
+					{{-- Theme toggle. One button at a time: theme-script.js swaps
+						 `d-none` between them. The template's own rule for this keys
+						 on a class the header never carried, and the header's
+						 `display:flex` on .btn-menubar outranks it anyway — so both
+						 showed, stacked, the moon above the bar's centre line and the
+						 sun below it. --}}
+					<div class="me-2 d-flex align-items-center">
+						<a href="javascript:void(0);" id="dark-mode-toggle" class="btn btn-menubar" title="Dark mode">
 							<i class="ti ti-moon"></i>
 						</a>
-						<a href="javascript:void(0);" id="light-mode-toggle" class="btn btn-menubar deactivate">
+						<a href="javascript:void(0);" id="light-mode-toggle" class="btn btn-menubar d-none" title="Light mode">
 							<i class="ti ti-sun-high"></i>
 						</a>
 					</div>

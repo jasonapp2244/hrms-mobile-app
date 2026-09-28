@@ -68,7 +68,7 @@
 				<td>{{ $log->scanned_at->format('h:i A') }}</td>
 				<td>{{ $log->work_date->format('m/d/Y') }}</td>
 				<td>{{ $log->source }}</td>
-					<td>@if($log->latitude && $log->longitude)<a href="https://www.google.com/maps?q={{ $log->latitude }},{{ $log->longitude }}" style="color:#2563eb;text-decoration:none;">{{ $log->latitude }}, {{ $log->longitude }}</a>@else—@endif</td>
+					<td>@if($log->latitude && $log->longitude){{ $log->latitude }}, {{ $log->longitude }}@else—@endif</td>
 					<td>{{ $log->ip_address ?? '—' }}</td>
 			</tr>
 			@empty

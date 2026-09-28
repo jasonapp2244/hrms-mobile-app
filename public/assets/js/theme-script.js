@@ -59,17 +59,21 @@ document.addEventListener('DOMContentLoaded', function () {
         return;
     }
 
+    // Only the button that switches away from the current theme is shown.
+    // `d-none` rather than the template's `activate`: the header's rule giving
+    // .btn-menubar display:flex outranks the template's hide rule, and both
+    // buttons showed at once.
     function enableDarkMode() {
         document.documentElement.setAttribute('data-theme', 'dark');
-        darkModeToggle.classList.remove('activate');
-        lightModeToggle.classList.add('activate');
+        darkModeToggle.classList.add('d-none');
+        lightModeToggle.classList.remove('d-none');
         localStorage.setItem('darkMode', 'enabled');
     }
 
     function disableDarkMode() {
         document.documentElement.setAttribute('data-theme', 'light');
-        lightModeToggle.classList.remove('activate');
-        darkModeToggle.classList.add('activate');
+        lightModeToggle.classList.add('d-none');
+        darkModeToggle.classList.remove('d-none');
         localStorage.removeItem('darkMode');
     }
 

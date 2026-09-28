@@ -74,7 +74,7 @@
   <div class="col-12">
     <div class="card">
       <div class="card-header">
-        <h5 class="mb-0"><i class="ti ti-map-2 me-1"></i>Phase / Roadmap</h5>
+        <h5 class="mb-0"><i class="ti ti-list-check me-1"></i>Phase / Roadmap</h5>
       </div>
       {{-- Driven from config/roadmap.php. The previous version was hard-coded
            here and drifted: it advertised Leave, Shift/Schedule and the mobile
