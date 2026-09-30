@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\QrRefused;
 use App\Models\AttendanceLog;
 use App\Models\Employee;
 use App\Models\Holiday;
 use App\Models\Office;
 use App\Services\AttendanceService;
 use App\Services\LeaveService;
+use App\Services\QrAttendanceService;
 use App\Support\Clock;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -43,6 +45,7 @@ class AttendanceController extends ApiController
     public function __construct(
         protected AttendanceService $attendance,
         protected LeaveService $leave,
+        protected QrAttendanceService $qr,
     ) {}
 
     /**
@@ -58,6 +61,13 @@ class AttendanceController extends ApiController
         ] + self::INTEGRITY_RULES);
 
         $employee = $this->employee();
+
+        // A4.21. Office staff at a company that asked for it scan the office
+        // screen instead. Refused before the cooldown so the app is told the
+        // one thing it can act on — open the scanner — rather than to wait.
+        if ($this->qr->requiresQr($employee)) {
+            return $this->fail('qr_required', __('attendance.qr_required'), 422);
+        }
 
         if ($this->attendance->recentlyScanned($employee)) {
             return $this->fail(
@@ -164,7 +174,23 @@ class AttendanceController extends ApiController
 
         $results = [];
 
+        // A4.21. An offline punch is a button tap that never reached the
+        // server, and office staff under the QR policy may not tap. Refused
+        // per punch, like any other punch that will never be accepted, so the
+        // queue drops it and says why instead of retrying for ever.
+        $qrOnly = $this->qr->requiresQr($employee);
+
         foreach ($queued as $punch) {
+            if ($qrOnly) {
+                $results[] = [
+                    'occurred_at' => $punch['occurred_at'],
+                    'result'      => 'refused',
+                    'message'     => __('attendance.qr_required'),
+                ];
+
+                continue;
+            }
+
             try {
                 $result = $this->attendance->recordQueued($employee, $office, $punch['_at'], [
                     'latitude'   => $punch['latitude'] ?? null,
@@ -198,6 +224,59 @@ class AttendanceController extends ApiController
             'accepted' => $counts['accepted'] ?? 0,
             'duplicate' => $counts['duplicate'] ?? 0,
             'refused'  => $counts['refused'] ?? 0,
+        ]);
+    }
+
+    /**
+     * Punch in or out by scanning the office screen (A4.21).
+     *
+     * The same punch as `check` — the server still decides the direction —
+     * with one more fact: the code on the screen, which proves the person is
+     * standing at it. Available whether or not the company requires it, so a
+     * company can put a screen up and let people try it before switching the
+     * button off.
+     *
+     * Not queued offline, and not queueable: the code is only worth anything
+     * while it is live, and checking that needs the server.
+     */
+    public function qr(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'qr'        => 'required|string|max:200',
+            'latitude'  => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ] + self::INTEGRITY_RULES);
+
+        $employee = $this->employee();
+
+        if ($this->attendance->recentlyScanned($employee)) {
+            return $this->fail(
+                'duplicate_scan',
+                __('attendance.duplicate_scan'),
+                429,
+            );
+        }
+
+        try {
+            $result = $this->qr->consume($employee, $data['qr'], [
+                'latitude'   => $data['latitude'] ?? null,
+                'longitude'  => $data['longitude'] ?? null,
+                'ip_address' => $request->ip(),
+            ] + $this->integrityMeta($data));
+        } catch (QrRefused $e) {
+            return $this->fail($e->error, $e->getMessage(), 422);
+        } catch (\RuntimeException $e) {
+            return $this->fail('outside_geofence', $e->getMessage(), 422);
+        }
+
+        $log = $result['log'];
+
+        return $this->ok([
+            'punch'       => $this->punchPayload($log, $this->timezone($employee)),
+            'next_action' => $result['type'] === 'in' ? 'out' : 'in',
+            'message'     => $result['type'] === 'in'
+                ? __('attendance.clocked_in', ['time' => Clock::time($log->scanned_at)])
+                : __('attendance.clocked_out', ['time' => Clock::time($log->scanned_at)]),
         ]);
     }
 
@@ -303,6 +382,12 @@ class AttendanceController extends ApiController
             'server_time' => $now->toIso8601String(),
             'timezone'    => $timezone,
             'next_action' => $state['clocked_in'] ? 'out' : 'in',
+            // A4.21. How the in/out button works for this person today:
+            // `button` taps `check`, `qr` opens the scanner and posts to
+            // `attendance/qr`. Decided here, so the app never works the policy
+            // and the work-mode exemption out for itself. Breaks are a button
+            // either way.
+            'method'      => $this->qr->requiresQr($employee) ? 'qr' : 'button',
             // False only while the cooldown is running, so the app can grey the
             // button out rather than let a tap fail.
             'can_check'      => ! $cooldown,

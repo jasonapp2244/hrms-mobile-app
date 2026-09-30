@@ -55,4 +55,56 @@ class QrCode
             return null;
         }
     }
+
+    /**
+     * [$text] as PNG bytes, or **null** when it cannot be drawn (A4.21).
+     *
+     * For email, and only for email: Gmail and Outlook strip inline SVG, so the
+     * welcome email's sign-in code has to be a bitmap. bacon's own PNG writer
+     * needs Imagick, which shared hosts rarely have; the matrix is drawn with
+     * GD instead, which they nearly always do. Where GD is missing too the
+     * caller leaves the picture out — the email still works without it.
+     */
+    public static function png(string $text, int $moduleSize = 8): ?string
+    {
+        if ($text === '' || ! function_exists('imagecreatetruecolor')) {
+            return null;
+        }
+
+        try {
+            $matrix = \BaconQrCode\Encoder\Encoder::encode(
+                $text,
+                \BaconQrCode\Common\ErrorCorrectionLevel::M(),
+            )->getMatrix();
+
+            // Four modules of white border: the quiet zone the spec asks for,
+            // without which phone cameras regularly fail to lock on.
+            $quiet = 4;
+            $width = $matrix->getWidth();
+            $side  = ($width + 2 * $quiet) * $moduleSize;
+
+            $image = imagecreatetruecolor($side, $side);
+            $white = imagecolorallocate($image, 255, 255, 255);
+            $black = imagecolorallocate($image, 0, 0, 0);
+            imagefill($image, 0, 0, $white);
+
+            for ($y = 0; $y < $matrix->getHeight(); $y++) {
+                for ($x = 0; $x < $width; $x++) {
+                    if ($matrix->get($x, $y) === 1) {
+                        $left = ($x + $quiet) * $moduleSize;
+                        $top  = ($y + $quiet) * $moduleSize;
+                        imagefilledrectangle($image, $left, $top, $left + $moduleSize - 1, $top + $moduleSize - 1, $black);
+                    }
+                }
+            }
+
+            ob_start();
+            imagepng($image);
+            $png = ob_get_clean();
+
+            return $png === false || $png === '' ? null : $png;
+        } catch (Throwable) {
+            return null;
+        }
+    }
 }

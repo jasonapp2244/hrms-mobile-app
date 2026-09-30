@@ -131,6 +131,13 @@ class Company extends Model
         // and the control bites from the second one.
         'enforce_device_binding' => false,
 
+        // Office staff check in and out by scanning the code on the office
+        // screen instead of tapping (A4.21). Off by default like every control
+        // that can refuse a punch: switching it on before a screen is on the
+        // wall would stop a whole office clocking in. WFH and hybrid staff keep
+        // the button either way — see QrAttendanceService::requiresQr.
+        'require_qr_checkin' => false,
+
         // Show colleagues' email and phone in the app's directory (B3.8). Off
         // by default, and this one matters more than it looks: `employees.phone`
         // is the only phone column on the record, and for a workforce with no

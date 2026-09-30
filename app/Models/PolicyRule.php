@@ -84,6 +84,8 @@ class PolicyRule extends Model
                 'options' => [
                     'mobile'         => 'The app',
                     'mobile_offline' => 'The app, offline',
+                    'qr'             => 'The office QR code',
+                    'button'         => 'The web portal button',
                     'pwa'            => 'The browser',
                     'kiosk'          => 'A kiosk',
                     'manual'         => 'Entered by hand',

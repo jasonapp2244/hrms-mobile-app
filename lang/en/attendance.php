@@ -26,6 +26,12 @@ return [
     'no_office'      => 'No office is set up for your company yet. Please contact HR.',
     'not_clocked_in' => 'You need to be checked in before starting a break.',
 
+    // --- The office QR code (A4.21) ----------------------------------------
+    'qr_required'     => 'Check in and out by scanning the QR code on the office screen with the app.',
+    'qr_invalid'      => 'That is not a check-in code for your company. Scan the code on your office screen.',
+    'qr_expired'      => 'That code has just changed. Scan the new one on the screen.',
+    'qr_already_used' => 'That code was just used by someone else. Scan the new one on the screen.',
+
     // Names the distance on purpose: "outside the area" with no number is a
     // refusal somebody cannot act on.
     'outside_geofence' => 'You appear to be :distance from :office, which is outside the :radius'

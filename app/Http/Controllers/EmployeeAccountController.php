@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ActivationCode;
 use App\Models\ActivityLog;
 use App\Models\Employee;
 use App\Models\User;
+use App\Notifications\EmployeeInvite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -103,12 +105,67 @@ class EmployeeAccountController extends Controller
             subject: $user,
         );
 
-        // Mail is not guaranteed to be configured, so the password cannot simply
-        // be emailed and forgotten about. It is flashed once, for the
-        // administrator to hand over, and never stored in readable form.
+        // A4.21. The welcome email with the one-time sign-in code. Sent on top
+        // of the flashed password, never instead of it: mail is not guaranteed
+        // to be configured, so the password cannot simply be emailed and
+        // forgotten about. It is flashed once, for the administrator to hand
+        // over, and never stored in readable form.
+        $invited = $this->sendInvite($user, $request->user());
+
         return back()
-            ->with('success', "Sign-in account created for {$employee->full_name}.")
+            ->with('success', "Sign-in account created for {$employee->full_name}."
+                . ($invited ? " A welcome email with a sign-in QR code is on its way to {$user->email}." : ''))
+            ->with('error', $invited ? null : 'The welcome email could not be sent. Check the mail settings, then use "Send welcome email".')
             ->with('generated_password', $generated);
+    }
+
+    /**
+     * Send the welcome email again (A4.21) — lost, expired, or the person has
+     * a new phone. The code in any earlier email stops working.
+     */
+    public function invite(Request $request, Employee $employee)
+    {
+        $this->assertSameCompany($employee);
+        $user = $this->accountFor($employee);
+
+        // The code signs a phone in as this account, so it is the same power
+        // as setting its password: not HR's to use on an HR or admin login.
+        if ($refusal = $this->refuseElevated($request, $user, 'send a sign-in code for')) {
+            return $refusal;
+        }
+
+        if (! $user->is_active) {
+            return back()->with('error', 'This sign-in account is disabled. Enable it before sending a welcome email.');
+        }
+
+        if (! $this->sendInvite($user, $request->user())) {
+            return back()->with('error', 'The welcome email could not be sent. Check the mail settings and try again.');
+        }
+
+        return back()->with('success', "A new welcome email with a sign-in QR code is on its way to {$user->email}. Any earlier one no longer works.");
+    }
+
+    /**
+     * Issue a code and send it. False when sending failed — the account is
+     * made either way, and the caller says so instead of pretending.
+     */
+    private function sendInvite(User $user, User $by): bool
+    {
+        try {
+            $user->notify(new EmployeeInvite(ActivationCode::issueFor($user, $by)));
+        } catch (\Throwable $e) {
+            report($e);
+
+            return false;
+        }
+
+        ActivityLog::record(
+            event: ActivityLog::ACCOUNT_CHANGED,
+            description: "Sent a welcome email with a one-time sign-in code to {$user->email}",
+            subject: $user,
+        );
+
+        return true;
     }
 
     /**
@@ -203,11 +260,32 @@ class EmployeeAccountController extends Controller
         return $user->hasAnyRole(self::ELEVATED_ROLES);
     }
 
+    /**
+     * Turn away somebody without `manage-roles` acting on an HR or admin
+     * login, or null to carry on — the store() split, applied to every action
+     * that is as good as holding that login.
+     */
+    private function refuseElevated(Request $request, User $user, string $action)
+    {
+        if (self::holdsElevatedRole($user) && ! $request->user()->can('manage-roles')) {
+            return back()->with('error', "Only an administrator can {$action} an HR or admin login.");
+        }
+
+        return null;
+    }
+
     /** Issue a new password for an existing login. */
     public function resetPassword(Request $request, Employee $employee)
     {
         $this->assertSameCompany($employee);
         $user = $this->accountFor($employee);
+
+        // The page hides this button on an HR or admin login; the route did
+        // not, so HR could post here, set an administrator's password and sign
+        // in as them.
+        if ($refusal = $this->refuseElevated($request, $user, 'reset the password of')) {
+            return $refusal;
+        }
 
         $data = $request->validate([
             'password' => ['nullable', 'string', 'min:8', 'confirmed'],
@@ -273,6 +351,11 @@ class EmployeeAccountController extends Controller
 
         if ($user->is($request->user())) {
             return back()->with('error', 'You cannot deactivate your own sign-in account.');
+        }
+
+        // Same gap as resetPassword(): hidden on the page, open on the route.
+        if ($refusal = $this->refuseElevated($request, $user, 'switch on or off')) {
+            return $refusal;
         }
 
         $user->update(['is_active' => ! $user->is_active]);

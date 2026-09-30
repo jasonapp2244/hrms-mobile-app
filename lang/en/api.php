@@ -49,6 +49,10 @@ return [
     'device_not_trusted'  => 'This account is signed in on a different phone. Ask HR to release it before signing in here.',
     'device_unregistered' => 'Device will no longer receive notifications.',
 
+    // A4.21 — the one-time sign-in code from the welcome email.
+    'activation_invalid' => 'That sign-in code is not valid. Ask HR to send a new welcome email.',
+    'activation_expired' => 'That sign-in code has expired or has already been used. Ask HR to send a new welcome email, or sign in with your email and password.',
+
     // --- Profile ----------------------------------------------------------
     'profile_updated'  => 'Profile updated.',
     'password_changed' => 'Password changed.',

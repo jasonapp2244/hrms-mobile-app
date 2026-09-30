@@ -517,4 +517,28 @@ class EmployeeAccountTest extends TestCase
         $this->assertNull($b->fresh()->user_id);
         $this->assertNull($foreign->fresh()->user_id);
     }
+    public function test_hr_cannot_reset_or_switch_off_an_admin_login_by_posting_directly(): void
+    {
+        // The page hides both buttons on an HR or admin login. The routes did
+        // not, so HR could set an administrator's password and sign in as one.
+        $admin = $this->staff('admin');
+        $employee = $this->employee(['user_id' => $admin->id]);
+        $hash = $admin->password;
+
+        $this->actingAs($this->staff('hr'))
+            ->post(route('employees.account.password', $employee))
+            ->assertSessionHas('error');
+        $this->assertSame($hash, $admin->fresh()->password);
+
+        $this->actingAs($this->staff('hr'))
+            ->post(route('employees.account.toggle', $employee))
+            ->assertSessionHas('error');
+        $this->assertTrue((bool) $admin->fresh()->is_active);
+
+        // An administrator still can.
+        $this->actingAs($this->staff('admin'))
+            ->post(route('employees.account.password', $employee))
+            ->assertSessionHas('success');
+        $this->assertNotSame($hash, $admin->fresh()->password);
+    }
 }

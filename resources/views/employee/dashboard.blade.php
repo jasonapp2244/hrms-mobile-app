@@ -90,11 +90,24 @@
 			<span class="badge bg-primary-transparent text-primary">Next: {{ strtoupper($nextAction) }}</span>
 		</div>
 		<div class="card-body text-center">
+			@unless($qrRequired)
 			<p class="text-muted mb-4">
 				Tap the button below to record your {{ $nextAction === 'in' ? 'check-in' : 'check-out' }}.
 				Works on your phone or computer.
 			</p>
+			@endunless
 
+			{{-- A4.21. Office staff at a company that requires it scan the office
+				 screen with the app instead; the server refuses the button for them
+				 anyway, so it is not offered. --}}
+			@if($qrRequired)
+				<div class="alert alert-info d-inline-block text-start mb-0" style="max-width:480px">
+					<i class="ti ti-qrcode me-1"></i>
+					<strong>Check in and out with the QR code.</strong>
+					Open the KEMP app on your phone, tap <em>Scan to check in</em> and point it at the
+					screen in your office. It knows whether you are coming or going.
+				</div>
+			@else
 			<button id="check-btn"
 				class="btn btn-lg {{ $nextAction === 'in' ? 'btn-success' : 'btn-primary' }} px-5 py-3"
 				data-action="{{ $nextAction }}"
@@ -105,6 +118,7 @@
 					<i class="ti ti-logout me-1"></i>Check Out
 				@endif
 			</button>
+			@endif
 
 			{{-- Break (A4.15). Only while clocked in: off the clock there is
 				 nothing to pause, and the server refuses it anyway. --}}
@@ -241,7 +255,7 @@
 		});
 	}
 
-	btn.addEventListener('click', async function () {
+	if (btn) btn.addEventListener('click', async function () {
 		if (busy) return;
 		busy = true;
 		const original = btn.innerHTML;

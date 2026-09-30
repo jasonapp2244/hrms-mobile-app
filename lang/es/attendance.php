@@ -23,6 +23,12 @@ return [
     'no_office'      => 'Tu empresa todavía no tiene ninguna oficina configurada. Contacta con RR. HH.',
     'not_clocked_in' => 'Tienes que haber fichado la entrada antes de iniciar un descanso.',
 
+    // --- El código QR de la oficina (A4.21) ---------------------------------
+    'qr_required'     => 'Ficha la entrada y la salida escaneando con la app el código QR de la pantalla de la oficina.',
+    'qr_invalid'      => 'Ese no es un código de fichaje de tu empresa. Escanea el código de la pantalla de tu oficina.',
+    'qr_expired'      => 'Ese código acaba de cambiar. Escanea el nuevo de la pantalla.',
+    'qr_already_used' => 'Otra persona acaba de usar ese código. Escanea el nuevo de la pantalla.',
+
     'outside_geofence' => 'Parece que estás a :distance de :office, fuera de la zona de fichaje de :radius'
         . ' m. Acércate o pide a RR. HH. que registre este fichaje por ti.',
 

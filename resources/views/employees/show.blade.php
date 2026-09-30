@@ -248,6 +248,15 @@
               <button class="btn btn-outline-warning btn-sm w-100"><i class="ti ti-refresh me-1"></i>Reset password</button>
             </form>
 
+            {{-- A4.21. Signs a phone in once; never checks anybody in. --}}
+            @if($account->is_active)
+              <form method="POST" action="{{ route('employees.account.invite', $employee) }}" class="mb-2"
+                    title="Emails a one-time QR code that signs the app in on their phone">
+                @csrf
+                <button class="btn btn-outline-primary btn-sm w-100"><i class="ti ti-qrcode me-1"></i>Send welcome email</button>
+              </form>
+            @endif
+
             <form method="POST" action="{{ route('employees.account.toggle', $employee) }}">
               @csrf
               <button class="btn btn-outline-{{ $account->is_active ? 'danger' : 'success' }} btn-sm w-100">

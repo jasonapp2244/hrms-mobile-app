@@ -142,6 +142,24 @@
           </div>
         </div>
         <div class="col-md-4">
+          <label class="form-label">Check-in method</label>
+          <div class="form-check mt-2">
+            <input type="hidden" name="require_qr_checkin" value="0">
+            <input class="form-check-input" type="checkbox" name="require_qr_checkin" value="1" id="qrCheckin"
+                   @checked(old('require_qr_checkin', $company->policy('require_qr_checkin')))>
+            <label class="form-check-label" for="qrCheckin">Office staff scan the office QR code to check in and out</label>
+          </div>
+          <div class="form-text">
+            {{-- A4.21. Put a screen up first: this stops office staff tapping the
+                 button, so switching it on with no screen showing a code stops
+                 them clocking in at all. --}}
+            Staff open the app and scan the code on the office screen; it changes after every scan.
+            Set a screen up on the <a href="{{ route('attendance.qr-displays.index') }}">QR screens</a> page
+            <strong>before</strong> switching this on. Breaks stay a button, and WFH or hybrid
+            staff keep the button for everything.
+          </div>
+        </div>
+        <div class="col-md-4">
           <label class="form-label">Staff directory</label>
           <div class="form-check mt-2">
             <input type="hidden" name="directory_show_contact_details" value="0">

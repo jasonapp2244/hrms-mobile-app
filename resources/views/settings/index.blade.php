@@ -22,13 +22,22 @@
       <div class="card-body">
         <table class="table mb-2">
           <tbody>
+            {{-- A4.21. Read from the policy, not written here: this card said
+                 "Button" as a literal and would have gone on saying so. --}}
+            @php($qrCheckin = (bool) auth()->user()->company?->policy('require_qr_checkin'))
             <tr>
               <th style="width:50%">Check-in Method</th>
-              <td>Button (Check In / Check Out)</td>
+              <td>
+                @if($qrCheckin)
+                  Office QR code for office staff; button for WFH and hybrid
+                @else
+                  Button (Check In / Check Out)
+                @endif
+              </td>
             </tr>
             <tr>
               <th>Works On</th>
-              <td>Employee's own mobile or PC</td>
+              <td>{{ $qrCheckin ? 'Employee\'s own phone, scanning the office screen' : 'Employee\'s own mobile or PC' }}</td>
             </tr>
             <tr>
               <th>Location (GPS)</th>

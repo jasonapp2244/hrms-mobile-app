@@ -136,6 +136,26 @@ return [
         'ignore'   => 'If this was not you, nothing has changed — you can ignore this email and your password stays as it is.',
     ],
 
+    // A4.21. The welcome email with the one-time sign-in code.
+    'employee_invite' => [
+        'subject'         => 'Welcome to :app — sign in on your phone',
+        'greeting'        => 'Welcome, :name!',
+        'intro'           => ':company uses :app for attendance and leave. Three steps get you started.',
+        'step_install'    => 'Install the app',
+        'install_line'    => 'Install :app on your own phone.',
+        'step_scan'       => 'Sign in with this code',
+        'scan_line'       => 'Open the app, tap "Sign in with QR" and point your phone at this code. You are signed in straight away.',
+        'text_scan_line'  => 'Open this email on another screen to see the sign-in code, then open the app, tap "Sign in with QR" and scan it.',
+        'qr_alt'          => 'Your one-time sign-in code',
+        'qr_rules'        => 'This code works once, on one phone, for :days days. It only signs you in — you cannot check in with it. Do not share it.',
+        'no_qr'           => 'Sign in to the app with :email and the password HR gave you.',
+        'step_clock'      => 'Check in at work',
+        'clock_line'      => 'At the office, tap "Scan to check in" in the app and scan the code on the office screen. Scan it again when you leave — the app knows which is which.',
+        'account_line'    => 'Your sign-in email is :email. To choose your own password, use',
+        'password_link'   => 'Forgot password',
+        'ignore'          => 'If you were not expecting this email, you can ignore it.',
+    ],
+
     // Shared by every mail that opens with a name.
     'greeting' => 'Hello :name,',
 

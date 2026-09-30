@@ -41,6 +41,7 @@ return [
             // Table rows carrying times and a status pill.
             'attendance'      => 25,
             'trusted_devices' => 25,
+            'qr_displays'     => 25,
 
             // Rows with a body of text or a decision attached.
             'announcements'   => 20,

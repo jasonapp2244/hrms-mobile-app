@@ -75,6 +75,7 @@ class PolicyController extends Controller
             'session_idle_timeout_minutes'  => 'required|integer|min:0|max:1440',
             'enforce_geofence'              => 'nullable|boolean',
             'enforce_device_binding'        => 'nullable|boolean',
+            'require_qr_checkin'            => 'nullable|boolean',
             'require_two_factor_for_staff'  => 'nullable|boolean',
             'directory_show_contact_details' => 'nullable|boolean',
             // The day a punch is judged against when nobody rostered one
@@ -130,6 +131,7 @@ class PolicyController extends Controller
             'session_idle_timeout_minutes'    => (int) $data['session_idle_timeout_minutes'],
             'enforce_geofence'                => $request->boolean('enforce_geofence'),
             'enforce_device_binding'          => $request->boolean('enforce_device_binding'),
+            'require_qr_checkin'              => $request->boolean('require_qr_checkin'),
             'require_two_factor_for_staff'    => $request->boolean('require_two_factor_for_staff'),
             'directory_show_contact_details'  => $request->boolean('directory_show_contact_details'),
             'default_day_start'               => $start,

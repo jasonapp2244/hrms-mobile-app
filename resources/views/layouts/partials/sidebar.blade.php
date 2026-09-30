@@ -42,6 +42,7 @@
 								<li><a class="{{ request()->routeIs('attendance.history*') ? 'active' : '' }}" href="{{ route('attendance.history') }}">Attendance History</a></li>
 								@can('manage-attendance')
 								<li><a class="{{ request()->routeIs('attendance.regularisations*') ? 'active' : '' }}" href="{{ route('attendance.regularisations') }}">Corrections</a></li>
+								<li><a class="{{ request()->routeIs('attendance.qr-displays*') ? 'active' : '' }}" href="{{ route('attendance.qr-displays.index') }}">QR Screens</a></li>
 								@endcan
 								@endcan
 							</ul>

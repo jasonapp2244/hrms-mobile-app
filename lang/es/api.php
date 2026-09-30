@@ -40,6 +40,10 @@ return [
     'device_not_trusted'  => 'Esta cuenta está vinculada a otro teléfono. Pide a RR. HH. que la libere antes de iniciar sesión aquí.',
     'device_unregistered' => 'Este dispositivo dejará de recibir notificaciones.',
 
+    // A4.21 — el código de acceso de un solo uso del correo de bienvenida.
+    'activation_invalid' => 'Ese código de acceso no es válido. Pide a RR. HH. que te envíe un nuevo correo de bienvenida.',
+    'activation_expired' => 'Ese código de acceso ha caducado o ya se ha usado. Pide a RR. HH. un nuevo correo de bienvenida, o inicia sesión con tu correo y tu contraseña.',
+
     // --- Perfil ------------------------------------------------------------
     'profile_updated'  => 'Perfil actualizado.',
     'password_changed' => 'Contraseña cambiada.',

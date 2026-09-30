@@ -100,6 +100,10 @@ class ApiDocsTest extends TestCase
             'invalid_credentials', 'account_disabled', 'duplicate_scan',
             'no_office', 'wrong_password', 'invalid_range', 'range_too_large',
             'outside_geofence', 'break_not_available',
+            // A4.21. Raised through QrRefused, so the controller scan below
+            // cannot see them by name.
+            'qr_required', 'qr_invalid', 'qr_expired', 'qr_already_used',
+            'activation_invalid', 'activation_expired',
         ];
 
         foreach ($codes as $code) {

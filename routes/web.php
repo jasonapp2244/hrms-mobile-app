@@ -43,6 +43,8 @@ use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSwapAdminController;
 use App\Http\Controllers\ShiftSwapController;
 use App\Http\Controllers\TrustedDeviceController;
+use App\Http\Controllers\QrDisplayController;
+use App\Http\Controllers\QrDisplayScreenController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Guest / Auth ----
@@ -71,6 +73,17 @@ Route::middleware('guest')->group(function () {
         ->middleware('throttle:10,1')->name('two-factor.verify');
 });
 Route::post('logout', [LoginController::class, 'logout'])->middleware('auth')->name('logout');
+
+// ---- The office QR screen (A4.21) ----
+// No sign-in, by design: the tablet on the wall belongs to nobody. Both routes
+// are signed links naming one screen, so they cannot be guessed, and revoking
+// the screen stops them at the next poll. The poll is once a second from one
+// device, so the limiter sits well above that and well below a loop.
+Route::middleware('signed')->group(function () {
+    Route::get('qr-display/{display}', [QrDisplayScreenController::class, 'show'])->name('qr-display.show');
+    Route::get('qr-display/{display}/current', [QrDisplayScreenController::class, 'current'])
+        ->middleware('throttle:180,1')->name('qr-display.current');
+});
 
 // Enrolling in two-factor, from an ordinary signed-in session.
 Route::middleware('auth')->group(function () {
@@ -271,6 +284,14 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
             Route::get('regularisations', [RegularisationController::class, 'index'])->name('regularisations');
             Route::post('regularisations/{regularisation}/approve', [RegularisationController::class, 'approve'])->name('regularisations.approve');
             Route::post('regularisations/{regularisation}/reject', [RegularisationController::class, 'reject'])->name('regularisations.reject');
+
+            // The office screens that show the check-in code (A4.21). Same
+            // permission as correcting a punch: HR runs attendance, and putting
+            // the code back up on a tablet is an attendance job, not an office
+            // configuration one.
+            Route::get('qr-screens', [QrDisplayController::class, 'index'])->name('qr-displays.index');
+            Route::post('qr-screens', [QrDisplayController::class, 'store'])->name('qr-displays.store');
+            Route::post('qr-screens/{display}/revoke', [QrDisplayController::class, 'revoke'])->name('qr-displays.revoke');
         });
     });
 
@@ -350,6 +371,8 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
         Route::post('employees/{employee}/account/password', [EmployeeAccountController::class, 'resetPassword'])->name('employees.account.password');
         Route::post('employees/{employee}/account/role', [EmployeeAccountController::class, 'updateRole'])->name('employees.account.role');
         Route::post('employees/{employee}/account/toggle', [EmployeeAccountController::class, 'toggleActive'])->name('employees.account.toggle');
+        // The welcome email with the one-time app sign-in code (A4.21).
+        Route::post('employees/{employee}/account/invite', [EmployeeAccountController::class, 'invite'])->name('employees.account.invite');
     });
 
     Route::resource('employees', EmployeeController::class)->middleware('permission:manage-employees');

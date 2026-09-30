@@ -73,6 +73,12 @@ Route::post('auth/forgot-password', [AuthController::class, 'forgotPassword'])
     ->middleware('throttle:login')
     ->name('api.auth.forgot-password');
 
+// Signing a phone in with the one-time code from the welcome email (A4.21).
+// It stands in for a password, so it shares the login limiter.
+Route::post('auth/activate', [AuthController::class, 'activate'])
+    ->middleware('throttle:login')
+    ->name('api.auth.activate');
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('auth/me', [AuthController::class, 'me'])->name('api.auth.me');
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.auth.logout');
@@ -103,6 +109,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('attendance/check', [AttendanceController::class, 'check'])
         ->middleware('throttle:punch')
         ->name('api.attendance.check');
+    // The same punch made by scanning the office screen (A4.21). On the punch
+    // limiter with the rest: it writes an attendance row.
+    Route::post('attendance/qr', [AttendanceController::class, 'qr'])
+        ->middleware('throttle:punch')
+        ->name('api.attendance.qr');
     // Breaks share the punch limiter rather than the write one: they write an
     // attendance row like a punch does, and a loop on this endpoint costs the
     // same as a loop on that one.

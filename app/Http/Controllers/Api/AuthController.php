@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\ActivationCode;
 use App\Models\ActivityLog;
 use App\Models\TrustedDevice;
 use App\Models\User;
@@ -79,11 +80,78 @@ class AuthController extends ApiController
             return $refusal;
         }
 
+        return $this->signIn($user, $data['device_name']);
+    }
+
+    /**
+     * Sign a phone in with the one-time code from the welcome email (A4.21).
+     *
+     * The code stands in for the password and nothing else: the account must
+     * still be active, device binding still applies, and the code is spent the
+     * moment it works. It signs a phone in; it never records a punch.
+     *
+     * One message for a code that does not exist, so a guesser learns nothing.
+     * An expired or spent code says so, because the person holding a genuine
+     * old email needs to know to ask for a new one rather than to retype it.
+     */
+    public function activate(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'code'        => 'required|string|max:200',
+            'device_name' => 'required|string|max:100',
+            'device_id'   => 'nullable|string|max:100',
+            'platform'    => 'nullable|string|max:20',
+        ]);
+
+        $code = ActivationCode::with('user')
+            ->where('code_hash', ActivationCode::hash(ActivationCode::parse($data['code'])))
+            ->first();
+
+        if (! $code || ! $code->user) {
+            return $this->fail('activation_invalid', __('api.activation_invalid'), 422);
+        }
+
+        if (! $code->isUsable()) {
+            return $this->fail('activation_expired', __('api.activation_expired'), 422);
+        }
+
+        $user = $code->user;
+
+        if ($user->is_active === false) {
+            return $this->fail('account_disabled', __('api.account_disabled'), 403);
+        }
+
+        if ($refusal = $this->refuseUntrustedDevice($request, $user, $data)) {
+            return $refusal;
+        }
+
+        // Spent before the token exists, and conditionally, so two phones
+        // scanning one email at the same moment get one sign-in between them.
+        $spent = ActivationCode::whereKey($code->id)->whereNull('used_at')->update(['used_at' => now()]);
+
+        if ($spent !== 1) {
+            return $this->fail('activation_expired', __('api.activation_expired'), 422);
+        }
+
+        ActivityLog::record(
+            event: ActivityLog::LOGIN,
+            description: sprintf('Signed in on %s with the welcome email\'s one-time code', $data['device_name']),
+            actor: $user,
+            actorLabel: $user->email,
+            request: $request,
+        );
+
+        return $this->signIn($user, $data['device_name']);
+    }
+
+    /** The token and profile a successful sign-in answers with, however it was proved. */
+    protected function signIn(User $user, string $deviceName): JsonResponse
+    {
         // Same device name twice means the app reinstalled or re-authenticated;
         // the old token is dead weight and a second valid credential.
-        $user->tokens()->where('name', $data['device_name'])->delete();
+        $user->tokens()->where('name', $deviceName)->delete();
 
-        $token = $user->createToken($data['device_name']);
+        $token = $user->createToken($deviceName);
 
         // The listener turns this into "Signed in from the mobile app". The
         // handset's name is not in the line because it is already on the

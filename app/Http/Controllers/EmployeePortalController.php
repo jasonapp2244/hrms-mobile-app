@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceLog;
 use App\Models\Office;
 use App\Services\AttendanceService;
+use App\Services\QrAttendanceService;
 use App\Support\Clock;
 use Illuminate\Http\Request;
 
@@ -12,6 +13,7 @@ class EmployeePortalController extends Controller
 {
     public function __construct(
         protected AttendanceService $attendance,
+        protected QrAttendanceService $qr,
     ) {}
 
     /** Resolve the employee record for the currently logged-in user. */
@@ -33,10 +35,6 @@ class EmployeePortalController extends Controller
             ->whereDate('work_date', $today)
             ->orderBy('scanned_at')
             ->get();
-
-        $lastToday = $todayLogs->last();
-        // If the last punch today was an "in", the next action is to check OUT.
-        $nextAction = ($lastToday && $lastToday->type === 'in') ? 'out' : 'in';
 
         $logs = AttendanceLog::with('office')
             ->where('employee_id', $employee->id)
@@ -60,6 +58,11 @@ class EmployeePortalController extends Controller
 
         $breakState = $this->attendance->breakState($employee, $today);
 
+        // Trap 6: not the last punch. After a break the last row is
+        // `break_end`, which read as "not clocked in" and offered Check In to
+        // somebody still at work. breakState is the one definition.
+        $nextAction = $breakState['clocked_in'] ? 'out' : 'in';
+
         // The shift's break policy (A5.7), so the button can say what pressing
         // it costs. Before this the page asserted flatly that "breaks are not
         // counted as worked time" — which stopped being true the day a shift
@@ -68,9 +71,12 @@ class EmployeePortalController extends Controller
         // somebody on a different one, with a different break.
         $breakShift = $employee->shiftOn($today);
 
+        // A4.21 — office staff at a company that requires it scan instead.
+        $qrRequired = $this->qr->requiresQr($employee);
+
         return view('employee.dashboard', compact(
             'employee', 'todayLogs', 'nextAction', 'logs', 'leaveToday', 'schedule',
-            'breakState', 'breakShift',
+            'breakState', 'breakShift', 'qrRequired',
         ));
     }
 
@@ -90,6 +96,12 @@ class EmployeePortalController extends Controller
         ]);
 
         $employee = $this->currentEmployee();
+
+        // A4.21. The page does not offer the button in this case; this is for
+        // a page left open from before the policy changed.
+        if ($this->qr->requiresQr($employee)) {
+            return response()->json(['ok' => false, 'message' => __('attendance.qr_required')], 422);
+        }
 
         if ($this->attendance->recentlyScanned($employee)) {
             return response()->json(['ok' => false, 'message' => 'Already recorded moments ago. Please wait a minute.'], 429);

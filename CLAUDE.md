@@ -27,7 +27,7 @@ as a background task does not persist, it exits.
 
 ```bash
 php artisan serve            # http://127.0.0.1:8000
-php artisan test             # 1618 tests, ~320s, SQLite in memory
+php artisan test             # 1684 tests, ~240s, SQLite in memory
 ```
 
 The Laravel application is the **root of this repository**. It used to sit in an
@@ -925,6 +925,45 @@ widening either.
   `dart:io`'s in any test that imports both. Import it with `show`.
 
 ---
+
+### QR check-in at an office screen (A4.21) — added 2026-09-30
+
+**This reverses the 2026-07-21 decision** (`9c5c988`, "Remove QR attendance
+entirely"). The client asked for it back, in a different shape, and the shape is
+the point: the old kiosk rotated one code on a clock and scanned on the web; this
+one scans with the **employee's own signed-in phone**, and **each code is good for
+exactly one scan**.
+
+- **The screen** is a `qr_displays` row, reached by a **signed link** (`qr-display.show`),
+  not a sign-in — the tablet on the wall belongs to nobody. Revoking the row kills
+  the link. It polls `qr-display.current` once a second and says which code it is
+  showing in an **`X-Showing` header, not a query parameter**: the URL is signed,
+  and any parameter added to it fails the signature.
+- **The codes** are `attendance_qr_tokens`, stored as a **hash**; the plain value
+  leaves the server once, in the poll that issued it, which is why the screen has
+  to say what it is showing rather than ask to be told. Claimed with a
+  **conditional update** (`whereNull('consumed_at')->update(...)`, one row or
+  refuse) — `lockForUpdate` is a no-op on SQLite and the race is exactly the
+  thing being prevented. The claim and the punch share a transaction, so a
+  geofence refusal leaves the code usable.
+- **The punch** is `AttendanceService::record()` untouched, `source = 'qr'`,
+  filed against the office **on the screen**. **Never `kiosk`**: that is the
+  marker `emp:purge-demo` deletes by.
+- **The policy** `require_qr_checkin` is off by default and binds **office**
+  staff only (`QrAttendanceService::requiresQr` — the one definition; the API's
+  `today.method`, both `check` endpoints and offline `sync` all read it). WFH and
+  hybrid keep the button. Breaks are a button for everybody.
+- **The welcome email** (`EmployeeInvite`) is sent when a login is created and on
+  *Send welcome email*. Its QR is an **`activation_codes` row that signs a phone in
+  once** (`POST /auth/activate`) and can never punch — agreed with the client,
+  because a code in an inbox can be forwarded. It carries **no password and no
+  reset token** (a token minted now is dead in 60 minutes; welcome emails are
+  read days later) — it points at *forgot password*. The HTML and text parts are
+  **two Blade views, not markdown**: a markdown mail renders its template twice
+  and `embedData` would attach the PNG twice. PNG via GD
+  (`App\Support\QrCode::png`), because mail clients strip SVG.
+- **Mail still goes nowhere on staging** until SMTP is set (`MAIL_MAILER=log`).
+  Creating a login still flashes the password, exactly as before.
 
 ## Where things stand
 

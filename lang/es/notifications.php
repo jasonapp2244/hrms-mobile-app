@@ -121,6 +121,26 @@ return [
         'ignore'   => 'Si no has sido tú, no ha cambiado nada: puedes ignorar este correo y tu contraseña seguirá igual.',
     ],
 
+    // A4.21. El correo de bienvenida con el código de acceso de un solo uso.
+    'employee_invite' => [
+        'subject'         => 'Bienvenido a :app: inicia sesión en tu teléfono',
+        'greeting'        => '¡Bienvenido, :name!',
+        'intro'           => ':company usa :app para la asistencia y las ausencias. Empieza en tres pasos.',
+        'step_install'    => 'Instala la app',
+        'install_line'    => 'Instala :app en tu propio teléfono.',
+        'step_scan'       => 'Inicia sesión con este código',
+        'scan_line'       => 'Abre la app, pulsa «Iniciar sesión con QR» y apunta el teléfono a este código. Entrarás al momento.',
+        'text_scan_line'  => 'Abre este correo en otra pantalla para ver el código de acceso; después abre la app, pulsa «Iniciar sesión con QR» y escanéalo.',
+        'qr_alt'          => 'Tu código de acceso de un solo uso',
+        'qr_rules'        => 'Este código funciona una vez, en un teléfono, durante :days días. Solo sirve para iniciar sesión: no permite fichar. No lo compartas.',
+        'no_qr'           => 'Inicia sesión en la app con :email y la contraseña que te dio RR. HH.',
+        'step_clock'      => 'Ficha en el trabajo',
+        'clock_line'      => 'En la oficina, pulsa «Escanear para fichar» en la app y escanea el código de la pantalla. Vuelve a escanearlo al salir: la app sabe cuál es cuál.',
+        'account_line'    => 'Tu correo de acceso es :email. Para elegir tu propia contraseña, usa',
+        'password_link'   => 'He olvidado mi contraseña',
+        'ignore'          => 'Si no esperabas este correo, puedes ignorarlo.',
+    ],
+
     'greeting' => 'Hola :name:',
 
 ];
