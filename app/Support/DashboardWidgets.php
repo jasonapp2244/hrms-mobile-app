@@ -41,9 +41,15 @@ class DashboardWidgets
             'roles'      => ['admin', 'hr'],
         ],
         'attendance_trend' => [
-            'label'      => 'Seven-day attendance chart',
-            'blurb'      => 'How many people were in each day for the last week.',
+            'label'      => 'Attendance trend chart',
+            'blurb'      => 'People in each day, on time and late, over the last week or month.',
             'permission' => null,
+            'roles'      => ['admin', 'hr'],
+        ],
+        'attendance_donut' => [
+            'label'      => 'Today\'s attendance',
+            'blurb'      => 'On time, late, on leave and absent as one chart, with who has not turned up.',
+            'permission' => 'view-attendance',
             'roles'      => ['admin', 'hr'],
         ],
         'who_is_in' => [
@@ -52,10 +58,34 @@ class DashboardWidgets
             'permission' => 'view-attendance',
             'roles'      => ['admin', 'hr'],
         ],
+        'late_today' => [
+            'label'      => 'Late arrivals today',
+            'blurb'      => 'Everybody who clocked in late today, and by how many minutes.',
+            'permission' => 'view-attendance',
+            'roles'      => ['admin', 'hr'],
+        ],
+        'by_department' => [
+            'label'      => 'Employees by department',
+            'blurb'      => 'Active headcount in each department.',
+            'permission' => 'manage-employees',
+            'roles'      => ['admin', 'hr'],
+        ],
         'pending_approvals' => [
             'label'      => 'Waiting on you',
             'blurb'      => 'Leave requests, regularisations and shift swaps needing a decision.',
             'permission' => 'view-attendance',
+            'roles'      => ['hr'],
+        ],
+        'upcoming' => [
+            'label'      => 'Who\'s off soon',
+            'blurb'      => 'Approved leave in the next two weeks, and the next public holidays.',
+            'permission' => 'manage-leave',
+            'roles'      => ['admin', 'hr'],
+        ],
+        'birthdays' => [
+            'label'      => 'Birthdays this month',
+            'blurb'      => 'Active employees with a birthday this month.',
+            'permission' => 'manage-employees',
             'roles'      => ['hr'],
         ],
         'document_expiries' => [

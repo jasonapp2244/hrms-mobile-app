@@ -291,6 +291,8 @@ Route::middleware(['auth', 'role:admin|hr'])->group(function () {
             // configuration one.
             Route::get('qr-screens', [QrDisplayController::class, 'index'])->name('qr-displays.index');
             Route::post('qr-screens', [QrDisplayController::class, 'store'])->name('qr-displays.store');
+            // Pick an office, open its screen — reusing the one it has.
+            Route::post('qr-screens/launch', [QrDisplayController::class, 'launch'])->name('qr-displays.launch');
             Route::post('qr-screens/{display}/revoke', [QrDisplayController::class, 'revoke'])->name('qr-displays.revoke');
         });
     });

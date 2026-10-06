@@ -402,6 +402,129 @@ class QrAttendanceTest extends TestCase
         $this->actingAs($this->user)->get(route('attendance.qr-displays.index'))->assertForbidden();
     }
 
+    // ================= "Open QR screen": pick an office, open it =================
+
+    public function test_opening_an_office_with_no_screen_makes_one_and_goes_to_it(): void
+    {
+        $hr = $this->hr();
+        $branch = Office::create(['company_id' => $this->company->id, 'name' => 'Branch', 'is_active' => true]);
+
+        $response = $this->actingAs($hr)->post(route('attendance.qr-displays.launch'), ['office_id' => $branch->id]);
+
+        $screen = QrDisplay::where('office_id', $branch->id)->sole();
+        $this->assertSame('Branch check-in screen', $screen->name);
+        $this->assertSame($hr->id, $screen->created_by_user_id);
+        $response->assertRedirect($screen->url());
+
+        // The link it lands on is a working screen, not just a URL.
+        $this->get($screen->url())->assertOk();
+    }
+
+    public function test_opening_an_office_again_reuses_its_screen(): void
+    {
+        // A bookmarked tablet keeps working, and clicks do not pile up rows.
+        $hr = $this->hr();
+
+        $first = $this->actingAs($hr)->post(route('attendance.qr-displays.launch'), ['office_id' => $this->office->id]);
+        $again = $this->actingAs($hr)->post(route('attendance.qr-displays.launch'), ['office_id' => $this->office->id]);
+
+        $first->assertRedirect($this->display->url());
+        $again->assertRedirect($this->display->url());
+        $this->assertSame(1, QrDisplay::where('office_id', $this->office->id)->count());
+    }
+
+    public function test_opening_prefers_the_screen_a_device_is_already_showing(): void
+    {
+        $hr = $this->hr();
+        $this->display->forceFill(['last_seen_at' => now()->subSeconds(10)])->save();
+        QrDisplay::create(['company_id' => $this->company->id, 'office_id' => $this->office->id, 'name' => 'Spare']);
+
+        $this->actingAs($hr)->post(route('attendance.qr-displays.launch'), ['office_id' => $this->office->id])
+            ->assertRedirect($this->display->url());
+    }
+
+    public function test_a_switched_off_screen_is_never_reopened(): void
+    {
+        $hr = $this->hr();
+        $this->display->revoke($hr);
+
+        $this->actingAs($hr)->post(route('attendance.qr-displays.launch'), ['office_id' => $this->office->id]);
+
+        $fresh = QrDisplay::where('office_id', $this->office->id)->active()->sole();
+        $this->assertNotSame($this->display->id, $fresh->id);
+    }
+
+    public function test_another_companys_or_a_closed_office_cannot_be_opened(): void
+    {
+        $hr = $this->hr();
+        $other = Company::create(['name' => 'Rival', 'timezone' => 'UTC', 'currency' => 'USD']);
+        $theirs = Office::create(['company_id' => $other->id, 'name' => 'Rival HQ', 'is_active' => true]);
+        $closed = Office::create(['company_id' => $this->company->id, 'name' => 'Closed', 'is_active' => false]);
+
+        foreach ([$theirs, $closed] as $office) {
+            $this->actingAs($hr)->post(route('attendance.qr-displays.launch'), ['office_id' => $office->id])
+                ->assertRedirect(route('attendance.qr-displays.index'))
+                ->assertSessionHas('error');
+            $this->assertFalse(QrDisplay::where('office_id', $office->id)->exists());
+        }
+    }
+
+    public function test_an_employee_cannot_open_a_screen(): void
+    {
+        $this->actingAs($this->user)
+            ->post(route('attendance.qr-displays.launch'), ['office_id' => $this->office->id])
+            ->assertForbidden();
+    }
+
+    public function test_a_screen_made_without_a_name_is_named_after_its_office(): void
+    {
+        $this->actingAs($this->hr())
+            ->post(route('attendance.qr-displays.store'), ['office_id' => $this->office->id, 'name' => ''])
+            ->assertSessionHas('success');
+
+        $this->assertTrue(QrDisplay::where('name', 'HQ check-in screen')->exists());
+    }
+
+    public function test_the_picker_shows_each_office_with_its_screen_state(): void
+    {
+        $hr = $this->hr();
+        $this->display->forceFill(['last_seen_at' => now()->subSeconds(10)])->save();
+        Office::create(['company_id' => $this->company->id, 'name' => 'Branch', 'is_active' => true]);
+
+        $this->actingAs($hr)->get(route('attendance.qr-displays.index'))->assertOk()
+            ->assertSee('Open a QR check-in screen')
+            ->assertSee('data-url="' . e($this->display->url()) . '"', false)
+            ->assertSee('data-live="1"', false)
+            ->assertSee('data-url=""', false);
+    }
+
+    public function test_a_link_on_this_computers_own_address_is_flagged(): void
+    {
+        // The office tablet cannot reach 127.0.0.1, however correct the link is.
+        $hr = $this->hr();
+
+        $this->actingAs($hr)->get('http://127.0.0.1/attendance/qr-screens')->assertOk()
+            ->assertSee('the link only works on this computer');
+
+        $this->actingAs($hr)->get('http://hr.example.com/attendance/qr-screens')->assertOk()
+            ->assertDontSee('the link only works on this computer');
+    }
+
+    public function test_admin_and_hr_get_the_button_on_the_dashboard(): void
+    {
+        $admin = User::create([
+            'name' => 'Ada', 'email' => 'ada@acme.test', 'password' => Hash::make('password'),
+            'company_id' => $this->company->id, 'is_active' => true,
+        ]);
+        $admin->assignRole('admin');
+
+        foreach ([$admin, $this->hr()] as $user) {
+            $this->actingAs($user)->get(route('dashboard'))->assertOk()
+                ->assertSee('Open QR screen')
+                ->assertSee('id="qrLaunchModal"', false);
+        }
+    }
+
     public function test_the_policy_is_switched_on_from_the_policies_screen(): void
     {
         $admin = User::create([

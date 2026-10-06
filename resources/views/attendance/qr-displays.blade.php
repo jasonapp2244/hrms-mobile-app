@@ -9,6 +9,9 @@
 			<li class="breadcrumb-item active">QR screens</li>
 		</ol></nav></div>
 	<div class="d-flex align-items-center flex-wrap gap-2">
+		<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#qrLaunchModal">
+			<i class="ti ti-qrcode me-1"></i>Open QR screen
+		</button>
 		@if($required)
 			<span class="badge bg-success">QR check-in is on</span>
 		@else
@@ -56,8 +59,8 @@
 				</div>
 				<div class="col-md-4">
 					<label class="form-label">Screen name</label>
-					<input type="text" name="name" class="form-control" maxlength="100" required
-						value="{{ old('name') }}" placeholder="Front desk tablet">
+					<input type="text" name="name" class="form-control" maxlength="100"
+						value="{{ old('name') }}" placeholder="Optional — e.g. Front desk tablet">
 				</div>
 				<div class="col-md-4">
 					<button type="submit" class="btn btn-primary"><i class="ti ti-plus me-1"></i>Create screen</button>
@@ -150,4 +153,6 @@
 		<div class="card-footer">{{ $displays->links() }}</div>
 	@endif
 </div>
+
+@include('attendance.partials.qr-launch-modal')
 @endsection

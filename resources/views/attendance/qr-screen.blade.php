@@ -199,7 +199,13 @@
 		const statusEl = $('status'), statusText = $('status-text');
 		const toast = $('toast'), veil = $('veil'), recent = $('recent');
 
-		let showing = null, remaining = lifetime, busy = false, stopped = false, lastScan = '', toastTimer;
+		// How long one request may take before it is given up on. Without a
+		// limit a request that never answered — the PC slept mid-request, the
+		// network dropped — held `busy` for ever, and the screen sat on one code
+		// long after it had expired, with nothing to say so.
+		const requestTimeoutMs = 5000;
+
+		let showing = null, expiresAt = 0, busy = false, stopped = false, lastScan = '', toastTimer;
 
 		function stop() {
 			stopped = true;
@@ -245,12 +251,14 @@
 		async function poll() {
 			if (busy || stopped) return;
 			busy = true;
+			const abort = new AbortController();
+			const timer = setTimeout(() => abort.abort(), requestTimeoutMs);
 			try {
 				// A header, not a query parameter: the link is signed, and any
 				// parameter added to it would fail the signature.
 				const headers = { 'Accept': 'application/json' };
 				if (showing) headers['X-Showing'] = String(showing);
-				const res = await fetch(currentUrl, { headers, cache: 'no-store' });
+				const res = await fetch(currentUrl, { headers, cache: 'no-store', signal: abort.signal });
 				if (res.status === 410 || res.status === 403) { stop(); return; }
 				if (!res.ok) throw new Error('http ' + res.status);
 				const data = await res.json();
@@ -262,21 +270,37 @@
 					}, showing ? 180 : 0);
 					showing = data.token_id;
 				}
-				remaining = data.expires_in;
+				// A moment in time rather than a count of ticks: a browser slows
+				// the timers of a tab it is not showing, and a counter would then
+				// drift from the server's clock.
+				expiresAt = Date.now() + data.expires_in * 1000;
 				if (data.last_scan) announce(data.last_scan);
 				online(true);
 			} catch (e) {
 				online(false);
 			} finally {
+				clearTimeout(timer);
 				busy = false;
 			}
 		}
 
 		function tick() {
-			remaining = Math.max(0, remaining - 1);
-			countdownEl.textContent = remaining;
+			const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+			countdownEl.textContent = showing ? remaining : '--';
 			ringBar.style.strokeDashoffset = circumference * (1 - Math.min(1, remaining / lifetime));
+
+			// Never leave a dead code on the wall. A phone would read it and be
+			// refused, and the person holding it could not tell why. Forgetting
+			// it also makes the next poll ask for a fresh one.
+			if (showing && remaining === 0) {
+				showing = null;
+				holder.innerHTML = '<div class="spinner"></div>';
+			}
 		}
+
+		// A tab brought back to the front has had its timers slowed; ask at once
+		// rather than at whatever moment the next one fires.
+		document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
 
 		function clock() {
 			const d = new Date();

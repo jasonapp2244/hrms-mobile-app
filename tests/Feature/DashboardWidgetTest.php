@@ -2,10 +2,14 @@
 
 namespace Tests\Feature;
 
+use App\Models\ActivityLog;
 use App\Models\AttendanceLog;
 use App\Models\Company;
 use App\Models\Department;
 use App\Models\Employee;
+use App\Models\Holiday;
+use App\Models\LeaveRequest;
+use App\Models\LeaveType;
 use App\Models\Office;
 use App\Models\Shift;
 use App\Models\User;
@@ -324,5 +328,230 @@ class DashboardWidgetTest extends TestCase
         $this->assertNotNull($response->viewData('stats'));
         $this->assertArrayNotHasKey('comparison', $response->original->getData());
         $this->assertArrayNotHasKey('security', $response->original->getData());
+        $this->assertArrayNotHasKey('lateToday', $response->original->getData());
+        $this->assertArrayNotHasKey('byDepartment', $response->original->getData());
+    }
+
+    // -------------------------------------------------------------------------
+    // The redesigned panels
+    // -------------------------------------------------------------------------
+
+    private function leaveType(?int $companyId = null): LeaveType
+    {
+        return LeaveType::create([
+            'company_id' => $companyId ?? $this->company->id, 'name' => 'Annual Leave',
+            'days_per_year' => 20, 'requires_approval' => true, 'is_active' => true,
+        ]);
+    }
+
+    public function test_the_new_panels_are_on_by_default_for_both_roles(): void
+    {
+        foreach ([$this->admin, $this->hr] as $user) {
+            $defaults = DashboardWidgets::defaultsFor($user);
+
+            foreach (['attendance_donut', 'late_today', 'by_department', 'upcoming'] as $key) {
+                $this->assertContains($key, $defaults, "{$key} for {$user->email}");
+            }
+        }
+
+        $this->assertContains('birthdays', DashboardWidgets::defaultsFor($this->hr));
+    }
+
+    public function test_late_arrivals_show_how_late_by_the_shift_that_marked_them(): void
+    {
+        // Shift starts 09:00 with 15 minutes' grace, so 09:40 is 25 minutes late
+        // — the same arithmetic that set the status, not a second opinion.
+        Carbon::setTestNow('2026-08-05 12:00:00');
+
+        $ann = $this->employee('Ann');
+        $bo = $this->employee('Bo');
+        $this->punch($ann, '2026-08-05 09:40:00', 'late');
+        $this->punch($bo, '2026-08-05 09:05:00');
+
+        $response = $this->actingAs($this->admin)->get(route('dashboard'))->assertOk()
+            ->assertSee('Late Arrivals Today')
+            ->assertSee('+25 min');
+
+        $late = $response->viewData('lateToday');
+        $this->assertSame(1, $late['count']);
+        $this->assertSame('Ann Test', $late['rows'][0]['log']->employee->full_name);
+    }
+
+    public function test_a_late_return_from_a_break_does_not_make_somebody_a_late_arrival(): void
+    {
+        // Only the first clock-in of the day decides it.
+        Carbon::setTestNow('2026-08-05 18:00:00');
+
+        $ann = $this->employee('Ann');
+        $this->punch($ann, '2026-08-05 09:00:00');
+        $this->punch($ann, '2026-08-05 14:00:00', 'late');
+
+        $response = $this->actingAs($this->admin)->get(route('dashboard'))->assertOk();
+
+        $this->assertSame(0, $response->viewData('lateToday')['count']);
+    }
+
+    public function test_headcount_by_department_counts_only_active_staff(): void
+    {
+        $sales = Department::create(['company_id' => $this->company->id, 'name' => 'Sales']);
+
+        $this->employee('Ann');
+        $this->employee('Bo');
+        $this->employee('Cy')->update(['department_id' => $sales->id]);
+        $this->employee('Di')->update(['department_id' => null]);
+        $this->employee('Ed')->update(['status' => 'inactive']);
+
+        $response = $this->actingAs($this->admin)->get(route('dashboard'))->assertOk()
+            ->assertSee('Employees By Department');
+
+        $figures = $response->viewData('byDepartment');
+        $counts = $figures['departments']->pluck('headcount', 'name');
+
+        $this->assertSame(2, $counts['Ops']);
+        $this->assertSame(1, $counts['Sales']);
+        $this->assertSame(1, $figures['unassigned']);
+        $this->assertSame(4, $figures['total']);
+    }
+
+    public function test_the_waiting_list_shows_this_companys_requests_only(): void
+    {
+        $ann = $this->employee('Ann');
+
+        LeaveRequest::create([
+            'company_id' => $this->company->id, 'employee_id' => $ann->id,
+            'leave_type_id' => $this->leaveType()->id, 'start_date' => '2026-08-10',
+            'end_date' => '2026-08-11', 'days' => 2, 'status' => 'pending',
+        ]);
+
+        $other = Company::create(['name' => 'Rival', 'timezone' => 'UTC', 'currency' => 'USD']);
+        $stranger = Employee::create([
+            'company_id' => $other->id, 'employee_code' => 'R1',
+            'first_name' => 'Zed', 'last_name' => 'Outsider', 'status' => 'active',
+        ]);
+        LeaveRequest::create([
+            'company_id' => $other->id, 'employee_id' => $stranger->id,
+            'leave_type_id' => $this->leaveType($other->id)->id, 'start_date' => '2026-08-10',
+            'end_date' => '2026-08-10', 'days' => 1, 'status' => 'pending',
+        ]);
+
+        $response = $this->actingAs($this->hr)->get(route('dashboard'))->assertOk()
+            ->assertSee('Ann Test')
+            ->assertDontSee('Zed Outsider');
+
+        $this->assertSame(1, $response->viewData('approvals')['leave']);
+        $this->assertCount(1, $response->viewData('approvals')['requests']);
+    }
+
+    public function test_upcoming_lists_booked_leave_and_the_next_holiday(): void
+    {
+        Carbon::setTestNow('2026-08-05 12:00:00');
+
+        $ann = $this->employee('Ann');
+        LeaveRequest::create([
+            'company_id' => $this->company->id, 'employee_id' => $ann->id,
+            'leave_type_id' => $this->leaveType()->id, 'start_date' => '2026-08-08',
+            'end_date' => '2026-08-09', 'days' => 2, 'status' => 'approved',
+        ]);
+        Holiday::create(['company_id' => $this->company->id, 'name' => 'Founders Day', 'date' => '2026-09-01']);
+
+        $this->actingAs($this->admin)->get(route('dashboard'))->assertOk()
+            ->assertSee("Who&#039;s off soon", false)
+            ->assertSee('Ann Test')
+            ->assertSee('in 3 days')
+            ->assertSee('Founders Day');
+    }
+
+    public function test_birthdays_show_only_this_months(): void
+    {
+        Carbon::setTestNow('2026-08-05 12:00:00');
+
+        $this->employee('Ann')->update(['date_of_birth' => '1990-08-21']);
+        $this->employee('Bo')->update(['date_of_birth' => '1990-03-02']);
+
+        $response = $this->actingAs($this->hr)->get(route('dashboard'))->assertOk()
+            ->assertSee('Birthdays This Month');
+
+        $this->assertSame(['Ann Test'], $response->viewData('birthdays')->pluck('full_name')->all());
+    }
+
+    public function test_an_attendance_rate_of_nobody_is_no_rate_at_all(): void
+    {
+        // No staff at all: not 0%, which would read as everyone absent.
+        $response = $this->actingAs($this->admin)->get(route('dashboard'))->assertOk();
+
+        $this->assertNull($response->viewData('stats')['rate']);
+    }
+
+    public function test_the_tiles_compare_with_the_last_working_day(): void
+    {
+        // Wednesday against Tuesday; on a Monday it would be Friday.
+        Carbon::setTestNow('2026-08-05 12:00:00');
+
+        $ann = $this->employee('Ann');
+        $bo = $this->employee('Bo');
+        $this->punch($ann, '2026-08-04 09:00:00');
+        $this->punch($ann, '2026-08-05 09:00:00');
+        $this->punch($bo, '2026-08-05 09:00:00');
+
+        $stats = $this->actingAs($this->admin)->get(route('dashboard'))->assertOk()->viewData('stats');
+
+        $this->assertSame('Tue', $stats['versus']);
+        $this->assertSame(1, $stats['before']['present']);
+        $this->assertSame(2, $stats['present']);
+        $this->assertSame(100, $stats['rate']);
+    }
+
+    public function test_the_donut_names_who_has_not_turned_up(): void
+    {
+        Carbon::setTestNow('2026-08-05 12:00:00');
+
+        $this->punch($this->employee('Ann'), '2026-08-05 09:00:00');
+        $this->employee('Bo');
+
+        $donut = $this->actingAs($this->admin)->get(route('dashboard'))->assertOk()
+            ->assertSee("Today's Attendance", false)
+            ->viewData('donut');
+
+        $this->assertSame(1, $donut['ontime']);
+        $this->assertSame(1, $donut['missing']);
+        $this->assertSame('Bo Test', $donut['absentees'][0]->full_name);
+    }
+
+    public function test_the_security_panel_ignores_another_companys_sign_in_failures(): void
+    {
+        // The activity log's own scope: ours, plus attempts nobody can
+        // attribute (an address matching no account). Never a rival's.
+        $other = Company::create(['name' => 'Rival', 'timezone' => 'UTC', 'currency' => 'USD']);
+
+        foreach ([$this->company->id, null, $other->id] as $companyId) {
+            ActivityLog::create([
+                'company_id' => $companyId, 'event' => ActivityLog::LOGIN_FAILED,
+                'actor_label' => 'someone@' . ($companyId ?? 'nowhere') . '.test',
+            ]);
+        }
+
+        $security = $this->actingAs($this->admin)->get(route('dashboard'))->assertOk()
+            ->assertDontSee('someone@' . $other->id . '.test')
+            ->viewData('security');
+
+        $this->assertSame(2, $security['failed_24h']);
+        $this->assertCount(2, $security['recent']);
+    }
+
+    public function test_the_redesign_still_shows_no_location_or_ip_anywhere(): void
+    {
+        $ann = $this->employee('Ann');
+        AttendanceLog::create([
+            'company_id' => $this->company->id, 'employee_id' => $ann->id,
+            'office_id' => $this->office->id, 'type' => 'in',
+            'scanned_at' => now(), 'work_date' => now()->toDateString(),
+            'status' => 'late', 'source' => 'button',
+            'latitude' => 40.7128, 'longitude' => -74.0060, 'ip_address' => '198.51.100.23',
+        ]);
+
+        $this->actingAs($this->admin)->get(route('dashboard'))->assertOk()
+            ->assertDontSee('198.51.100.23')
+            ->assertDontSee('40.7128')
+            ->assertDontSee('google.com/maps', false);
     }
 }

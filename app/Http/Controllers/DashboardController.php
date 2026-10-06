@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\AttendanceRegularisation;
 use App\Models\AttendanceLog;
 use App\Models\Department;
 use App\Models\Employee;
 use App\Models\EmployeeDocument;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Models\Office;
 use App\Models\ShiftSwapRequest;
@@ -14,6 +16,7 @@ use App\Models\User;
 use App\Services\AttendanceService;
 use App\Services\LeaveService;
 use App\Support\DashboardWidgets;
+use App\Support\QrLaunch;
 use Illuminate\Http\Request;
 
 /**
@@ -44,8 +47,34 @@ class DashboardController extends Controller
             'available' => DashboardWidgets::availableTo($user),
         ];
 
+        // Shared by the tiles and the donut, so showing both costs one summary.
+        $summary = ($show('tiles') || $show('attendance_donut'))
+            ? $this->attendance->daySummary($companyId)
+            : null;
+
+        // Shared by the live board and the donut's absentee list.
+        $live = ($show('who_is_in') || $show('attendance_donut'))
+            ? $this->attendance->whoIsIn($companyId)
+            : null;
+
+        // The banner is not a panel: it is the page's heading, so it is always
+        // drawn — but it is two counts, not two panels' worth of queries.
+        $data['welcome'] = [
+            'leave'           => LeaveRequest::where('company_id', $companyId)->pending()->count(),
+            'regularisations' => AttendanceRegularisation::where('company_id', $companyId)
+                ->where('status', 'pending')->count(),
+            'now'             => $this->companyNow(),
+        ];
+
+        // The "Open QR screen" picker in the banner (A4.21) — for whoever runs
+        // attendance, which is the permission the screens themselves sit behind.
+        $data['qrLaunch'] = $user->can('manage-attendance') ? QrLaunch::forCompany($companyId) : null;
+
         if ($show('tiles')) {
-            $summary = $this->attendance->daySummary($companyId);
+            $previous = $this->previousWorkingDay($companyId);
+            $before = $previous
+                ? $this->attendance->daySummary($companyId, $previous->toDateString())
+                : null;
 
             $data['stats'] = [
                 'employees'   => Employee::where('company_id', $companyId)->active()->count(),
@@ -55,6 +84,27 @@ class DashboardController extends Controller
                 'late'        => $summary['late'],
                 'on_leave'    => $summary['on_leave'],
                 'absent'      => $summary['absent'],
+                'rate'        => $this->attendanceRate($summary),
+                // Measured against the last day people were expected in, not
+                // the calendar's yesterday: on a Monday that is Friday, and a
+                // comparison with an empty Sunday would read as a triumph.
+                'versus'      => $previous?->format('D'),
+                'before'      => $before ? $before + ['rate' => $this->attendanceRate($before)] : null,
+            ];
+        }
+
+        if ($show('attendance_donut')) {
+            $absentees = array_map(fn ($row) => $row['employee'], $live['not_in']);
+
+            $data['donut'] = [
+                'ontime'    => max(0, $summary['present'] - $summary['late']),
+                'late'      => $summary['late'],
+                'on_leave'  => $summary['on_leave'],
+                'absent'    => $summary['absent'],
+                'total'     => $summary['total'],
+                'rate'      => $this->attendanceRate($summary),
+                'absentees' => array_slice($absentees, 0, 6),
+                'missing'   => count($absentees),
             ];
         }
 
@@ -63,11 +113,14 @@ class DashboardController extends Controller
         }
 
         if ($show('attendance_trend')) {
-            $data['trend'] = $this->sevenDayTrend($companyId);
+            $month = $this->dailyTrend($companyId, 30);
+
+            $data['trend'] = $month->slice(-7)->values();
+            $data['trendMonth'] = $month;
         }
 
         if ($show('who_is_in')) {
-            $board = $this->attendance->whoIsIn($companyId);
+            $board = $live;
 
             $data['board'] = [
                 'in'       => count($board['in']),
@@ -83,14 +136,37 @@ class DashboardController extends Controller
             ];
         }
 
+        if ($show('late_today')) {
+            $data['lateToday'] = $this->lateToday($companyId);
+        }
+
+        if ($show('by_department')) {
+            $data['byDepartment'] = $this->headcountByDepartment($companyId);
+        }
+
         if ($show('pending_approvals')) {
             $data['approvals'] = [
-                'leave'           => LeaveRequest::where('company_id', $companyId)->pending()->count(),
-                'regularisations' => \App\Models\AttendanceRegularisation::where('company_id', $companyId)
-                    ->where('status', 'pending')->count(),
+                'leave'           => $data['welcome']['leave'],
+                'regularisations' => $data['welcome']['regularisations'],
                 'swaps'           => ShiftSwapRequest::where('company_id', $companyId)
                     ->where('status', 'pending')->count(),
+                // Oldest first: the request that has waited longest is the one
+                // somebody is about to chase.
+                'requests'        => LeaveRequest::with(['employee', 'leaveType'])
+                    ->where('company_id', $companyId)
+                    ->pending()
+                    ->orderBy('created_at')
+                    ->limit(5)
+                    ->get(),
             ];
+        }
+
+        if ($show('upcoming')) {
+            $data['upcoming'] = $this->upcoming($companyId);
+        }
+
+        if ($show('birthdays')) {
+            $data['birthdays'] = $this->birthdaysThisMonth($companyId);
         }
 
         if ($show('document_expiries')) {
@@ -114,10 +190,17 @@ class DashboardController extends Controller
         if ($show('security')) {
             $staff = User::where('company_id', $companyId)->where('is_active', true)->get();
 
+            // The same scope the activity log itself uses: this company's
+            // events, plus the ones nobody can attribute — a guess at an
+            // address that matches no account belongs to no company, and
+            // hiding it would hide the most common attack there is. Another
+            // company's attributed events are theirs, not ours.
+            $mine = fn ($q) => $q->where('company_id', $companyId)->orWhereNull('company_id');
+
             $data['security'] = [
-                'failed_24h' => ActivityLog::where('event', ActivityLog::LOGIN_FAILED)
+                'failed_24h' => ActivityLog::where($mine)->where('event', ActivityLog::LOGIN_FAILED)
                     ->where('created_at', '>=', now()->subDay())->count(),
-                'lockouts_24h' => ActivityLog::where('event', ActivityLog::LOCKOUT)
+                'lockouts_24h' => ActivityLog::where($mine)->where('event', ActivityLog::LOCKOUT)
                     ->where('created_at', '>=', now()->subDay())->count(),
                 // Counted over the accounts that can actually reach staff data.
                 // "60% of everybody" is meaningless when most of everybody is
@@ -127,6 +210,7 @@ class DashboardController extends Controller
                     fn (User $u) => $u->hasAnyRole(['admin', 'hr']) && $u->hasTwoFactor(),
                 )->count(),
                 'recent' => ActivityLog::with('user')
+                    ->where($mine)
                     ->whereIn('event', [ActivityLog::LOGIN_FAILED, ActivityLog::LOCKOUT, ActivityLog::SETTINGS_CHANGED])
                     ->latest('created_at')
                     ->limit(5)
@@ -226,26 +310,161 @@ class DashboardController extends Controller
         ];
     }
 
-    /** Distinct people in, per day, for the last seven days. */
-    protected function sevenDayTrend(int $companyId)
+    /**
+     * Distinct people in per day, split into on time and late, oldest first.
+     *
+     * One query for the whole window rather than one per day — the old version
+     * fired a count per day and used a raw work_date comparison that dropped
+     * rows on any engine storing a time component with the date. A person's
+     * day counts as late when their first clock-in of it was.
+     *
+     * @return \Illuminate\Support\Collection<int, array{date: string, label: string, short: string, count: int, late: int, ontime: int}>
+     */
+    protected function dailyTrend(int $companyId, int $days)
     {
-        // One query, grouped, rather than seven — the old version fired a count
-        // per day and used a raw work_date comparison that dropped rows on any
-        // engine storing a time component with the date.
-        $counts = AttendanceLog::where('company_id', $companyId)
-            ->forDates($this->companyNow()->subDays(6)->toDateString(), $this->companyNow()->toDateString())
-            ->where('type', 'in')
-            ->get(['employee_id', 'work_date'])
-            ->groupBy(fn ($log) => $log->work_date->toDateString())
-            ->map(fn ($logs) => $logs->pluck('employee_id')->unique()->count());
+        $today = $this->companyNow();
 
-        return collect(range(6, 0))->map(function ($daysAgo) use ($counts) {
-            $day = $this->companyNow()->subDays($daysAgo);
+        $byDay = AttendanceLog::where('company_id', $companyId)
+            ->forDates($today->copy()->subDays($days - 1)->toDateString(), $today->toDateString())
+            ->where('type', 'in')
+            ->orderBy('scanned_at')
+            ->get(['employee_id', 'work_date', 'status', 'scanned_at'])
+            ->groupBy(fn ($log) => $log->work_date->toDateString())
+            ->map(function ($logs) {
+                $firsts = $logs->unique('employee_id');
+
+                return ['count' => $firsts->count(), 'late' => $firsts->where('status', 'late')->count()];
+            });
+
+        return collect(range($days - 1, 0))->map(function ($daysAgo) use ($byDay, $today) {
+            $day = $today->copy()->subDays($daysAgo);
+            $figures = $byDay[$day->toDateString()] ?? ['count' => 0, 'late' => 0];
 
             return [
-                'label' => $day->format('D'),
-                'count' => $counts[$day->toDateString()] ?? 0,
+                'date'   => $day->toDateString(),
+                'label'  => $day->format('D'),
+                'short'  => $day->format('M j'),
+                'count'  => $figures['count'],
+                'late'   => $figures['late'],
+                'ontime' => $figures['count'] - $figures['late'],
             ];
-        });
+        })->values();
+    }
+
+    /**
+     * Present as a share of the people who were expected in: headcount less
+     * approved leave. Null when nobody was expected — a rate of nothing is not
+     * zero percent (trap 28).
+     */
+    protected function attendanceRate(array $summary): ?int
+    {
+        $expected = $summary['total'] - $summary['on_leave'];
+
+        return $expected > 0 ? (int) min(100, round($summary['present'] / $expected * 100)) : null;
+    }
+
+    /** The most recent working day before today, inside the last fortnight. */
+    protected function previousWorkingDay(int $companyId): ?\Carbon\Carbon
+    {
+        $today = $this->companyNow();
+
+        $dates = $this->leave->workingDatesBetween(
+            \App\Models\Company::find($companyId),
+            $today->copy()->subDays(14)->toDateString(),
+            $today->copy()->subDay()->toDateString(),
+        );
+
+        return $dates ? \Carbon\Carbon::parse(end($dates)) : null;
+    }
+
+    /**
+     * Today's late arrivals, earliest first, one row per person — their first
+     * clock-in of the day is the one that decides it.
+     *
+     * @return array{count: int, rows: array<int, array{log: AttendanceLog, minutes: int}>}
+     */
+    protected function lateToday(int $companyId): array
+    {
+        $today = $this->companyNow()->toDateString();
+
+        $logs = AttendanceLog::with(['employee.department', 'employee.company'])
+            ->where('company_id', $companyId)
+            ->forDates($today, $today)
+            ->where('type', 'in')
+            ->orderBy('scanned_at')
+            ->get()
+            ->unique('employee_id')
+            ->where('status', 'late')
+            ->values();
+
+        return [
+            'count' => $logs->count(),
+            // Minutes come from the same arithmetic that marked the punch late,
+            // so the badge and the status can never disagree.
+            'rows'  => $logs->take(6)->map(fn (AttendanceLog $log) => [
+                'log'     => $log,
+                'minutes' => $log->employee
+                    ? $this->attendance->lateMinutes($log->employee, $log->scanned_at, $log->work_date->toDateString())
+                    : 0,
+            ])->all(),
+        ];
+    }
+
+    /** @return array{departments: \Illuminate\Support\Collection, unassigned: int, total: int} */
+    protected function headcountByDepartment(int $companyId): array
+    {
+        $departments = Department::where('company_id', $companyId)
+            ->withCount(['employees as headcount' => fn ($q) => $q->active()])
+            ->orderByDesc('headcount')
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        $unassigned = Employee::where('company_id', $companyId)->active()->whereNull('department_id')->count();
+
+        return [
+            'departments' => $departments,
+            'unassigned'  => $unassigned,
+            'total'       => $departments->sum('headcount') + $unassigned,
+        ];
+    }
+
+    /**
+     * Approved leave touching the next fortnight, and the next few holidays.
+     *
+     * @return array{leave: \Illuminate\Support\Collection, holidays: array<string, string>}
+     */
+    protected function upcoming(int $companyId): array
+    {
+        $today = $this->companyNow();
+
+        $holidays = Holiday::namedBetween($companyId, $today->toDateString(), $today->copy()->addDays(90)->toDateString());
+        ksort($holidays);
+
+        return [
+            'leave' => LeaveRequest::with(['employee', 'leaveType'])
+                ->where('company_id', $companyId)
+                ->approved()
+                ->overlapping($today->toDateString(), $today->copy()->addDays(14)->toDateString())
+                ->orderBy('start_date')
+                ->limit(6)
+                ->get(),
+            'holidays' => array_slice($holidays, 0, 4, true),
+        ];
+    }
+
+    /** Active employees born this month, in the order their days come round. */
+    protected function birthdaysThisMonth(int $companyId)
+    {
+        $today = $this->companyNow();
+
+        return Employee::with('department')
+            ->where('company_id', $companyId)
+            ->active()
+            ->whereNotNull('date_of_birth')
+            ->whereMonth('date_of_birth', $today->month)
+            ->get()
+            ->sortBy(fn (Employee $e) => $e->date_of_birth->day)
+            ->values()
+            ->take(8);
     }
 }

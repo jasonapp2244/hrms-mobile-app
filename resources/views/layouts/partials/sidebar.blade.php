@@ -188,6 +188,23 @@
 				</li>
 				@endcanany
 
+				<li class="menu-title"><span>ACCOUNT</span></li>
+				<li>
+					<ul>
+						<li>
+							{{-- A link rather than a button so the sidebar styles it like every
+							     other item; signing out is still a POST with the CSRF token. --}}
+							<a href="{{ route('logout') }}" class="text-danger"
+							   onclick="event.preventDefault(); document.getElementById('sidebar-logout-form').submit();">
+								<i class="ti ti-logout text-danger"></i><span>Logout</span>
+							</a>
+							<form id="sidebar-logout-form" method="POST" action="{{ route('logout') }}" class="d-none">
+								@csrf
+							</form>
+						</li>
+					</ul>
+				</li>
+
 			</ul>
 		</div>
 	</div>

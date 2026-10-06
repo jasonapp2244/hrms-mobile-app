@@ -103,6 +103,23 @@
 						</li>
 					</ul>
 				</li>
+
+				<li class="menu-title"><span>ACCOUNT</span></li>
+				<li>
+					<ul>
+						<li>
+							{{-- Same as the admin sidebar: a link so it is styled like the
+							     rest, signing out is still a POST with the CSRF token. --}}
+							<a href="{{ route('logout') }}" class="text-danger"
+							   onclick="event.preventDefault(); document.getElementById('sidebar-logout-form').submit();">
+								<i class="ti ti-logout text-danger"></i><span>Logout</span>
+							</a>
+							<form id="sidebar-logout-form" method="POST" action="{{ route('logout') }}" class="d-none">
+								@csrf
+							</form>
+						</li>
+					</ul>
+				</li>
 			</ul>
 		</div>
 	</div>

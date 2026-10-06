@@ -96,6 +96,13 @@ class AttendanceController extends ApiController
                 'longitude'  => $data['longitude'] ?? null,
                 'ip_address' => $request->ip(),
             ] + $this->integrityMeta($data));
+        } catch (\PDOException $e) {
+            // A fault, not a refusal. QueryException is a \RuntimeException,
+            // so without this arm a database that failed to write the punch
+            // reached the phone as `outside_geofence`, with the SQL as its
+            // message. Thrown on, it becomes the API's generic server_error.
+            // The same arm guards every punch endpoint below.
+            throw $e;
         } catch (\RuntimeException $e) {
             // Geofence enforcement (A4.16). Given its own error code rather than
             // a generic refusal so the app can say "move closer" instead of
@@ -204,6 +211,10 @@ class AttendanceController extends ApiController
                     'result' => $result['duplicate'] ? 'duplicate' : 'accepted',
                     'punch'  => $this->punchPayload($result['log'], $timezone),
                 ];
+            } catch (\PDOException $e) {
+                // Above all here: `refused` tells the app to drop the punch, and
+                // a database that failed once will very likely take it next time.
+                throw $e;
             } catch (\RuntimeException $e) {
                 // Refused for a reason that will not change on a retry — too
                 // old, dated in the future, outside the fence. The app drops
@@ -265,6 +276,8 @@ class AttendanceController extends ApiController
             ] + $this->integrityMeta($data));
         } catch (QrRefused $e) {
             return $this->fail($e->error, $e->getMessage(), 422);
+        } catch (\PDOException $e) {
+            throw $e;
         } catch (\RuntimeException $e) {
             return $this->fail('outside_geofence', $e->getMessage(), 422);
         }
@@ -327,6 +340,8 @@ class AttendanceController extends ApiController
                 'longitude'  => $data['longitude'] ?? null,
                 'ip_address' => $request->ip(),
             ] + $this->integrityMeta($data));
+        } catch (\PDOException $e) {
+            throw $e;
         } catch (\RuntimeException $e) {
             // Its own code, not the geofence's: this one means "you are not
             // clocked in", which the app answers by refreshing the day rather
