@@ -69,8 +69,12 @@
             {{-- The company's zone is the one that matters: shifts, "today",
                  reports and the phone all follow it. This row used to print the
                  server's own UTC clock under the bare label "Timezone", which
-                 read as though the system ran on UTC. --}}
-            @php $settingsCompany = auth()->user()->company; @endphp
+                 read as though the system ran on UTC.
+
+                 The inline @php(...) form, not a block: this file already has
+                 inline ones above, and Blade pairs the first of those with a
+                 block's closing tag, so a block here is never compiled. --}}
+            @php($settingsCompany = auth()->user()->company)
             <tr>
               <th>Company timezone</th>
               <td>
