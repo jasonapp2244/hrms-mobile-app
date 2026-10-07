@@ -288,7 +288,8 @@ class NotificationTest extends TestCase
         $this->assertSame('leave.submitted', $data['type']);
         $this->assertStringContainsString('Ann Lee', $data['title']);
         $this->assertStringContainsString('Annual', $data['body']);
-        $this->assertStringContainsString('approvals', $data['url']);
+        // HR decide in the register, filtered to what is waiting.
+        $this->assertSame(route('leave.index', ['status' => 'pending']), $data['url']);
     }
 
     public function test_a_decision_notification_points_at_the_employees_own_leave(): void
@@ -335,11 +336,59 @@ class NotificationTest extends TestCase
 
         $note = $hr->user->unreadNotifications()->first();
 
+        // HR decide in the company register, not the manager's portal inbox —
+        // which they are refused. This used to assert that 403 as the target.
         $this->actingAs($hr->user)
+            ->get(route('notifications.show', $note->id))
+            ->assertRedirect(route('leave.index', ['status' => 'pending']));
+
+        $this->actingAs($hr->user)
+            ->get(route('leave.index', ['status' => 'pending']))
+            ->assertOk()
+            ->assertSee('Ann Lee');
+
+        $this->assertSame(0, $hr->user->unreadNotifications()->count());
+    }
+
+    public function test_a_line_manager_is_sent_to_their_own_inbox(): void
+    {
+        $manager = $this->staff('Mo', 'Kay', 'E2', 'employee', 'manager');
+        $this->employee->update(['manager_id' => $manager->id]);
+        $this->apply();
+
+        $note = $manager->user->unreadNotifications()->first();
+
+        $this->actingAs($manager->user)
             ->get(route('notifications.show', $note->id))
             ->assertRedirect(route('employee.approvals.index'));
 
-        $this->assertSame(0, $hr->user->unreadNotifications()->count());
+        $this->actingAs($manager->user)->get(route('employee.approvals.index'))->assertOk();
+    }
+
+    public function test_a_notification_stored_with_the_old_link_still_lands_where_the_reader_can_go(): void
+    {
+        // Rows written before the fix carry the manager's inbox for everybody,
+        // and announcements carry the editor. The click works it out again.
+        $hr = $this->staff('Hana', 'Ruiz', 'E3', 'hr');
+        $hr->user->notifications()->create([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'type' => LeaveRequestSubmitted::class,
+            'data' => ['type' => 'leave.submitted', 'title' => 'x', 'url' => route('employee.approvals.index')],
+        ]);
+        $this->employee->user->notifications()->create([
+            'id' => (string) \Illuminate\Support\Str::uuid(), 'type' => \App\Notifications\CompanyAnnouncement::class,
+            'data' => ['type' => 'announcement', 'title' => 'Depot closed', 'body' => 'Friday', 'url' => route('announcements.index')],
+        ]);
+
+        $this->actingAs($hr->user)
+            ->get(route('notifications.show', $hr->user->notifications()->first()->id))
+            ->assertRedirect(route('leave.index', ['status' => 'pending']));
+
+        $this->actingAs($this->employee->user)
+            ->get(route('notifications.show', $this->employee->user->notifications()->first()->id))
+            ->assertRedirect(route('notifications.index'));
+
+        $this->actingAs($this->employee->user)->get(route('announcements.index'))->assertForbidden();
+        $this->actingAs($this->employee->user)->get(route('notifications.index'))->assertOk()->assertSee('Depot closed');
     }
 
     public function test_one_person_cannot_open_anothers_notification(): void

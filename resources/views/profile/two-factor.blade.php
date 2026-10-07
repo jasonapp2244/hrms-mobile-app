@@ -1,13 +1,24 @@
-@extends('layouts.app')
+{{--
+  Reached from My Profile by all four roles, so it follows profile/index.blade.php:
+  staff get the dashboard layout, employees and managers the portal. It used to
+  extend layouts.app for everyone, which handed a manager or employee the admin
+  sidebar and a home crumb to route('dashboard') — every one of them a 403.
+--}}
+@php($staffLayout = auth()->user()->hasAnyRole(['admin', 'hr']))
+@extends($staffLayout ? 'layouts.app' : 'layouts.employee')
 @section('title','Two-Factor Authentication')
 @section('content')
 <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
   <div class="my-auto mb-2"><h2 class="mb-1">Two-Factor Authentication</h2>
+    @if($staffLayout)
     <nav><ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"><i class="ti ti-smart-home"></i></a></li>
+      <li class="breadcrumb-item"><a href="{{ route(auth()->user()->homeRoute()) }}"><i class="ti ti-smart-home"></i></a></li>
       <li class="breadcrumb-item"><a href="{{ route('profile.index') }}">Profile</a></li>
       <li class="breadcrumb-item active">Two-Factor</li>
-    </ol></nav></div>
+    </ol></nav>
+    @else
+    <a href="{{ route('profile.index') }}" class="small"><i class="ti ti-arrow-left me-1"></i>Back to My Profile</a>
+    @endif</div>
 </div>
 
 @if(session('success'))<div class="alert alert-success">{{ session('success') }}</div>@endif

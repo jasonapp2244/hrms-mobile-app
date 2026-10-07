@@ -35,8 +35,14 @@
 	@unless($required)
 		<div class="mt-2 mb-0">
 			Staff can still tap the button until you switch on
-			<a href="{{ route('policies.edit') }}">“Office staff scan the office QR code”</a> in policies —
-			do that once a screen is up.
+			{{-- HR run this screen but do not hold manage-settings; a link they would 403 on is worse than a name. --}}
+			@can('manage-settings')
+				<a href="{{ route('policies.edit') }}">“Office staff scan the office QR code”</a> in policies —
+				do that once a screen is up.
+			@else
+				<strong>“Office staff scan the office QR code”</strong> in policies —
+				an administrator can do that once a screen is up.
+			@endcan
 		</div>
 	@endunless
 </div>

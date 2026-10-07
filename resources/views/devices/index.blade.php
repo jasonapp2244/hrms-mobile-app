@@ -31,7 +31,11 @@
 			Nothing is bound yet. This list fills as people sign in
 			@unless(auth()->user()->company?->policy('enforce_device_binding'))
 				— though binding is currently <strong>off</strong>, so nobody is being refused.
-				Switch it on in <a href="{{ route('policies.edit') }}">policies</a>.
+				@can('manage-settings')
+					Switch it on in <a href="{{ route('policies.edit') }}">policies</a>.
+				@else
+					An administrator can switch it on in policies.
+				@endcan
 			@endunless
 		</div>
 	@endunless

@@ -73,6 +73,55 @@ class WebPagesRenderTest extends TestCase
         $this->assertGreaterThan(0, $rendered, "{$email} rendered no page at all");
     }
 
+    /**
+     * No page offers a link its reader is refused.
+     *
+     * Rendering is not the whole of it: two-factor handed managers and
+     * employees the admin sidebar, and the QR Screens and Devices pages linked
+     * HR to Policies, which HR cannot open. Each was a 200 page full of 403s.
+     * Every same-site href on every page the role can open is followed once.
+     *
+     * @dataProvider roles
+     */
+    public function test_no_page_links_the_role_to_a_page_it_is_refused(string $email): void
+    {
+        $user = User::where('email', $email)->firstOrFail();
+        $host = parse_url(config('app.url'), PHP_URL_HOST);
+        $sources = [];
+
+        foreach ($this->pageUris() as $uri) {
+            $response = $this->actingAs($user)->get($uri);
+            if ($response->getStatusCode() !== 200 || ! str_contains((string) $response->headers->get('Content-Type'), 'html')) {
+                continue;
+            }
+
+            preg_match_all('/href="([^"#]+)"/', $response->getContent(), $m);
+            foreach ($m[1] as $href) {
+                $href = html_entity_decode($href);
+                $parts = parse_url($href);
+                if (isset($parts['host']) && $parts['host'] !== $host) {
+                    continue;
+                }
+                $path = $parts['path'] ?? '';
+                if ($path === '' || ! str_starts_with($path, '/') || preg_match('#^/(assets|build|storage)/|\.(css|js|png|jpe?g|svg|ico|webp)$#', $path)) {
+                    continue;
+                }
+                $sources[$path] ??= $uri;
+            }
+        }
+
+        $dead = [];
+        foreach ($sources as $path => $from) {
+            $status = $this->actingAs($user)->get($path)->getStatusCode();
+            if ($status === 403 || $status >= 500) {
+                $dead[] = "{$status} {$path}  (linked from {$from})";
+            }
+        }
+
+        $this->assertNotEmpty($sources, "{$email} was shown no links at all");
+        $this->assertSame([], $dead, "Links {$email} is shown but refused:\n" . implode("\n", $dead));
+    }
+
     /** @return list<string> */
     private function pageUris(): array
     {

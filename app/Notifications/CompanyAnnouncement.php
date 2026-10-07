@@ -104,7 +104,22 @@ class CompanyAnnouncement extends Notification implements ShouldQueue
             // there is no screen to send anybody to for the rest of it.
             'body'            => $this->body,
             'announcement_id' => $this->announcementId,
-            'url'             => route('announcements.index'),
+            'url'             => self::urlFor($notifiable),
         ];
+    }
+
+    /**
+     * Where opening it should go.
+     *
+     * Whoever can manage announcements goes to the list of them. Everybody else
+     * — the people announcements are actually for — stays in the notification
+     * centre, which shows the body in full. Sending them to /announcements was a
+     * 403: that screen is the authoring side, behind manage-announcements.
+     */
+    public static function urlFor(object $notifiable): string
+    {
+        return method_exists($notifiable, 'can') && $notifiable->can('manage-announcements')
+            ? route('announcements.index')
+            : route('notifications.index');
     }
 }

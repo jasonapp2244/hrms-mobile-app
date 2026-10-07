@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Notifications\CompanyAnnouncement;
+use App\Notifications\LeaveRequestSubmitted;
 use Illuminate\Http\Request;
 
 /**
@@ -37,7 +40,24 @@ class NotificationController extends Controller
 
         $notification->markAsRead();
 
-        return redirect($notification->data['url'] ?? route('notifications.index'));
+        return redirect($this->destination($request->user(), $notification->data));
+    }
+
+    /**
+     * Where a notification points, for the person opening it.
+     *
+     * Two types are addressed to people with different screens, and their
+     * stored url was once the same for everyone — HR sent to the manager's
+     * inbox, staff to the announcement editor, both 403s. Those rows still
+     * exist, so the destination is worked out again here rather than trusted.
+     */
+    private function destination(User $user, array $data): string
+    {
+        return match ($data['type'] ?? null) {
+            'leave.submitted' => LeaveRequestSubmitted::urlFor($user),
+            'announcement'    => CompanyAnnouncement::urlFor($user),
+            default           => $data['url'] ?? route('notifications.index'),
+        };
     }
 
     public function markAllRead(Request $request)

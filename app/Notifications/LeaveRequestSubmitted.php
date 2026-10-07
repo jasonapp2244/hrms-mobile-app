@@ -114,11 +114,27 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
             'employee_id'      => $request->employee_id,
             'employee'         => $request->employee?->full_name,
             'stage'            => $request->stage_label,
-            // Where the bell should take someone who taps it. The approvals
-            // inbox rather than the record itself: the point of the message is
-            // that a decision is waiting.
-            'url' => route('employee.approvals.index'),
+            // Where the bell should take someone who taps it. An inbox rather
+            // than the record itself: the point of the message is that a
+            // decision is waiting. Which inbox depends on who is reading.
+            'url' => self::urlFor($notifiable),
         ];
+    }
+
+    /**
+     * The inbox this reader decides from.
+     *
+     * HR and admin decide in the company-wide register at /leave; the line
+     * manager in the portal inbox. Sending HR to the portal inbox was a 403 —
+     * the route is the manager's, and HR hold manage-leave, not a team.
+     * NotificationController reuses this so rows written before the fix land
+     * in the right place too.
+     */
+    public static function urlFor(object $notifiable): string
+    {
+        return method_exists($notifiable, 'can') && $notifiable->can('manage-leave')
+            ? route('leave.index', ['status' => 'pending'])
+            : route('employee.approvals.index');
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -142,7 +158,7 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
             ->when((bool) $request->reason, fn (MailMessage $mail) => $mail->line(
                 __('notifications.leave_submitted.reason', ['reason' => $request->reason]),
             ))
-            ->action(__('notifications.leave_submitted.action'), route('employee.approvals.index'))
+            ->action(__('notifications.leave_submitted.action'), self::urlFor($notifiable))
             ->line(__('notifications.leave_submitted.why'));
     }
 }
