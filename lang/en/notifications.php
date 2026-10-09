@@ -57,7 +57,7 @@ return [
         ],
         'note'   => 'Note: :note',
         'action' => 'View your leave',
-        'dates'  => 'Dates: :dates',
+        'range'  => ':from to :to',
     ],
 
     // --- Still clocked in after the shift ended ---------------------------
@@ -158,5 +158,23 @@ return [
 
     // Shared by every mail that opens with a name.
     'greeting' => 'Hello :name,',
+
+    // --- A scheduled report, delivered (A7.12) -----------------------------
+    'scheduled_report' => [
+        'subject'      => ':title — :from to :to',
+        'your_company' => 'Your company',
+        'period'       => '**:from** to **:to**',
+        'office'       => 'Office: :office',
+        'figure'       => 'Figure',
+        'value'        => 'Value',
+        'attached'     => 'The full report is attached as **:file**.',
+        'action'       => 'Open in the dashboard',
+        'why'          => 'You are receiving this because this address is on a scheduled report list (:frequency). An administrator can change or stop it under Reports → Scheduled Reports.',
+        'frequency'    => [
+            'daily'   => 'every day',
+            'weekly'  => 'every Monday',
+            'monthly' => 'on the 1st of the month',
+        ],
+    ],
 
 ];

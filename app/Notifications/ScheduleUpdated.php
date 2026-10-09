@@ -55,8 +55,8 @@ class ScheduleUpdated extends Notification implements ShouldQueue
     {
         return __('notifications.schedule_updated.summary', [
             'days' => $this->days,
-            'from' => \Carbon\Carbon::parse($this->from)->format('M j'),
-            'to'   => \Carbon\Carbon::parse($this->to)->format('M j'),
+            'from' => \Carbon\Carbon::parse($this->from)->translatedFormat('M j'),
+            'to'   => \Carbon\Carbon::parse($this->to)->translatedFormat('M j'),
         ]);
     }
 

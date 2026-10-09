@@ -44,7 +44,7 @@ return [
         ],
         'note'   => 'Nota: :note',
         'action' => 'Ver tus permisos',
-        'dates'  => 'Fechas: :dates',
+        'range'  => ':from al :to',
     ],
 
     // --- Sigues fichado después de terminar el turno -----------------------
@@ -142,5 +142,23 @@ return [
     ],
 
     'greeting' => 'Hola :name:',
+
+    // --- Un informe programado (A7.12) -------------------------------------
+    'scheduled_report' => [
+        'subject'      => ':title — del :from al :to',
+        'your_company' => 'Tu empresa',
+        'period'       => 'del **:from** al **:to**',
+        'office'       => 'Oficina: :office',
+        'figure'       => 'Dato',
+        'value'        => 'Valor',
+        'attached'     => 'El informe completo va adjunto como **:file**.',
+        'action'       => 'Abrir en el panel',
+        'why'          => 'Recibes este correo porque esta dirección está en la lista de un informe programado (:frequency). Un administrador puede cambiarlo o detenerlo en Informes → Informes programados.',
+        'frequency'    => [
+            'daily'   => 'cada día',
+            'weekly'  => 'cada lunes',
+            'monthly' => 'el día 1 de cada mes',
+        ],
+    ],
 
 ];

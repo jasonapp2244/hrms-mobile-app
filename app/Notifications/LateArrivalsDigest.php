@@ -52,7 +52,7 @@ class LateArrivalsDigest extends Notification implements ShouldQueue
                 ])
                 : __('notifications.late_arrivals.body_many', [
                     'count' => $count,
-                    'date'  => $this->workDate,
+                    'date'  => $this->displayDate(),
                 ]),
             'work_date' => $this->workDate,
             'arrivals'  => $this->arrivals,
@@ -67,9 +67,9 @@ class LateArrivalsDigest extends Notification implements ShouldQueue
         $mail = (new MailMessage())
             ->subject(__('notifications.late_arrivals.subject', [
                 'count' => $count,
-                'date'  => $this->workDate,
+                'date'  => $this->displayDate(),
             ]))
-            ->greeting(__('notifications.late_arrivals.greeting', ['date' => $this->workDate]))
+            ->greeting(__('notifications.late_arrivals.greeting', ['date' => $this->displayDate()]))
             ->line(__('notifications.late_arrivals.intro'));
 
         foreach ($this->arrivals as $arrival) {
@@ -86,5 +86,14 @@ class LateArrivalsDigest extends Notification implements ShouldQueue
                 'from' => $this->workDate, 'to' => $this->workDate,
             ]))
             ->line(__('notifications.late_arrivals.why'));
+    }
+
+    /**
+     * The day as a person reads it, in their language. workDate stays Y-m-d
+     * because the report link and the stored row need the machine form.
+     */
+    protected function displayDate(): string
+    {
+        return Carbon::parse($this->workDate)->translatedFormat('D j M Y');
     }
 }

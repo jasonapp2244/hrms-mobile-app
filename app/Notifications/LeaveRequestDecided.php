@@ -104,9 +104,9 @@ class LeaveRequestDecided extends Notification implements ShouldQueue
             ]));
         }
 
-        return $mail
-            ->action(__('notifications.leave_decided.action'), route('employee.leave.index'))
-            ->line(__('notifications.leave_decided.dates', ['dates' => $this->dates()]));
+        // The dates are already in the body; repeating them under the button
+        // only made the mail longer.
+        return $mail->action(__('notifications.leave_decided.action'), route('employee.leave.index'));
     }
 
     /**
@@ -141,7 +141,10 @@ class LeaveRequestDecided extends Notification implements ShouldQueue
         $request = $this->leaveRequest;
 
         return $request->start_date->equalTo($request->end_date)
-            ? $request->start_date->format('D j M Y')
-            : sprintf('%s to %s', $request->start_date->format('j M'), $request->end_date->format('j M Y'));
+            ? $request->start_date->translatedFormat('D j M Y')
+            : __('notifications.leave_decided.range', [
+                'from' => $request->start_date->translatedFormat('j M'),
+                'to'   => $request->end_date->translatedFormat('j M Y'),
+            ]);
     }
 }

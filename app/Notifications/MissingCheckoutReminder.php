@@ -107,7 +107,7 @@ class MissingCheckoutReminder extends Notification implements ShouldQueue
             ->greeting(__('notifications.greeting', ['name' => $notifiable->name]))
             ->line(__('notifications.missing_checkout.line', [
                 'time' => Clock::time($this->openPunch->scanned_at),
-                'date' => $this->openPunch->work_date->format('D j M Y'),
+                'date' => $this->openPunch->work_date->translatedFormat('D j M Y'),
             ]))
             ->line(__('notifications.missing_checkout.finish'))
             // Said plainly so nobody is surprised by the row appearing later.

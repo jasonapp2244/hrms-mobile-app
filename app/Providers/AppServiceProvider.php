@@ -14,6 +14,7 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Middleware\RedirectIfAuthenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Mail\Markdown;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Notifications\ChannelManager;
 use Illuminate\Notifications\SendQueuedNotifications;
@@ -74,6 +75,12 @@ class AppServiceProvider extends ServiceProvider
         $this->forceHttpsWhenConfigured();
 
         $this->registerPushChannel();
+
+        // Mail lines carry text people typed: a leave reason goes to the
+        // manager, a decision note to the employee, a document title to HR.
+        // Rendered as plain markdown, "[Click here](https://...)" in any of
+        // them became a real link in a mail that came from us.
+        Markdown::withSecuredEncoding();
 
         // SmartHR template is Bootstrap 5 — render pagination to match.
         Paginator::useBootstrapFive();

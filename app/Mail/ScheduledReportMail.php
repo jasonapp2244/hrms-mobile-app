@@ -14,8 +14,8 @@ use Illuminate\Queue\SerializesModels;
 /**
  * A scheduled report, delivered (A7.12).
  *
- * The file is built before the mail is constructed and passed in as raw bytes
- * rather than a path. A queued mailable is serialised and may be sent minutes
+ * The file is built before the mail is constructed and passed in as bytes
+ * rather than a path (held base64, see $fileBase64). A queued mailable is serialised and may be sent minutes
  * later on another process; a temporary file written by the command would not
  * reliably still be there, and writing the report into storage would leave
  * everybody's hours lying around on disk after the send.
@@ -27,6 +27,13 @@ use Illuminate\Queue\SerializesModels;
 class ScheduledReportMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
+
+    /**
+     * The attachment, base64. A queued job is stored as JSON, and a PDF or XLSX
+     * is not valid UTF-8 — kept raw, every scheduled report and every "Send
+     * now" failed at the moment it was queued, never reaching the worker.
+     */
+    protected string $fileBase64;
 
     /**
      * The period is `periodFrom`/`periodTo` rather than the obvious `from`/`to`:
@@ -42,14 +49,20 @@ class ScheduledReportMail extends Mailable implements ShouldQueue
         public string $periodTo,
         public array $tiles,
         public string $filename,
-        protected string $fileContents,
+        string $fileContents,
         protected string $mimeType,
-    ) {}
+    ) {
+        $this->fileBase64 = base64_encode($fileContents);
+    }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: sprintf('%s — %s to %s', $this->reportTitle, $this->periodFrom, $this->periodTo),
+            subject: __('notifications.scheduled_report.subject', [
+                'title' => $this->reportTitle,
+                'from'  => $this->periodFrom,
+                'to'    => $this->periodTo,
+            ]),
         );
     }
 
@@ -62,7 +75,7 @@ class ScheduledReportMail extends Mailable implements ShouldQueue
     public function attachments(): array
     {
         return [
-            Attachment::fromData(fn () => $this->fileContents, $this->filename)
+            Attachment::fromData(fn () => $this->attachmentBytes(), $this->filename)
                 ->withMime($this->mimeType),
         ];
     }
@@ -76,6 +89,6 @@ class ScheduledReportMail extends Mailable implements ShouldQueue
      */
     public function attachmentBytes(): string
     {
-        return $this->fileContents;
+        return base64_decode($this->fileBase64);
     }
 }

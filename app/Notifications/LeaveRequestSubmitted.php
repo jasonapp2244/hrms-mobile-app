@@ -67,8 +67,8 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
             ]),
             body: __('notifications.leave_submitted.push', [
                 'type' => $request->leaveType?->name,
-                'from' => $request->start_date->format('j M'),
-                'to'   => $request->end_date->format('j M'),
+                'from' => $request->start_date->translatedFormat('j M'),
+                'to'   => $request->end_date->translatedFormat('j M'),
             ]),
             data: [
                 'type'             => 'leave.submitted',
@@ -107,8 +107,8 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
             'body'         => __('notifications.leave_submitted.body', [
                 'days' => rtrim(rtrim(number_format((float) $request->days, 1), '0'), '.'),
                 'type' => $request->leaveType?->name,
-                'from' => $request->start_date->format('M j'),
-                'to'   => $request->end_date->format('M j, Y'),
+                'from' => $request->start_date->translatedFormat('M j'),
+                'to'   => $request->end_date->translatedFormat('M j, Y'),
             ]),
             'leave_request_id' => $request->id,
             'employee_id'      => $request->employee_id,
@@ -152,8 +152,8 @@ class LeaveRequestSubmitted extends Notification implements ShouldQueue
                 'type' => $request->leaveType?->name,
             ]))
             ->line(__('notifications.leave_submitted.dates', [
-                'from' => $request->start_date->format('D j M Y'),
-                'to'   => $request->end_date->format('D j M Y'),
+                'from' => $request->start_date->translatedFormat('D j M Y'),
+                'to'   => $request->end_date->translatedFormat('D j M Y'),
             ]))
             ->when((bool) $request->reason, fn (MailMessage $mail) => $mail->line(
                 __('notifications.leave_submitted.reason', ['reason' => $request->reason]),
