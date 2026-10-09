@@ -97,7 +97,7 @@ class ProfileController extends ApiController
         $addressChanged = $data['email'] !== $user->email;
         $wasEmail = $user->email;
 
-        $user->update($data);
+        $user->updateOwnContact($data);
 
         if ($addressChanged) {
             ActivityLog::record(

@@ -147,6 +147,43 @@ class ProfileApiTest extends TestCase
         $this->assertSame('ann.smith@acme.test', $this->user->fresh()->email);
     }
 
+    public function test_a_new_phone_number_reaches_the_employee_record(): void
+    {
+        // HR's register, the HR app and the directory all read the employee
+        // record's phone. Written only to the account, a corrected number was
+        // shown back to the person who typed it and to nobody else.
+        $this->putJson('/api/v1/profile', [
+            'name' => 'Ann Lee', 'email' => 'ann@acme.test', 'phone' => '555-0199',
+        ])->assertOk()->assertJsonPath('account.phone', '555-0199');
+
+        $this->assertSame('555-0199', $this->employee->fresh()->phone);
+    }
+
+    public function test_leaving_the_phone_out_does_not_wipe_the_employee_record(): void
+    {
+        $this->employee->update(['phone' => '555-0123']);
+
+        $this->putJson('/api/v1/profile', [
+            'name' => 'Ann Lee', 'email' => 'ann@acme.test',
+        ])->assertOk();
+
+        $this->assertSame('555-0123', $this->employee->fresh()->phone);
+    }
+
+    public function test_an_account_with_no_employee_record_can_still_change_its_phone(): void
+    {
+        $admin = User::create([
+            'name' => 'Ada Min', 'email' => 'admin@acme.test',
+            'password' => Hash::make('password'), 'company_id' => $this->company->id,
+        ]);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin);
+
+        $this->putJson('/api/v1/profile', [
+            'name' => 'Ada Min', 'email' => 'admin@acme.test', 'phone' => '555-0300',
+        ])->assertOk()->assertJsonPath('account.phone', '555-0300');
+    }
+
     public function test_an_address_already_in_use_is_rejected(): void
     {
         User::create([

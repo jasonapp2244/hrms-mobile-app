@@ -956,7 +956,9 @@ class AttendanceApiTest extends TestCase
         $this->assertSame(2, $totals['present_days']);
         $this->assertSame(1, $totals['late_days']);
         $this->assertSame(1, $totals['leave_days']);
-        $this->assertSame(2, $totals['absent_days']);   // the 6th and the 7th
+        // The 6th. The 7th is today and its shift runs until 17:00, so at noon
+        // it is `not_yet`, not an absence.
+        $this->assertSame(1, $totals['absent_days']);
         $this->assertSame(930, $totals['worked_minutes']);
     }
 

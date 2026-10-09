@@ -173,6 +173,22 @@ class ProfileAccessTest extends TestCase
         $this->assertTrue(Hash::check('CorrectHorse1', $user->fresh()->password));
     }
 
+    public function test_a_phone_changed_on_the_web_profile_reaches_the_employee_record(): void
+    {
+        $user = $this->userWith('employee');
+        $employee = \App\Models\Employee::create([
+            'company_id' => $this->company->id, 'user_id' => $user->id,
+            'employee_code' => 'E1', 'first_name' => 'Employee', 'last_name' => 'Person',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user)->put(route('profile.update'), [
+            'name' => $user->name, 'email' => $user->email, 'phone' => '555-0142',
+        ])->assertRedirect();
+
+        $this->assertSame('555-0142', $employee->fresh()->phone);
+    }
+
     public function test_a_manager_updating_their_profile_cannot_touch_anyone_else(): void
     {
         $manager = $this->userWith('manager');

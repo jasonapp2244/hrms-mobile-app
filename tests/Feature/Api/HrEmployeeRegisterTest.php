@@ -379,6 +379,33 @@ class HrEmployeeRegisterTest extends TestCase
             ->assertJsonPath('attendance.early_leave', 1);
     }
 
+    public function test_the_attendance_summary_counts_days_not_punches(): void
+    {
+        // In on time, out at lunch, back in after lunch, out at the end of the
+        // shift. The return after lunch was stamped late and the lunch exit
+        // early, and counting rows turned one ordinary day into a day that was
+        // on time, late and left early all at once — 5 on time plus 6 late out
+        // of 10 days worked on the live demo record.
+        $day = now()->subDay()->toDateString();
+
+        foreach ([['in', 'ontime'], ['out', 'early_leave'], ['in', 'late'], ['out', 'ontime']] as [$type, $status]) {
+            AttendanceLog::create([
+                'company_id' => $this->company->id, 'employee_id' => $this->staff->id,
+                'office_id' => $this->office->id, 'type' => $type, 'status' => $status,
+                'scanned_at' => now()->subDay(), 'work_date' => $day, 'source' => 'mobile',
+            ]);
+        }
+
+        Sanctum::actingAs($this->hr);
+
+        $this->getJson("/api/v1/hr/employees/{$this->staff->id}")
+            ->assertOk()
+            ->assertJsonPath('attendance.days_worked', 1)
+            ->assertJsonPath('attendance.on_time', 1)
+            ->assertJsonPath('attendance.late', 0)
+            ->assertJsonPath('attendance.early_leave', 0);
+    }
+
     public function test_one_persons_leave_history_is_its_own_request(): void
     {
         $type = LeaveType::create([

@@ -534,9 +534,10 @@ class HrEmployeeController extends ApiController
      * late, how often they left early. The detail is one tap away —
      * [attendance] answers the same window day by day.
      *
-     * Counted from `work_date`, never from `scanned_at` — a night shift's
-     * punches belong to the day the shift started, and counting by timestamp
-     * would split one shift across two days.
+     * Counted in **days**, off the same rows [attendance] lists — first in and
+     * last out of each work date. It used to count punches: somebody back from
+     * lunch has a second arrival, often stamped late, and one ordinary day
+     * came out as on time *and* late, with the lunch exit as an early leave.
      *
      * @return array<string, mixed>
      */
@@ -546,25 +547,16 @@ class HrEmployeeController extends ApiController
         $to = Carbon::now($timezone)->toDateString();
         $from = Carbon::now($timezone)->subDays(self::ATTENDANCE_WINDOW_DAYS - 1)->toDateString();
 
-        $logs = AttendanceLog::where('employee_id', $employee->id)
-            // forDates(), never whereBetween() — trap 1. `work_date` is a date
-            // cast, every engine but MySQL stores it as a midnight timestamp,
-            // and the string comparison drops the last day of every range. This
-            // is the fifth instance; the note said to assume there would be one.
-            ->forDates($from, $to)
-            ->get(['work_date', 'type', 'status']);
-
-        $arrivals = $logs->where('type', 'in');
+        $worked = $this->attendance->dayRows($employee, $from, $to)
+            ->where('status', 'present');
 
         return [
             'from'        => $from,
             'to'          => $to,
-            'days_worked' => $logs->pluck('work_date')->map(
-                fn ($date) => $date instanceof \DateTimeInterface ? $date->format('Y-m-d') : (string) $date,
-            )->unique()->count(),
-            'late'        => $arrivals->where('status', 'late')->count(),
-            'early_leave' => $logs->where('type', 'out')->where('status', 'early_leave')->count(),
-            'on_time'     => $arrivals->where('status', 'ontime')->count(),
+            'days_worked' => $worked->count(),
+            'late'        => $worked->where('late', true)->count(),
+            'early_leave' => $worked->where('early_leave', true)->count(),
+            'on_time'     => $worked->where('late', false)->count(),
         ];
     }
 }

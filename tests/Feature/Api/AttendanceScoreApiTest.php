@@ -440,6 +440,69 @@ class AttendanceScoreApiTest extends TestCase
         $this->assertSame(5, $body['score']['streak']);
     }
 
+    // ================= today, before it is over =================
+
+    /** The row the history endpoint prints for one date. */
+    protected function dayRow(string $from, string $to, string $date): array
+    {
+        return collect($this->getJson("/api/v1/attendance/history?from={$from}&to={$to}")
+            ->assertOk()
+            ->json('days'))
+            ->firstWhere('date', $date);
+    }
+
+    public function test_today_is_not_yet_absent_while_the_shift_is_still_running(): void
+    {
+        // Thursday, eleven in the morning, nobody has punched. The streak has
+        // always known today is not over; the row and the score did not, and
+        // printed "Absent" against a day the employee may still turn up for.
+        $this->travelTo(Carbon::parse('2026-08-06 11:00:00'));
+
+        $this->assertSame('not_yet', $this->dayRow('2026-08-03', '2026-08-06', '2026-08-06')['status']);
+    }
+
+    public function test_today_does_not_cost_the_score_before_the_shift_ends(): void
+    {
+        $this->arrived('2026-08-03');
+        $this->arrived('2026-08-04');
+        $this->arrived('2026-08-05');
+
+        $this->travelTo(Carbon::parse('2026-08-06 11:00:00'));
+
+        $score = $this->score('2026-08-03', '2026-08-06');
+
+        $this->assertSame(100, $score['score']);
+        $this->assertSame(3, $score['obliged_days']);
+    }
+
+    public function test_today_is_absent_once_the_shift_has_ended(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-06 17:30:00'));
+
+        $this->assertSame('absent', $this->dayRow('2026-08-03', '2026-08-06', '2026-08-06')['status']);
+    }
+
+    public function test_the_shift_end_is_read_in_the_companys_zone(): void
+    {
+        // 17:00 in New York is 21:00 UTC in August. At 20:00 UTC the shift
+        // still has an hour to run; reading the roster time as UTC would call
+        // it over three hours early.
+        $this->company->update(['timezone' => 'America/New_York']);
+
+        $this->travelTo(Carbon::parse('2026-08-06 20:00:00', 'UTC'));
+        $this->assertSame('not_yet', $this->dayRow('2026-08-03', '2026-08-06', '2026-08-06')['status']);
+
+        $this->travelTo(Carbon::parse('2026-08-06 21:30:00', 'UTC'));
+        $this->assertSame('absent', $this->dayRow('2026-08-03', '2026-08-06', '2026-08-06')['status']);
+    }
+
+    public function test_yesterday_without_a_punch_is_still_absent(): void
+    {
+        $this->travelTo(Carbon::parse('2026-08-06 11:00:00'));
+
+        $this->assertSame('absent', $this->dayRow('2026-08-03', '2026-08-06', '2026-08-05')['status']);
+    }
+
     // ================= the stored monthly row =================
 
     public function test_the_monthly_row_scores_the_same_way_the_api_does(): void

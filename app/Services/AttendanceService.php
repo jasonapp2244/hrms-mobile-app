@@ -619,16 +619,26 @@ class AttendanceService
 
             $shift = $employee->shiftOn($date);
 
+            $status = $this->dayStatus(
+                $dayLogs->isNotEmpty(),
+                isset($onLeave[$date]),
+                isset($holidays[$date]),
+                $daysOff->has($date),
+                isset($working[$date]),
+            );
+
+            // Absence is a verdict on a day that is over. Until the shift ends
+            // the employee may still turn up, and "absent" on this morning's
+            // row also cost them their score for it — the same reason
+            // onTimeStreak() skips today. A day with no shift runs to midnight.
+            if ($status === 'absent' && ! $this->dayIsOver($employee, $date)) {
+                $status = 'not_yet';
+            }
+
             $rows->push([
                 'date'    => $date,
                 'weekday' => $day->format('D'),
-                'status'  => $this->dayStatus(
-                    $dayLogs->isNotEmpty(),
-                    isset($onLeave[$date]),
-                    isset($holidays[$date]),
-                    $daysOff->has($date),
-                    isset($working[$date]),
-                ),
+                'status'  => $status,
                 'late'           => $firstIn?->status === 'late',
                 'early_leave'    => $lastOut?->status === 'early_leave',
                 'first_in'       => $firstIn?->scanned_at,
@@ -1195,6 +1205,18 @@ class AttendanceService
         $end = Carbon::parse($workDate . ' ' . $shift->end_time, $this->tzFor($employee));
 
         return $shift->crossesMidnight() ? $end->addDay() : $end;
+    }
+
+    /**
+     * Whether a work date has finished — its shift has ended, or, with no
+     * shift to measure against, the day itself has, in the company's zone.
+     */
+    public function dayIsOver(Employee $employee, string $workDate): bool
+    {
+        $end = $this->shiftEndFor($employee, $workDate)
+            ?? Carbon::parse($workDate, $this->tzFor($employee))->endOfDay();
+
+        return Carbon::now()->gte($end);
     }
 
     /**

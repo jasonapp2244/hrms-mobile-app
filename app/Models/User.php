@@ -13,6 +13,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
@@ -62,6 +63,25 @@ class User extends Authenticatable implements HasLocalePreference
     public function employee(): HasOne
     {
         return $this->hasOne(Employee::class);
+    }
+
+    /**
+     * Save the person's own name, sign-in address and phone.
+     *
+     * The phone is also written to their employee record, because that is the
+     * one HR's register, the HR app and the colleague directory read. Kept only
+     * on the account, a corrected number reached nobody but the person who typed
+     * it. A request that leaves the phone out leaves both copies alone.
+     */
+    public function updateOwnContact(array $data): void
+    {
+        DB::transaction(function () use ($data) {
+            $this->update($data);
+
+            if (array_key_exists('phone', $data)) {
+                $this->employee?->update(['phone' => $data['phone']]);
+            }
+        });
     }
 
     /** Handsets registered to receive push notifications. */
