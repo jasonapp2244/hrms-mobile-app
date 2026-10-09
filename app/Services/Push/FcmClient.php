@@ -4,6 +4,7 @@ namespace App\Services\Push;
 
 use App\Notifications\Messages\PushMessage;
 use Google\Auth\Credentials\ServiceAccountCredentials;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -56,21 +57,40 @@ class FcmClient
             return FcmResult::failed('Authentication with Firebase failed.');
         }
 
-        $response = Http::withToken($accessToken)
-            ->timeout((int) config('fcm.timeout'))
-            ->post(
-                sprintf(
-                    'https://fcm.googleapis.com/v1/projects/%s/messages:send',
-                    config('fcm.project_id'),
-                ),
-                ['message' => $this->payload($deviceToken, $message, $platform)],
-            );
+        try {
+            $response = Http::withToken($accessToken)
+                ->timeout((int) config('fcm.timeout'))
+                ->post(
+                    sprintf(
+                        'https://fcm.googleapis.com/v1/projects/%s/messages:send',
+                        config('fcm.project_id'),
+                    ),
+                    ['message' => $this->payload($deviceToken, $message, $platform)],
+                );
+        } catch (ConnectionException $e) {
+            // A timeout or a DNS hiccup says nothing about the handset. Thrown
+            // out of here it would fail the whole channel and resend to every
+            // handset that had already received it.
+            Log::warning('FCM: could not reach Google.', ['error' => $e->getMessage()]);
+
+            return FcmResult::transient('Could not reach Firebase.');
+        }
 
         if ($response->successful()) {
             return FcmResult::delivered();
         }
 
-        return $this->interpretFailure($response->status(), $response->json() ?? []);
+        if ($response->status() === 401) {
+            // The cached access token was revoked or expired early. Forget it so
+            // the retry mints a fresh one instead of failing the same way.
+            Cache::forget(self::TOKEN_CACHE_KEY);
+        }
+
+        return $this->interpretFailure(
+            $response->status(),
+            $response->json() ?? [],
+            $this->retryAfter($response->header('Retry-After')),
+        );
     }
 
     /**
@@ -120,31 +140,66 @@ class FcmClient
     }
 
     /**
-     * Turns FCM's error into either "try again later" or "this token is dead".
+     * Turns FCM's error into "try again later", "this token is dead", or neither.
      *
      * The distinction is the whole point: a 503 is Google having a bad minute
-     * and the job should retry, while UNREGISTERED means the app is gone from
-     * that handset and retrying forever would be the bug.
+     * and should be retried, while UNREGISTERED means the app is gone from that
+     * handset and retrying forever would be the bug.
+     *
+     * INVALID_ARGUMENT is the trap. FCM answers it for a malformed token, but
+     * also for a malformed *message* — a title over the size limit, a bad data
+     * key. Reading it as "dead token" would let one bad notification delete
+     * every handset it was addressed to, silently unsubscribing the whole
+     * company. It only counts as dead when FCM names the token as the field at
+     * fault.
      */
-    private function interpretFailure(int $status, array $body): FcmResult
+    private function interpretFailure(int $status, array $body, ?int $retryAfter = null): FcmResult
     {
-        $reason = $body['error']['details'][0]['errorCode']
+        $details = $body['error']['details'] ?? [];
+        $reason = collect($details)->pluck('errorCode')->filter()->first()
             ?? $body['error']['status']
             ?? 'UNKNOWN';
 
-        $deadToken = in_array($reason, ['UNREGISTERED', 'INVALID_ARGUMENT'], true)
+        $message = sprintf('FCM refused the message (%s).', $reason);
+
+        $badTokenField = collect($details)
+            ->flatMap(fn ($detail) => $detail['fieldViolations'] ?? [])
+            ->contains(fn ($violation) => ($violation['field'] ?? null) === 'message.token');
+
+        $deadToken = $reason === 'UNREGISTERED'
+            || ($reason === 'INVALID_ARGUMENT' && $badTokenField)
             // 404 is FCM's answer for a token it has never heard of.
             || $status === 404;
 
-        if (! $deadToken) {
-            Log::warning('FCM: delivery failed.', ['status' => $status, 'reason' => $reason]);
+        if ($deadToken) {
+            return new FcmResult(delivered: false, tokenIsDead: true, message: $message);
         }
 
-        return new FcmResult(
-            delivered: false,
-            tokenIsDead: $deadToken,
-            message: sprintf('FCM refused the message (%s).', $reason),
-        );
+        // Overloaded, rate-limited, or our access token went stale: the same
+        // request can succeed later.
+        // THIRD_PARTY_AUTH_ERROR also arrives as a 401, but it is Apple refusing
+        // our APNs key, which no amount of waiting fixes.
+        $retryable = $reason !== 'THIRD_PARTY_AUTH_ERROR'
+            && (in_array($status, [401, 429, 500, 502, 503, 504], true)
+                || in_array($reason, ['UNAVAILABLE', 'INTERNAL', 'QUOTA_EXCEEDED'], true));
+
+        if ($retryable) {
+            Log::warning('FCM: delivery failed, will retry.', ['status' => $status, 'reason' => $reason]);
+
+            return FcmResult::transient($message, $retryAfter);
+        }
+
+        // Anything else is ours to fix — a payload FCM will never accept, or a
+        // missing APNs key. Neither retrying nor forgetting the handset helps.
+        Log::error('FCM: message refused.', ['status' => $status, 'reason' => $reason, 'body' => $body]);
+
+        return FcmResult::failed($message);
+    }
+
+    /** Retry-After in seconds; FCM sends a number, never an HTTP date. */
+    private function retryAfter(?string $header): ?int
+    {
+        return is_numeric($header) ? max(0, (int) $header) : null;
     }
 
     /**

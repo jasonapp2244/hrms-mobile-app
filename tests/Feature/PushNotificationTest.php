@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\RetryPush;
 use App\Models\Company;
 use App\Models\PushDevice;
 use App\Models\User;
@@ -9,8 +10,10 @@ use App\Notifications\Channels\FcmChannel;
 use App\Notifications\Messages\PushMessage;
 use App\Services\Push\FcmClient;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Tests\TestCase;
 
 /**
@@ -189,6 +192,197 @@ class PushNotificationTest extends TestCase
         $this->assertDatabaseHas('push_devices', ['id' => $live->id]);
     }
 
+    public function test_a_malformed_message_does_not_delete_the_handset(): void
+    {
+        // INVALID_ARGUMENT is also FCM's answer to a bad payload. Read as "dead
+        // token", one malformed notification would unsubscribe every handset it
+        // was addressed to — the whole company, for an announcement.
+        $this->configurePush();
+        $device = $this->device('good-token');
+        Queue::fake();
+
+        Http::fake(['*' => Http::response(['error' => [
+            'status'  => 'INVALID_ARGUMENT',
+            'details' => [
+                ['@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError', 'errorCode' => 'INVALID_ARGUMENT'],
+                ['@type' => 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations' => [
+                    ['field' => 'message.notification.title', 'description' => 'Too long'],
+                ]],
+            ],
+        ]], 400)]);
+        $this->fakeAccessToken();
+
+        app(FcmChannel::class)->send($this->user, $this->pushNotification());
+
+        $this->assertDatabaseHas('push_devices', ['id' => $device->id]);
+        // Nor is it retried: the same payload would be refused the same way.
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_malformed_token_is_still_forgotten(): void
+    {
+        $this->configurePush();
+        $device = $this->device('not-a-real-token');
+
+        Http::fake(['*' => Http::response(['error' => [
+            'status'  => 'INVALID_ARGUMENT',
+            'details' => [
+                ['@type' => 'type.googleapis.com/google.firebase.fcm.v1.FcmError', 'errorCode' => 'INVALID_ARGUMENT'],
+                ['@type' => 'type.googleapis.com/google.rpc.BadRequest', 'fieldViolations' => [
+                    ['field' => 'message.token', 'description' => 'Invalid registration token'],
+                ]],
+            ],
+        ]], 400)]);
+        $this->fakeAccessToken();
+
+        app(FcmChannel::class)->send($this->user, $this->pushNotification());
+
+        $this->assertDatabaseMissing('push_devices', ['id' => $device->id]);
+    }
+
+    // ================= retrying =================
+
+    public function test_a_busy_google_gets_the_push_retried_later(): void
+    {
+        $this->configurePush();
+        $device = $this->device('good-token');
+        Queue::fake();
+
+        Http::fake(['*' => Http::response(['error' => ['status' => 'UNAVAILABLE']], 503)]);
+        $this->fakeAccessToken();
+
+        app(FcmChannel::class)->send($this->user, $this->pushNotification());
+
+        Queue::assertPushed(RetryPush::class, fn (RetryPush $job) => $job->device->is($device)
+            && $job->delay === RetryPush::BACKOFF[0]
+            && $job->message->title === 'Test');
+    }
+
+    public function test_the_retry_waits_as_long_as_google_asks(): void
+    {
+        $this->configurePush();
+        $this->device('good-token');
+        Queue::fake();
+
+        Http::fake(['*' => Http::response(
+            ['error' => ['status' => 'RESOURCE_EXHAUSTED', 'details' => [['errorCode' => 'QUOTA_EXCEEDED']]]],
+            429,
+            ['Retry-After' => '600'],
+        )]);
+        $this->fakeAccessToken();
+
+        app(FcmChannel::class)->send($this->user, $this->pushNotification());
+
+        Queue::assertPushed(RetryPush::class, fn (RetryPush $job) => $job->delay === 600);
+    }
+
+    public function test_only_the_handset_that_missed_it_is_retried(): void
+    {
+        // Failing the whole channel job instead would resend to the phone that
+        // already received it, once per retry.
+        $this->configurePush();
+        $this->device('phone-token');
+        $tablet = $this->device('tablet-token');
+        Queue::fake();
+
+        Http::fake(['*' => Http::sequence()
+            ->push(['name' => 'projects/hrms-test/messages/1'], 200)
+            ->push(['error' => ['status' => 'UNAVAILABLE']], 503)]);
+        $this->fakeAccessToken();
+
+        app(FcmChannel::class)->send($this->user, $this->pushNotification());
+
+        Queue::assertPushed(RetryPush::class, 1);
+        Queue::assertPushed(RetryPush::class, fn (RetryPush $job) => $job->device->is($tablet));
+    }
+
+    public function test_a_network_failure_is_retried_rather_than_thrown(): void
+    {
+        $this->configurePush();
+        $this->device('good-token');
+        Queue::fake();
+
+        Http::fake(fn () => throw new ConnectionException('cURL error 28: timed out'));
+        $this->fakeAccessToken();
+
+        app(FcmChannel::class)->send($this->user, $this->pushNotification());
+
+        Queue::assertPushed(RetryPush::class, 1);
+    }
+
+    public function test_a_rejected_access_token_is_forgotten_and_retried(): void
+    {
+        $this->configurePush();
+        $this->device('good-token');
+        Queue::fake();
+
+        Http::fake(['*' => Http::response(['error' => ['status' => 'UNAUTHENTICATED']], 401)]);
+        $this->fakeAccessToken();
+
+        app(FcmChannel::class)->send($this->user, $this->pushNotification());
+
+        $this->assertFalse(cache()->has('fcm.access_token'));
+        Queue::assertPushed(RetryPush::class, 1);
+    }
+
+    public function test_a_retry_that_lands_is_done(): void
+    {
+        $this->configurePush();
+        $device = $this->device('good-token');
+        Http::fake(['*' => Http::response(['name' => 'projects/hrms-test/messages/1'], 200)]);
+        $this->fakeAccessToken();
+
+        $job = $this->retryJob($device, attempts: 1);
+        $job->handle(app(FcmClient::class));
+
+        $job->assertNotReleased();
+        $job->assertNotFailed();
+        Http::assertSentCount(1);
+    }
+
+    public function test_a_retry_that_meets_google_busy_again_waits_longer(): void
+    {
+        $this->configurePush();
+        $device = $this->device('good-token');
+        Http::fake(['*' => Http::response(['error' => ['status' => 'UNAVAILABLE']], 503)]);
+        $this->fakeAccessToken();
+
+        $job = $this->retryJob($device, attempts: 1);
+        $job->handle(app(FcmClient::class));
+
+        $job->assertReleased(RetryPush::BACKOFF[1]);
+    }
+
+    public function test_a_retry_that_never_lands_ends_in_failed_jobs(): void
+    {
+        // Not silently dropped: an operator can `queue:retry` it once Google is back.
+        $this->configurePush();
+        $device = $this->device('good-token');
+        Http::fake(['*' => Http::response(['error' => ['status' => 'UNAVAILABLE']], 503)]);
+        $this->fakeAccessToken();
+
+        $job = $this->retryJob($device, attempts: 3);
+        $job->handle(app(FcmClient::class));
+
+        $job->assertFailed();
+        $job->assertNotReleased();
+    }
+
+    public function test_a_retry_that_finds_the_app_gone_forgets_the_handset(): void
+    {
+        $this->configurePush();
+        $device = $this->device('stale-token');
+        Http::fake(['*' => Http::response(['error' => ['details' => [['errorCode' => 'UNREGISTERED']]]], 404)]);
+        $this->fakeAccessToken();
+
+        $job = $this->retryJob($device, attempts: 1);
+        $job->handle(app(FcmClient::class));
+
+        $this->assertDatabaseMissing('push_devices', ['id' => $device->id]);
+        $job->assertNotReleased();
+        $job->assertNotFailed();
+    }
+
     // ================= the message =================
 
     public function test_data_values_are_strings_because_fcm_rejects_anything_else(): void
@@ -292,6 +486,16 @@ class PushNotificationTest extends TestCase
         // Skips the real OAuth exchange; the token cache is what the client
         // reads before building a request.
         cache()->put('fcm.access_token', 'test-access-token', 60);
+    }
+
+    /** A RetryPush as the worker would hand it over on its Nth attempt. */
+    protected function retryJob(PushDevice $device, int $attempts): RetryPush
+    {
+        $job = (new RetryPush($device, new PushMessage(title: 'Test', body: 'Body')))
+            ->withFakeQueueInteractions();
+        $job->job->attempts = $attempts;
+
+        return $job;
     }
 
     protected function pushNotification(): Notification

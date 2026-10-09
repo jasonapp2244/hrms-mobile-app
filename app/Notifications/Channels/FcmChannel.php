@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Channels;
 
+use App\Jobs\RetryPush;
 use App\Models\PushDevice;
 use App\Services\Push\FcmClient;
 use Illuminate\Notifications\Notification;
@@ -46,6 +47,10 @@ class FcmChannel
 
             if ($result->tokenIsDead) {
                 $dead[] = $device->id;
+            } elseif ($result->retryable) {
+                // Only this handset is tried again; the others already have it.
+                RetryPush::dispatch($device, $message)
+                    ->delay(RetryPush::delayFor(1, $result->retryAfter));
             }
         }
 
