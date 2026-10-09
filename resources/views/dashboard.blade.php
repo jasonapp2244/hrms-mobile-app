@@ -56,6 +56,9 @@
 	.dash-date-box { width: 46px; min-width: 46px; text-align: center; border-radius: 8px; line-height: 1.1; padding: 6px 0; }
 	.dash-legend i { font-size: 10px; }
 	.dash-scroll { max-height: 360px; overflow: auto; }
+	/* Widgets can be switched off, so a row can end half-full. The panels on a
+	   short row widen to fill it rather than leaving a blank block beside them. */
+	.dash-fill > [class*="col"] { flex-grow: 1; }
 	.min-w-0 { min-width: 0; }
 </style>
 @endpush
@@ -199,7 +202,7 @@
 </div>
 @endif
 
-<div class="row">
+<div class="row dash-fill">
 
 	{{-- Today's attendance --}}
 	@if($has('attendance_donut'))

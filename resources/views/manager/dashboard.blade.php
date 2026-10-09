@@ -1,6 +1,15 @@
 @extends('layouts.app', ['sidebarPartial' => 'layouts.partials.manager-sidebar'])
 @section('title', 'Team Dashboard')
 
+@push('styles')
+<style>
+	/* Five tiles take ten of twelve columns, and panels can be missing for a
+	   manager without the permission; a short row widens to fill instead of
+	   leaving a blank block on the right. */
+	.dash-fill > [class*="col"] { flex-grow: 1; }
+</style>
+@endpush
+
 @section('content')
 <div class="d-md-flex d-block align-items-center justify-content-between page-breadcrumb mb-3">
 	<div class="my-auto mb-2">
@@ -45,7 +54,7 @@
 	];
 @endphp
 
-<div class="row">
+<div class="row dash-fill">
 	@foreach($tiles as $tile)
 	<div class="col-xl-2 col-md-4 col-6 mb-3">
 		<div class="card h-100">
@@ -59,7 +68,7 @@
 	@endforeach
 </div>
 
-<div class="row">
+<div class="row dash-fill">
 	{{-- Waiting on this manager. First, because it is the only panel about
 		 something they have to do rather than something to know. --}}
 	<div class="col-xl-6 mb-3">
@@ -161,7 +170,7 @@
 	</div>
 </div>
 
-<div class="row">
+<div class="row dash-fill">
 	<div class="col-xl-7 mb-3">
 		<div class="card h-100">
 			<div class="card-header d-flex align-items-center justify-content-between">
