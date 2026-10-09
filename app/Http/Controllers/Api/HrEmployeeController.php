@@ -82,7 +82,7 @@ class HrEmployeeController extends ApiController
 
         // The same period vocabulary the detail view speaks, so one control in
         // the app drives both. The company's zone, not the caller's: a register
-        // read from a phone in Karachi still reports the employer's month.
+        // read from a phone on another timezone still reports the employer's month.
         [$period, $from, $to, $today] = $this->attendanceWindow(
             $request,
             $request->user()?->company?->tz() ?? config('app.timezone'),

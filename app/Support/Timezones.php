@@ -6,16 +6,18 @@ use DateTimeImmutable;
 use DateTimeZone;
 
 /**
- * The timezones a company can be set to, US first.
+ * The timezones a company can be set to: the United States only.
  *
  * The company's zone decides what "09:00" means for every shift, what "today"
  * is for every report, and what the phone shows for every punch, so it has to
  * be easy to get right. It used to be a free-text box that wanted an exact IANA
  * identifier typed in — "America/New_York" — with nothing to say what that was.
  *
- * The client is in the United States, so the US zones come first and by the
- * names people use for them. Every other identifier stays available below
- * them: a company with a branch abroad is still a company this has to serve.
+ * The client is in the United States and so is every office, so the list is
+ * the US zones, by the names people use for them, and nothing else. Offering
+ * the whole world put a zone on another continent one mis-scroll away from re-timing every
+ * shift. A company already saved on some other zone keeps it on the form,
+ * under its own heading, so opening the page and saving it changes nothing.
  */
 class Timezones
 {
@@ -41,29 +43,33 @@ class Timezones
         'America/Puerto_Rico' => 'Atlantic Time — Puerto Rico',
     ];
 
+    /** Whether a zone is one the company form offers. */
+    public static function isUs(?string $id): bool
+    {
+        return $id !== null && isset(self::US[$id]);
+    }
+
     /**
-     * Options for a select: ['United States' => [id => label], 'All timezones' => [...]].
+     * Options for a select: ['United States' => [id => label]], plus
+     * ['Current setting' => [...]] when $current is a real zone outside the US.
      *
      * Labels carry today's offset — "(UTC−04:00) Eastern Time" — so daylight
      * saving shows up as the number changing rather than as a surprise.
      */
-    public static function grouped(?DateTimeImmutable $at = null): array
+    public static function grouped(?DateTimeImmutable $at = null, ?string $current = null): array
     {
         $at ??= new DateTimeImmutable('now');
 
-        $us = [];
+        $groups = ['United States' => []];
         foreach (self::US as $id => $name) {
-            $us[$id] = self::offset($id, $at) . ' ' . $name;
+            $groups['United States'][$id] = self::offset($id, $at) . ' ' . $name;
         }
 
-        $all = [];
-        foreach (DateTimeZone::listIdentifiers() as $id) {
-            if (! isset(self::US[$id])) {
-                $all[$id] = self::offset($id, $at) . ' ' . str_replace('_', ' ', $id);
-            }
+        if ($current && ! self::isUs($current) && in_array($current, DateTimeZone::listIdentifiers(), true)) {
+            $groups['Current setting'] = [$current => self::offset($current, $at) . ' ' . str_replace('_', ' ', $current)];
         }
 
-        return ['United States' => $us, 'All timezones' => $all];
+        return $groups;
     }
 
     /** "(UTC−04:00)", with a real minus sign, for the given moment. */

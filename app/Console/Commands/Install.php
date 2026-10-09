@@ -35,8 +35,8 @@ class Install extends Command
     protected $signature = 'emp:install
                             {--company= : Company name}
                             {--company-id= : Attach the administrator to this existing company instead of creating one}
-                            {--timezone= : IANA timezone, e.g. America/New_York}
-                            {--currency=USD : ISO currency code}
+                            {--timezone= : US timezone, e.g. America/New_York}
+                            {--currency=USD : ISO currency code (USD only)}
                             {--name= : The administrator\'s full name}
                             {--email= : The administrator\'s email address}
                             {--password= : The administrator\'s password (prompted for if omitted)}
@@ -63,6 +63,12 @@ class Install extends Command
         $company  = $existing?->name ?? $this->given('company', 'Company name');
         $timezone = $existing?->timezone ?? $this->askTimezone();
         $currency = $existing?->currency ?? strtoupper((string) ($this->option('currency') ?: 'USD'));
+
+        if (! $existing && $currency !== 'USD') {
+            $this->error("  Currency '{$currency}' is not offered. Companies are set up in USD.");
+
+            return self::FAILURE;
+        }
 
         $this->line('');
         $this->line('  <fg=gray>Now the administrator account — the one that can reach every page.</>');
@@ -239,13 +245,12 @@ class Install extends Command
     }
 
     /**
-     * The setting most worth getting right, so it is not accepted until it is a
-     * real identifier. A typo here does not error — it silently falls back to
-     * UTC and mismarks every shift from then on.
+     * The setting most worth getting right, so it is not accepted until it is
+     * one of the US zones the company form offers. A typo here does not error
+     * — it silently falls back to UTC and mismarks every shift from then on.
      */
     protected function askTimezone(): string
     {
-        $valid = timezone_identifiers_list();
         $given = $this->option('timezone');
 
         while (true) {
@@ -253,11 +258,11 @@ class Install extends Command
             // UTC is five hours off every shift they will set.
             $timezone = $given ?: $this->ask('Company timezone (this decides what "09:00" means)', Timezones::DEFAULT);
 
-            if (in_array($timezone, $valid, true)) {
+            if (Timezones::isUs($timezone)) {
                 return $timezone;
             }
 
-            $this->error("  '{$timezone}' is not an IANA timezone. US: America/New_York, America/Chicago, America/Denver, America/Phoenix, America/Los_Angeles. Elsewhere: Europe/London, Asia/Karachi");
+            $this->error("  '{$timezone}' is not a US timezone. Use one of: " . implode(', ', array_keys(Timezones::US)));
 
             if ($given) {
                 // Given on the command line and wrong. Looping on the same bad

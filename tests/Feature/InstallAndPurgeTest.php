@@ -60,8 +60,8 @@ class InstallAndPurgeTest extends TestCase
     {
         $this->artisan('emp:install', [
             '--company'  => 'Real Company Ltd',
-            '--timezone' => 'Asia/Karachi',
-            '--currency' => 'PKR',
+            '--timezone' => 'America/Los_Angeles',
+            '--currency' => 'USD',
             '--name'     => 'Tauseef Aslam',
             '--email'    => 'boss@realcompany.com',
             '--password' => 'a-real-password',
@@ -71,7 +71,7 @@ class InstallAndPurgeTest extends TestCase
 
         $company = Company::firstWhere('name', 'Real Company Ltd');
         $this->assertNotNull($company);
-        $this->assertSame('Asia/Karachi', $company->timezone);
+        $this->assertSame('America/Los_Angeles', $company->timezone);
 
         $user = User::firstWhere('email', 'boss@realcompany.com');
         $this->assertNotNull($user);
@@ -107,7 +107,7 @@ class InstallAndPurgeTest extends TestCase
         // The state a purge leaves behind, and the one most likely to be got
         // wrong: staff already here, but nobody who can administer them.
         $company = Company::create([
-            'name' => 'Real Company Ltd', 'timezone' => 'Asia/Karachi', 'currency' => 'PKR',
+            'name' => 'Real Company Ltd', 'timezone' => 'America/Los_Angeles', 'currency' => 'USD',
         ]);
 
         $this->artisan('emp:install', [
@@ -128,8 +128,8 @@ class InstallAndPurgeTest extends TestCase
         // Untouched. These decide what "09:00" means for everyone already here,
         // so adding a user must not restate them.
         $company->refresh();
-        $this->assertSame('Asia/Karachi', $company->timezone);
-        $this->assertSame('PKR', $company->currency);
+        $this->assertSame('America/Los_Angeles', $company->timezone);
+        $this->assertSame('USD', $company->currency);
     }
 
     public function test_install_refuses_an_unknown_company_id(): void
@@ -153,7 +153,7 @@ class InstallAndPurgeTest extends TestCase
         $this->artisan('emp:install', [
             '--force'    => true,
             '--company'  => 'Second One',
-            '--timezone' => 'Europe/London',
+            '--timezone' => 'America/Denver',
             '--name'     => 'Someone',
             '--email'    => 'someone@example.com',
             '--password' => 'a-real-password',
@@ -168,7 +168,7 @@ class InstallAndPurgeTest extends TestCase
     {
         $this->artisan('emp:install', [
             '--company'  => 'Real Company Ltd',
-            '--timezone' => 'UTC',
+            '--timezone' => 'America/New_York',
             '--name'     => 'Tauseef Aslam',
             '--email'    => 'boss@realcompany.com',
             '--password' => 'a-real-password',
@@ -186,17 +186,50 @@ class InstallAndPurgeTest extends TestCase
         // whole workforce late every morning, which is why it is validated.
         $this->artisan('emp:install', [
             '--company'  => 'Real Company Ltd',
-            '--timezone' => 'Asia/Karachee',
+            '--timezone' => 'America/Los_Angles',
             '--name'     => 'Tauseef Aslam',
             '--email'    => 'boss@realcompany.com',
             '--password' => 'a-real-password',
         ])
-            ->expectsOutputToContain('is not an IANA timezone')
-            ->expectsQuestion('Company timezone (this decides what "09:00" means)', 'Asia/Karachi')
+            ->expectsOutputToContain('is not a US timezone')
+            ->expectsQuestion('Company timezone (this decides what "09:00" means)', 'America/Los_Angeles')
             ->expectsConfirmation('Create these?', 'yes')
             ->assertSuccessful();
 
-        $this->assertSame('Asia/Karachi', Company::first()->timezone);
+        $this->assertSame('America/Los_Angeles', Company::first()->timezone);
+    }
+
+    public function test_install_offers_only_us_timezones(): void
+    {
+        $this->artisan('emp:install', [
+            '--company'  => 'Real Company Ltd',
+            '--timezone' => 'Europe/London',
+            '--name'     => 'Tauseef Aslam',
+            '--email'    => 'boss@realcompany.com',
+            '--password' => 'a-real-password',
+        ])
+            ->expectsOutputToContain('is not a US timezone')
+            ->expectsQuestion('Company timezone (this decides what "09:00" means)', 'America/Chicago')
+            ->expectsConfirmation('Create these?', 'yes')
+            ->assertSuccessful();
+
+        $this->assertSame('America/Chicago', Company::first()->timezone);
+    }
+
+    public function test_install_refuses_a_currency_other_than_dollars(): void
+    {
+        $this->artisan('emp:install', [
+            '--company'  => 'Real Company Ltd',
+            '--timezone' => 'America/New_York',
+            '--currency' => 'EUR',
+            '--name'     => 'Tauseef Aslam',
+            '--email'    => 'boss@realcompany.com',
+            '--password' => 'a-real-password',
+        ])
+            ->expectsOutputToContain('Companies are set up in USD')
+            ->assertFailed();
+
+        $this->assertSame(0, Company::count());
     }
 
     // -------------------------------------------------------------------------

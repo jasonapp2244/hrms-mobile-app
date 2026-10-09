@@ -635,8 +635,8 @@ default. Not left as a local test result.*
 over `adb reverse tcp:8000 tcp:8000` so the handset's own `localhost` reaches
 the development machine down the USB cable. Worth recording because an emulator
 cannot answer the question this did: the punch stored `device_emulator=0`
-alongside `location_mocked=0` and `device_rooted=0`, and a real GPS fix in
-Karachi. Those three flags are the anti-tamper checks, and on an emulator the
+alongside `location_mocked=0` and `device_rooted=0`, and a real GPS fix from
+the developer's handset. Those three flags are the anti-tamper checks, and on an emulator the
 first of them reads `1`.
 
 **No application code was changed.** Every defect found was in the seeded data,

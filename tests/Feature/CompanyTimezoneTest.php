@@ -43,13 +43,18 @@ class CompanyTimezoneTest extends TestCase
         $this->admin->assignRole('admin');
     }
 
-    public function test_the_page_offers_a_list_with_the_us_first_and_the_saved_zone_chosen(): void
+    public function test_the_page_offers_only_us_zones_with_the_saved_one_chosen(): void
     {
         $page = $this->actingAs($this->admin)->get(route('company.index'))->assertOk();
 
         $page->assertSee('<select name="timezone"', false)
             ->assertDontSee('<input type="text" name="timezone"', false)
-            ->assertSeeInOrder(['United States', 'Eastern Time', 'Central Time', 'Pacific Time', 'All timezones'])
+            ->assertSeeInOrder(['United States', 'Eastern Time', 'Central Time', 'Pacific Time'])
+            ->assertDontSee('All timezones')
+            ->assertDontSee('Asia/', false)
+            ->assertDontSee('Europe/', false)
+            ->assertSee('<option value="USD" selected', false)
+            ->assertDontSee('<option value="EUR"', false)
             ->assertSee('<option value="America/New_York" selected', false)
             ->assertSee('Local time there now');
     }
@@ -76,13 +81,38 @@ class CompanyTimezoneTest extends TestCase
             ->assertJsonPath('user.company.timezone', 'America/Los_Angeles');
     }
 
-    public function test_a_zone_outside_the_us_is_still_accepted(): void
+    public function test_a_zone_outside_the_us_is_refused(): void
     {
         $this->actingAs($this->admin)->put(route('company.update'), [
             'name' => 'Acme', 'timezone' => 'Europe/London', 'currency' => 'USD',
-        ])->assertRedirect();
+        ])->assertSessionHasErrors('timezone');
 
-        $this->assertSame('Europe/London', $this->company->fresh()->timezone);
+        $this->assertSame('America/New_York', $this->company->fresh()->timezone);
+    }
+
+    public function test_a_currency_other_than_dollars_is_refused(): void
+    {
+        $this->actingAs($this->admin)->put(route('company.update'), [
+            'name' => 'Acme', 'timezone' => 'America/New_York', 'currency' => 'EUR',
+        ])->assertSessionHasErrors('currency');
+    }
+
+    public function test_a_company_already_on_another_zone_can_still_save_unchanged(): void
+    {
+        // Set before this rule existed. Saving the form for an unrelated edit
+        // must not be refused, nor quietly move every shift to Eastern.
+        $this->company->update(['timezone' => 'Europe/London', 'currency' => 'GBP']);
+
+        $this->actingAs($this->admin)->get(route('company.index'))
+            ->assertSee('Current setting')
+            ->assertSee('<option value="Europe/London" selected', false)
+            ->assertSee('<option value="GBP" selected', false);
+
+        $this->actingAs($this->admin)->put(route('company.update'), [
+            'name' => 'Acme Renamed', 'timezone' => 'Europe/London', 'currency' => 'GBP',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Acme Renamed', $this->company->fresh()->name);
     }
 
     public function test_a_made_up_zone_is_refused(): void
@@ -94,13 +124,12 @@ class CompanyTimezoneTest extends TestCase
         $this->assertSame('America/New_York', $this->company->fresh()->timezone);
     }
 
-    public function test_the_list_names_the_us_zones_first_and_is_honest_about_arizona(): void
+    public function test_the_list_is_the_us_zones_and_is_honest_about_arizona(): void
     {
         $groups = Timezones::grouped(new DateTimeImmutable('2026-07-01 12:00:00 UTC'));
 
-        $this->assertSame(['United States', 'All timezones'], array_keys($groups));
+        $this->assertSame(['United States'], array_keys($groups));
         $this->assertSame('America/New_York', array_key_first($groups['United States']));
-        $this->assertArrayNotHasKey('America/New_York', $groups['All timezones']);
 
         // Every US entry is a real identifier, or the page would offer a zone
         // the validator then refuses.

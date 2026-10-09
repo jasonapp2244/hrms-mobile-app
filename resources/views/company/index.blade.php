@@ -53,12 +53,12 @@
         </div>
         <div class="col-md-6">
           <label class="form-label" for="company-timezone">Timezone <span class="text-danger">*</span></label>
-          {{-- US zones first, by name; every other zone below. This decides
+          {{-- US zones only, by name (a non-US zone already saved stays listed). This decides
                what "09:00" means for every shift, what "today" is for every
                report, and the time printed on every punch, web and phone. --}}
           @php $selectedTz = old('timezone', $company->timezone ?: \App\Support\Timezones::DEFAULT); @endphp
           <select name="timezone" id="company-timezone" class="form-select" required>
-            @foreach(\App\Support\Timezones::grouped() as $group => $zones)
+            @foreach(\App\Support\Timezones::grouped(current: $company->timezone) as $group => $zones)
               <optgroup label="{{ $group }}">
                 @foreach($zones as $id => $label)
                   <option value="{{ $id }}" @selected($selectedTz === $id)>{{ $label }}</option>
@@ -75,7 +75,7 @@
           <label class="form-label">Currency <span class="text-danger">*</span></label>
           @php $selectedCurrency = old('currency', $company->currency ?? 'USD'); @endphp
           <select name="currency" class="form-select" required>
-            @foreach(['USD' => 'US Dollar ($)', 'EUR' => 'Euro (€)', 'GBP' => 'British Pound (£)', 'CAD' => 'Canadian Dollar (C$)', 'AUD' => 'Australian Dollar (A$)'] as $code => $label)
+            @foreach(\App\Http\Controllers\CompanyController::currencies($company->currency) as $code => $label)
               <option value="{{ $code }}" @selected($selectedCurrency === $code)>{{ $label }}</option>
             @endforeach
           </select>
