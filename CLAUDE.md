@@ -1200,8 +1200,9 @@ one failure is not a code change. As of 2026-09-17:
   tested, and all go nowhere until this is set.
 - Warnings: `APP_ENV=staging` (deliberate — setting it to `production` would
   switch preflight from advisory to blocking and then fail the deploy on
-  `MAIL_MAILER`), the mail from address, and push disabled until a Firebase
-  project exists.
+  `MAIL_MAILER`), and the mail from address. Push is **on**: FCM was configured
+  on 2026-09-28 (Firebase project `kemp-805c6`, key under
+  `storage/app/firebase/`) and a push was seen arriving on a handset.
 
 **All three of the original failures are closed**, and two of them closed
 without anybody doing it in a deploy — the note here had simply outlived them:
@@ -1210,6 +1211,12 @@ without anybody doing it in a deploy — the note here had simply outlived them:
   already started passing on its own: no account carries the seeded password
   any more, so by the time the panel came down it was publishing addresses that
   did not work. Both were true before anyone re-read this paragraph.
+  **That stopped being true later:** on 2026-10-10 seven demo accounts were
+  found signing in with `password` again on the live box (a later re-seed reset
+  them). They were rotated, then — at the client's request, for the demo — set
+  to first-name + `12345` (`james12345`, `hr12345`, `admin12345`…). Preflight
+  passes, because it only looks for the literal `password`; those are still
+  guessable, and must be replaced before real staff use the system.
 - **`TRUSTED_PROXIES` reads `127.0.0.1`, and the effect is proven rather than
   assumed.** It had been recorded here as unset; it is set, and after trap 36 it
   is also actually *read*. Varnish is on the loopback, so `127.0.0.1` is right
